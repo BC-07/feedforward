@@ -48,6 +48,9 @@ interface Feedback {
   updatedAt: string;
   response?: string;
   userId: string;
+  isAnonymous?: boolean;
+  submittedBy?: string;
+  userName?: string;
 }
 
 export default function UserProfile() {
@@ -56,7 +59,9 @@ export default function UserProfile() {
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [searchTrackingId, setSearchTrackingId] = useState("");
-  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
+  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
+    null,
+  );
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [formData, setFormData] = useState({
     type: "",
@@ -88,7 +93,9 @@ export default function UserProfile() {
 
   const loadUserFeedbacks = (userId: string) => {
     const allFeedbacks = JSON.parse(localStorage.getItem("feedbacks") || "[]");
-    const userFeedbacks = allFeedbacks.filter((f: Feedback) => f.userId === userId);
+    const userFeedbacks = allFeedbacks.filter(
+      (f: Feedback) => f.userId === userId,
+    );
     setFeedbacks(userFeedbacks);
   };
 
@@ -129,15 +136,24 @@ export default function UserProfile() {
     const allFeedbacks = JSON.parse(localStorage.getItem("feedbacks") || "[]");
     const newFeedback = {
       id: newTrackingId,
-      ...formData,
+      type: formData.type,
+      // FIX: ensure category is saved exactly as selected, trimmed
+      category: formData.category.trim(),
+      subject: formData.subject,
+      message: formData.message,
       status: "Pending",
       priority: "Medium",
       isAnonymous,
       userId: currentUser.id,
+      userName: currentUser.fullName,
       submittedBy: isAnonymous ? "Anonymous" : currentUser.fullName,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
+    console.log(
+      "[UserDashboard] Saving feedback:",
+      JSON.stringify(newFeedback),
+    );
     allFeedbacks.push(newFeedback);
     localStorage.setItem("feedbacks", JSON.stringify(allFeedbacks));
 
@@ -147,9 +163,13 @@ export default function UserProfile() {
     setFormData({ type: "", category: "", subject: "", message: "" });
   };
 
+  // FIX: search ALL feedbacks in localStorage, not just the user's own list
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    const found = feedbacks.find((f) => f.id === searchTrackingId.trim());
+    const allFeedbacks = JSON.parse(localStorage.getItem("feedbacks") || "[]");
+    const found = allFeedbacks.find(
+      (f: Feedback) => f.id === searchTrackingId.trim(),
+    );
     if (found) {
       setSelectedFeedback(found);
       toast.success("Feedback found!");
@@ -159,24 +179,44 @@ export default function UserProfile() {
     }
   };
 
+  // FIX: reload from localStorage when viewing selected feedback to get latest admin updates
+  const handleViewFeedback = (feedback: Feedback) => {
+    const allFeedbacks = JSON.parse(localStorage.getItem("feedbacks") || "[]");
+    const latest =
+      allFeedbacks.find((f: Feedback) => f.id === feedback.id) || feedback;
+    setSelectedFeedback(latest);
+    setSearchTrackingId(latest.id);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
-      case "pending": return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20";
-      case "under review": return "bg-blue-500/10 text-blue-700 border-blue-500/20";
-      case "in progress": return "bg-purple-500/10 text-purple-700 border-purple-500/20";
-      case "resolved": return "bg-green-500/10 text-green-700 border-green-500/20";
-      case "closed": return "bg-gray-500/10 text-gray-700 border-gray-500/20";
-      default: return "bg-gray-500/10 text-gray-700 border-gray-500/20";
+      case "pending":
+        return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20";
+      case "under review":
+        return "bg-blue-500/10 text-blue-700 border-blue-500/20";
+      case "in progress":
+        return "bg-purple-500/10 text-purple-700 border-purple-500/20";
+      case "resolved":
+        return "bg-green-500/10 text-green-700 border-green-500/20";
+      case "closed":
+        return "bg-gray-500/10 text-gray-700 border-gray-500/20";
+      default:
+        return "bg-gray-500/10 text-gray-700 border-gray-500/20";
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority.toLowerCase()) {
-      case "low": return "text-gray-600";
-      case "medium": return "text-yellow-600";
-      case "high": return "text-orange-600";
-      case "urgent": return "text-red-600";
-      default: return "text-gray-600";
+      case "low":
+        return "text-gray-600";
+      case "medium":
+        return "text-yellow-600";
+      case "high":
+        return "text-orange-600";
+      case "urgent":
+        return "text-red-600";
+      default:
+        return "text-gray-600";
     }
   };
 
@@ -192,25 +232,48 @@ export default function UserProfile() {
 
   const getStatusMessage = (status: string) => {
     switch (status.toLowerCase()) {
-      case "pending": return "Your feedback has been received and is awaiting review.";
-      case "under review": return "Your feedback is being assessed by our team.";
-      case "in progress": return "We are actively working on addressing your feedback.";
-      case "resolved": return "Your feedback has been addressed and resolved.";
-      case "closed": return "This feedback has been closed.";
-      default: return "Your feedback is being processed.";
+      case "pending":
+        return "Your feedback has been received and is awaiting review.";
+      case "under review":
+        return "Your feedback is being assessed by our team.";
+      case "in progress":
+        return "We are actively working on addressing your feedback.";
+      case "resolved":
+        return "Your feedback has been addressed and resolved.";
+      case "closed":
+        return "This feedback has been closed.";
+      default:
+        return "Your feedback is being processed.";
     }
   };
 
   const getStatusSteps = (currentStatus: string) => {
     const steps = [
       { name: "Submitted", description: "", completed: true },
-      { name: "Under Review", description: "Being assessed by our team", completed: false },
-      { name: "In Progress", description: "Actions being taken", completed: false },
+      {
+        name: "Under Review",
+        description: "Being assessed by our team",
+        completed: false,
+      },
+      {
+        name: "In Progress",
+        description: "Actions being taken",
+        completed: false,
+      },
       { name: "Resolved", description: "Issue addressed", completed: false },
     ];
-    const statusOrder = ["pending", "under review", "in progress", "resolved", "closed"];
+    const statusOrder = [
+      "pending",
+      "under review",
+      "in progress",
+      "resolved",
+      "closed",
+    ];
     const currentIndex = statusOrder.indexOf(currentStatus.toLowerCase());
-    return steps.map((step, index) => ({ ...step, completed: index <= currentIndex }));
+    return steps.map((step, index) => ({
+      ...step,
+      completed: index <= currentIndex,
+    }));
   };
 
   if (trackingId) {
@@ -221,7 +284,9 @@ export default function UserProfile() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold">User Dashboard</h1>
-                <p className="text-accent-foreground/80 mt-1">Welcome, {currentUser?.fullName}</p>
+                <p className="text-accent-foreground/80 mt-1">
+                  Welcome, {currentUser?.fullName}
+                </p>
               </div>
               <Button variant="secondary" onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
@@ -238,18 +303,29 @@ export default function UserProfile() {
                   <ArrowRight className="h-8 w-8 text-accent" />
                 </div>
                 <CardTitle>Feedback Submitted!</CardTitle>
-                <CardDescription>Your feedback has been received successfully</CardDescription>
+                <CardDescription>
+                  Your feedback has been received successfully
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="bg-muted rounded-lg p-4 text-center">
-                  <p className="text-sm text-muted-foreground mb-2">Your Tracking ID</p>
-                  <p className="text-2xl font-bold text-primary">{trackingId}</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Your Tracking ID
+                  </p>
+                  <p className="text-2xl font-bold text-primary">
+                    {trackingId}
+                  </p>
                 </div>
                 <p className="text-sm text-muted-foreground text-center">
-                  Please save this tracking ID to check the status of your submission.
+                  Please save this tracking ID to check the status of your
+                  submission.
                 </p>
                 <div className="flex gap-3">
-                  <Button variant="outline" className="flex-1" onClick={() => copyToClipboard(trackingId)}>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => copyToClipboard(trackingId)}
+                  >
                     Copy ID
                   </Button>
                   <Button
@@ -277,23 +353,25 @@ export default function UserProfile() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold">User Dashboard</h1>
-              <p className="text-accent-foreground/80 mt-1">Welcome, {currentUser?.fullName}</p>
+              <p className="text-accent-foreground/80 mt-1">
+                Welcome, {currentUser?.fullName}
+              </p>
             </div>
-           
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-2 gap-8">
-
           {/* Submit Feedback */}
           <div>
             <h2 className="text-2xl font-bold mb-4">Submit Feedback</h2>
             <Card className="shadow-lg">
               <CardHeader>
                 <CardTitle>Feedback Form</CardTitle>
-                <CardDescription>All submissions are anonymous and confidential</CardDescription>
+                <CardDescription>
+                  All submissions are anonymous and confidential
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -305,7 +383,10 @@ export default function UserProfile() {
                         <User className="h-5 w-5 text-accent" />
                       )}
                       <div>
-                        <Label htmlFor="anonymous" className="text-base cursor-pointer">
+                        <Label
+                          htmlFor="anonymous"
+                          className="text-base cursor-pointer"
+                        >
                           Submit Anonymously
                         </Label>
                         <p className="text-xs text-muted-foreground">
@@ -315,14 +396,20 @@ export default function UserProfile() {
                         </p>
                       </div>
                     </div>
-                    <Switch id="anonymous" checked={isAnonymous} onCheckedChange={setIsAnonymous} />
+                    <Switch
+                      id="anonymous"
+                      checked={isAnonymous}
+                      onCheckedChange={setIsAnonymous}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="type">Feedback Type *</Label>
                     <Select
                       value={formData.type}
-                      onValueChange={(value) => setFormData({ ...formData, type: value })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, type: value })
+                      }
                       required
                     >
                       <SelectTrigger id="type">
@@ -340,18 +427,28 @@ export default function UserProfile() {
                     <Label htmlFor="category">Category *</Label>
                     <Select
                       value={formData.category}
-                      onValueChange={(value) => setFormData({ ...formData, category: value })}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, category: value })
+                      }
                       required
                     >
                       <SelectTrigger id="category">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="IT Department">IT Department</SelectItem>
-                        <SelectItem value="Registrar Office">Registrar Office</SelectItem>
-                        <SelectItem value="Guidance Office">Guidance Office</SelectItem>
-                        <SelectItem value="Maintenance">Maintenance</SelectItem>
-                        <SelectItem value="Student Affairs">Student Affairs</SelectItem>
+                        <SelectItem value="IT Unit">IT Unit</SelectItem>
+                        <SelectItem value="Finance & Registrar Office">
+                          Finance &amp; Registrar Office
+                        </SelectItem>
+                        <SelectItem value="Student Affair Office">
+                          Student Affair Office
+                        </SelectItem>
+                        <SelectItem value="Guidance Office">
+                          Guidance Office
+                        </SelectItem>
+                        <SelectItem value="Faculty Office">
+                          Faculty Office
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -362,7 +459,9 @@ export default function UserProfile() {
                       id="subject"
                       placeholder="Brief summary of your feedback"
                       value={formData.subject}
-                      onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, subject: e.target.value })
+                      }
                       required
                     />
                   </div>
@@ -374,12 +473,17 @@ export default function UserProfile() {
                       placeholder="Provide detailed information about your feedback..."
                       rows={5}
                       value={formData.message}
-                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({ ...formData, message: e.target.value })
+                      }
                       required
                     />
                   </div>
 
-                  <Button type="submit" className="w-full bg-accent hover:bg-accent/90">
+                  <Button
+                    type="submit"
+                    className="w-full bg-accent hover:bg-accent/90"
+                  >
                     <Send className="mr-2 h-4 w-4" />
                     Submit Feedback
                   </Button>
@@ -395,7 +499,9 @@ export default function UserProfile() {
             <Card className="shadow-lg mb-6">
               <CardHeader>
                 <CardTitle>Enter Tracking ID</CardTitle>
-                <CardDescription>Search for your submitted feedback</CardDescription>
+                <CardDescription>
+                  Search for your submitted feedback
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSearch} className="flex gap-3">
@@ -405,7 +511,10 @@ export default function UserProfile() {
                     onChange={(e) => setSearchTrackingId(e.target.value)}
                     required
                   />
-                  <Button type="submit" className="bg-accent hover:bg-accent/90">
+                  <Button
+                    type="submit"
+                    className="bg-accent hover:bg-accent/90"
+                  >
                     <Search className="mr-2 h-4 w-4" />
                     Search
                   </Button>
@@ -431,50 +540,66 @@ export default function UserProfile() {
                   <CardContent className="pt-6">
                     <div className="flex items-start justify-between mb-6">
                       <h3 className="text-lg font-semibold mb-1">
-                        Status: <span className="uppercase">{selectedFeedback.status}</span>
+                        Status:{" "}
+                        <span className="uppercase">
+                          {selectedFeedback.status}
+                        </span>
                       </h3>
-                      <Badge className={getStatusColor(selectedFeedback.status)} variant="outline">
+                      <Badge
+                        className={getStatusColor(selectedFeedback.status)}
+                        variant="outline"
+                      >
                         {selectedFeedback.status.toLowerCase()}
                       </Badge>
                     </div>
 
                     <div className="flex items-start gap-3 mb-8 p-4 bg-muted/50 rounded-lg">
                       <Clock className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm">{getStatusMessage(selectedFeedback.status)}</p>
+                      <p className="text-sm">
+                        {getStatusMessage(selectedFeedback.status)}
+                      </p>
                     </div>
 
                     <div className="space-y-4">
-                      {getStatusSteps(selectedFeedback.status).map((step, index) => (
-                        <div key={index} className="flex gap-4">
-                          <div className="flex flex-col items-center">
-                            <div
-                              className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                step.completed ? "bg-green-500/20" : "bg-gray-200"
-                              }`}
-                            >
-                              {step.completed ? (
-                                <CheckCircle className="h-5 w-5 text-green-700" />
-                              ) : (
-                                <Circle className="h-5 w-5 text-gray-400" />
+                      {getStatusSteps(selectedFeedback.status).map(
+                        (step, index) => (
+                          <div key={index} className="flex gap-4">
+                            <div className="flex flex-col items-center">
+                              <div
+                                className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                  step.completed
+                                    ? "bg-green-500/20"
+                                    : "bg-gray-200"
+                                }`}
+                              >
+                                {step.completed ? (
+                                  <CheckCircle className="h-5 w-5 text-green-700" />
+                                ) : (
+                                  <Circle className="h-5 w-5 text-gray-400" />
+                                )}
+                              </div>
+                              {index <
+                                getStatusSteps(selectedFeedback.status).length -
+                                  1 && (
+                                <div className="h-12 w-px bg-border"></div>
                               )}
                             </div>
-                            {index < getStatusSteps(selectedFeedback.status).length - 1 && (
-                              <div className="h-12 w-px bg-border"></div>
-                            )}
+                            <div className="pb-4 flex-1">
+                              <p className="font-semibold">{step.name}</p>
+                              {step.name === "Submitted" && (
+                                <p className="text-sm text-muted-foreground">
+                                  {formatDate(selectedFeedback.createdAt)}
+                                </p>
+                              )}
+                              {step.description && (
+                                <p className="text-sm text-muted-foreground">
+                                  {step.description}
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <div className="pb-4 flex-1">
-                            <p className="font-semibold">{step.name}</p>
-                            {step.name === "Submitted" && (
-                              <p className="text-sm text-muted-foreground">
-                                {formatDate(selectedFeedback.createdAt)}
-                              </p>
-                            )}
-                            {step.description && (
-                              <p className="text-sm text-muted-foreground">{step.description}</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                        ),
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -485,30 +610,50 @@ export default function UserProfile() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">Type</p>
+                      <p className="text-sm font-semibold text-muted-foreground mb-1">
+                        Type
+                      </p>
                       <p className="capitalize">{selectedFeedback.type}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">Category</p>
+                      <p className="text-sm font-semibold text-muted-foreground mb-1">
+                        Category
+                      </p>
                       <p>{selectedFeedback.category}</p>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">Priority</p>
-                      <p className={`capitalize ${getPriorityColor(selectedFeedback.priority)}`}>
+                      <p className="text-sm font-semibold text-muted-foreground mb-1">
+                        Priority
+                      </p>
+                      <p
+                        className={`capitalize ${getPriorityColor(selectedFeedback.priority)}`}
+                      >
                         {selectedFeedback.priority}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">Subject</p>
-                      <p className="font-semibold">{selectedFeedback.subject}</p>
+                      <p className="text-sm font-semibold text-muted-foreground mb-1">
+                        Subject
+                      </p>
+                      <p className="font-semibold">
+                        {selectedFeedback.subject}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">Message</p>
-                      <p className="text-sm leading-relaxed">{selectedFeedback.message}</p>
+                      <p className="text-sm font-semibold text-muted-foreground mb-1">
+                        Message
+                      </p>
+                      <p className="text-sm leading-relaxed">
+                        {selectedFeedback.message}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">Last Updated</p>
-                      <p className="text-sm">{formatDate(selectedFeedback.updatedAt)}</p>
+                      <p className="text-sm font-semibold text-muted-foreground mb-1">
+                        Last Updated
+                      </p>
+                      <p className="text-sm">
+                        {formatDate(selectedFeedback.updatedAt)}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -536,21 +681,23 @@ export default function UserProfile() {
               <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle>My Submissions</CardTitle>
-                  <CardDescription>Your recent feedback submissions</CardDescription>
+                  <CardDescription>
+                    Your recent feedback submissions
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {feedbacks.map((feedback) => (
                     <div
                       key={feedback.id}
                       className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => {
-                        setSelectedFeedback(feedback);
-                        setSearchTrackingId(feedback.id);
-                      }}
+                      onClick={() => handleViewFeedback(feedback)}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <p className="font-semibold">{feedback.subject}</p>
-                        <Badge className={getStatusColor(feedback.status)} variant="outline">
+                        <Badge
+                          className={getStatusColor(feedback.status)}
+                          variant="outline"
+                        >
                           {feedback.status}
                         </Badge>
                       </div>
@@ -559,7 +706,9 @@ export default function UserProfile() {
                       </p>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="font-mono">{feedback.id}</span>
-                        <span>{new Date(feedback.createdAt).toLocaleDateString()}</span>
+                        <span>
+                          {new Date(feedback.createdAt).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -572,7 +721,9 @@ export default function UserProfile() {
                 <CardContent className="pt-6">
                   <div className="text-center py-8">
                     <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No Submissions Yet</h3>
+                    <h3 className="text-lg font-semibold mb-2">
+                      No Submissions Yet
+                    </h3>
                     <p className="text-muted-foreground">
                       Submit your first feedback using the form on the left.
                     </p>

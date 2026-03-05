@@ -61,7 +61,6 @@ export default function Submit() {
 
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
 
-    // Guard against SSR — localStorage is only available in the browser
     if (typeof window !== "undefined") {
       const userId = localStorage.getItem("currentUserId") || null;
       const userName = localStorage.getItem("currentUserName") || "Anonymous";
@@ -70,7 +69,7 @@ export default function Submit() {
         localStorage.getItem("currentUserDepartment") || null;
 
       const feedbacks: object[] = JSON.parse(
-        localStorage.getItem("feedbacks") || "[]"
+        localStorage.getItem("feedbacks") || "[]",
       );
 
       const newFeedback = {
@@ -147,7 +146,7 @@ export default function Submit() {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-3">Submit Your Feedback</h1>
           <p className="text-muted-foreground">
-            Help us improve by sharing your suggestions, complaint, and
+            Help us improve by sharing your suggestions, complaints, and
             inquiries.
           </p>
         </div>
@@ -195,14 +194,18 @@ export default function Submit() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="IT Unit">IT Unit</SelectItem>
-                    <SelectItem value="Finance & Registrar Office">Finance & Registrar Office</SelectItem>
+                    <SelectItem value="Finance & Registrar Office">
+                      Finance & Registrar Office
+                    </SelectItem>
                     <SelectItem value="Student Affair Office">
                       Student Affair Office
                     </SelectItem>
                     <SelectItem value="Guidance Office">
                       Guidance Office
                     </SelectItem>
-                    <SelectItem value="Faculty Office">Faculty Office</SelectItem>
+                    <SelectItem value="Faculty Office">
+                      Faculty Office
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>

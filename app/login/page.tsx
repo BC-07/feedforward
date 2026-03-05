@@ -13,38 +13,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { LogIn, Mail, Lock, User, Shield } from "lucide-react";
 
-interface UserRecord {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-  school: string;
-  department: string;
-}
-
 export default function Login() {
   const router = useRouter();
-
-  const [userFormData, setUserFormData] = useState({ email: "", password: "" });
-  const [adminFormData, setAdminFormData] = useState({ email: "", password: "" });
+  const [userEmail, setUserEmail] = useState("");
+  const [userPassword, setUserPassword] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
 
   const handleUserLogin = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     if (typeof window === "undefined") return;
 
-    const users: UserRecord[] = JSON.parse(localStorage.getItem("users") || "[]");
+    const users = JSON.parse(localStorage.getItem("users") || "[]");
     const user = users.find(
-      (u) => u.email === userFormData.email && u.password === userFormData.password
+      (u: any) => u.email === userEmail && u.password === userPassword,
     );
 
     if (user) {
@@ -52,9 +38,6 @@ export default function Login() {
       localStorage.setItem("currentUserId", user.id);
       localStorage.setItem("currentUserName", user.name);
       localStorage.setItem("currentUserEmail", user.email);
-      localStorage.setItem("currentUserSchool", user.school);
-      localStorage.setItem("currentUserDepartment", user.department);
-
       toast.success(`Welcome back, ${user.name}!`);
       router.push("/user");
     } else {
@@ -64,22 +47,20 @@ export default function Login() {
 
   const handleAdminLogin = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     if (typeof window === "undefined") return;
 
-    const admins: UserRecord[] = JSON.parse(localStorage.getItem("admins") || "[]");
+    const admins = JSON.parse(localStorage.getItem("admins") || "[]");
     const admin = admins.find(
-      (a) => a.email === adminFormData.email && a.password === adminFormData.password
+      (a: any) => a.email === adminEmail && a.password === adminPassword,
     );
 
     if (admin) {
+      const adminUnit = admin.unit || admin.department || "";
       localStorage.setItem("isAdminLoggedIn", "true");
       localStorage.setItem("currentAdminId", admin.id);
       localStorage.setItem("currentAdminName", admin.name);
       localStorage.setItem("currentAdminEmail", admin.email);
-      localStorage.setItem("currentAdminSchool", admin.school);
-      localStorage.setItem("currentAdminDepartment", admin.department);
-
+      localStorage.setItem("currentAdminDepartment", adminUnit);
       toast.success(`Welcome back, ${admin.name}!`);
       router.push("/dashboard");
     } else {
@@ -95,7 +76,9 @@ export default function Login() {
             <LogIn className="h-8 w-8 text-accent" />
           </div>
           <CardTitle>Login to FeedForward</CardTitle>
-          <CardDescription>Choose your account type to continue</CardDescription>
+          <CardDescription>
+            Choose your account type to continue
+          </CardDescription>
         </CardHeader>
 
         <CardContent>
@@ -123,15 +106,12 @@ export default function Login() {
                       type="email"
                       placeholder="Enter your email"
                       className="pl-10"
-                      value={userFormData.email}
-                      onChange={(e) =>
-                        setUserFormData({ ...userFormData, email: e.target.value })
-                      }
+                      value={userEmail}
+                      onChange={(e) => setUserEmail(e.target.value)}
                       required
                     />
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="user-password">Password</Label>
                   <div className="relative">
@@ -141,27 +121,28 @@ export default function Login() {
                       type="password"
                       placeholder="Enter your password"
                       className="pl-10"
-                      value={userFormData.password}
-                      onChange={(e) =>
-                        setUserFormData({ ...userFormData, password: e.target.value })
-                      }
+                      value={userPassword}
+                      onChange={(e) => setUserPassword(e.target.value)}
                       required
                     />
                   </div>
                 </div>
-
-                <Button type="submit" className="w-full" size="lg">
+                <Button
+                  type="submit"
+                  className="w-full bg-accent hover:bg-accent/90"
+                  size="lg"
+                >
                   Log In as User
                 </Button>
-
-                <div className="text-center text-sm">
-                  <p className="text-muted-foreground">
-                    Don&apos;t have an account?{" "}
-                    <Link href="/register" className="text-accent hover:underline font-medium">
-                      Sign up
-                    </Link>
-                  </p>
-                </div>
+                <p className="text-center text-sm text-muted-foreground">
+                  Don&apos;t have an account?{" "}
+                  <Link
+                    href="/register"
+                    className="text-accent hover:underline font-medium"
+                  >
+                    Sign up
+                  </Link>
+                </p>
               </form>
             </TabsContent>
 
@@ -177,15 +158,12 @@ export default function Login() {
                       type="email"
                       placeholder="Enter your email"
                       className="pl-10"
-                      value={adminFormData.email}
-                      onChange={(e) =>
-                        setAdminFormData({ ...adminFormData, email: e.target.value })
-                      }
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
                       required
                     />
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="admin-password">Password</Label>
                   <div className="relative">
@@ -195,15 +173,12 @@ export default function Login() {
                       type="password"
                       placeholder="Enter your password"
                       className="pl-10"
-                      value={adminFormData.password}
-                      onChange={(e) =>
-                        setAdminFormData({ ...adminFormData, password: e.target.value })
-                      }
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
                       required
                     />
                   </div>
                 </div>
-
                 <Button
                   type="submit"
                   className="w-full bg-black hover:bg-gray-800"
@@ -211,15 +186,15 @@ export default function Login() {
                 >
                   Log In as Admin
                 </Button>
-
-                <div className="text-center text-sm">
-                  <p className="text-muted-foreground">
-                    Don&apos;t have an admin account?{" "}
-                    <Link href="/register" className="text-black hover:underline font-medium">
-                      Register here
-                    </Link>
-                  </p>
-                </div>
+                <p className="text-center text-sm text-muted-foreground">
+                  Don&apos;t have an admin account?{" "}
+                  <Link
+                    href="/register"
+                    className="text-black hover:underline font-medium"
+                  >
+                    Register here
+                  </Link>
+                </p>
               </form>
             </TabsContent>
           </Tabs>

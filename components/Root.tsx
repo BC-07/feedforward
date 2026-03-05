@@ -136,11 +136,7 @@ export default function RootLayout({
                     <span className="font-medium">{adminName}</span>
                   </div>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleAdminLogout}
-                  >
+                  <Button variant="ghost" size="sm" onClick={handleAdminLogout}>
                     <LogOut className="h-4 w-4 mr-1" />
                     Logout
                   </Button>

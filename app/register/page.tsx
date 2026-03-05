@@ -25,19 +25,16 @@ import { toast } from "sonner";
 import { UserPlus, Mail, Lock, User, Shield, KeyRound } from "lucide-react";
 
 const UNITS = [
-  "School of Engineering and Architecture",
-  "School of Information Technology",
-  "School of Business and Accountancy",
-  "School of Arts and Sciences",
-  "School of Criminal Justice",
-  "School of Education",
-  "School of Hospitality and Tourism Management",
+  "IT Unit",
+  "Finance & Registrar Office",
+  "Student Affair Office",
+  "Guidance Office",
+  "Faculty Office",
 ];
 
 export default function Signup() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
   const accountType = searchParams.get("type") || "user";
   const [activeTab, setActiveTab] = useState(accountType);
 
@@ -65,7 +62,6 @@ export default function Signup() {
 
   const handleUserSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     if (typeof window === "undefined") return;
 
     if (userFormData.password !== userFormData.confirmPassword) {
@@ -78,8 +74,7 @@ export default function Signup() {
     }
 
     const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const emailExists = users.some((u: { email: string }) => u.email === userFormData.email);
-    if (emailExists) {
+    if (users.some((u: any) => u.email === userFormData.email)) {
       toast.error("Email already registered");
       return;
     }
@@ -87,23 +82,23 @@ export default function Signup() {
     const newUser = {
       id: `USER-${Date.now()}`,
       name: `${userFormData.firstName} ${userFormData.lastName}`,
-      ...userFormData,
+      firstName: userFormData.firstName,
+      lastName: userFormData.lastName,
+      email: userFormData.email,
+      password: userFormData.password,
       createdAt: new Date().toISOString(),
     };
     users.push(newUser);
     localStorage.setItem("users", JSON.stringify(users));
-
     toast.success("Account created successfully!");
     router.push("/login");
   };
 
   const handleAdminSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     if (typeof window === "undefined") return;
 
-    const ADMIN_REGISTRATION_KEY = "FEEDFORWARD2026";
-    if (adminFormData.adminKey !== ADMIN_REGISTRATION_KEY) {
+    if (adminFormData.adminKey !== "FEEDFORWARD2026") {
       toast.error("Invalid admin registration key");
       return;
     }
@@ -121,21 +116,25 @@ export default function Signup() {
     }
 
     const admins = JSON.parse(localStorage.getItem("admins") || "[]");
-    const emailExists = admins.some((a: { email: string }) => a.email === adminFormData.email);
-    if (emailExists) {
+    if (admins.some((a: any) => a.email === adminFormData.email)) {
       toast.error("Email already registered");
       return;
     }
 
+    // Explicitly construct — no spread to avoid stale/extra fields
     const newAdmin = {
       id: `ADMIN-${Date.now()}`,
       name: `${adminFormData.firstName} ${adminFormData.lastName}`,
-      ...adminFormData,
+      firstName: adminFormData.firstName,
+      lastName: adminFormData.lastName,
+      email: adminFormData.email,
+      password: adminFormData.password,
+      unit: adminFormData.unit, // e.g. "IT Unit"
+      department: adminFormData.unit, // same value, for login compatibility
       createdAt: new Date().toISOString(),
     };
     admins.push(newAdmin);
     localStorage.setItem("admins", JSON.stringify(admins));
-
     toast.success("Admin account created successfully!");
     router.push("/login");
   };
@@ -169,7 +168,6 @@ export default function Signup() {
             {/* USER FORM */}
             <TabsContent value="user">
               <form onSubmit={handleUserSubmit} className="space-y-4">
-                {/* First + Last Name */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="user-first-name">
@@ -183,7 +181,10 @@ export default function Signup() {
                         className="pl-10"
                         value={userFormData.firstName}
                         onChange={(e) =>
-                          setUserFormData({ ...userFormData, firstName: e.target.value })
+                          setUserFormData({
+                            ...userFormData,
+                            firstName: e.target.value,
+                          })
                         }
                         required
                       />
@@ -201,7 +202,10 @@ export default function Signup() {
                         className="pl-10"
                         value={userFormData.lastName}
                         onChange={(e) =>
-                          setUserFormData({ ...userFormData, lastName: e.target.value })
+                          setUserFormData({
+                            ...userFormData,
+                            lastName: e.target.value,
+                          })
                         }
                         required
                       />
@@ -209,7 +213,6 @@ export default function Signup() {
                   </div>
                 </div>
 
-                {/* Email */}
                 <div className="space-y-2">
                   <Label htmlFor="user-email">
                     Email Address <span className="text-destructive">*</span>
@@ -223,14 +226,16 @@ export default function Signup() {
                       className="pl-10"
                       value={userFormData.email}
                       onChange={(e) =>
-                        setUserFormData({ ...userFormData, email: e.target.value })
+                        setUserFormData({
+                          ...userFormData,
+                          email: e.target.value,
+                        })
                       }
                       required
                     />
                   </div>
                 </div>
 
-                {/* Password + Confirm */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="user-password">
@@ -245,7 +250,10 @@ export default function Signup() {
                         className="pl-10"
                         value={userFormData.password}
                         onChange={(e) =>
-                          setUserFormData({ ...userFormData, password: e.target.value })
+                          setUserFormData({
+                            ...userFormData,
+                            password: e.target.value,
+                          })
                         }
                         required
                       />
@@ -253,7 +261,8 @@ export default function Signup() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="user-confirm-password">
-                      Confirm Password <span className="text-destructive">*</span>
+                      Confirm Password{" "}
+                      <span className="text-destructive">*</span>
                     </Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -264,7 +273,10 @@ export default function Signup() {
                         className="pl-10"
                         value={userFormData.confirmPassword}
                         onChange={(e) =>
-                          setUserFormData({ ...userFormData, confirmPassword: e.target.value })
+                          setUserFormData({
+                            ...userFormData,
+                            confirmPassword: e.target.value,
+                          })
                         }
                         required
                       />
@@ -275,13 +287,19 @@ export default function Signup() {
                   Password must be at least 6 characters
                 </p>
 
-                <Button type="submit" className="w-full bg-accent hover:bg-accent/90" size="lg">
+                <Button
+                  type="submit"
+                  className="w-full bg-accent hover:bg-accent/90"
+                  size="lg"
+                >
                   Create User Account
                 </Button>
-
                 <p className="text-center text-sm text-muted-foreground">
                   Already have an account?{" "}
-                  <Link href="/login" className="text-accent font-medium hover:underline">
+                  <Link
+                    href="/login"
+                    className="text-accent font-medium hover:underline"
+                  >
                     Log in
                   </Link>
                 </p>
@@ -291,10 +309,10 @@ export default function Signup() {
             {/* ADMIN FORM */}
             <TabsContent value="admin">
               <form onSubmit={handleAdminSubmit} className="space-y-4">
-                {/* Admin Key */}
                 <div className="space-y-2">
                   <Label htmlFor="admin-key">
-                    Admin Registration Key <span className="text-destructive">*</span>
+                    Admin Registration Key{" "}
+                    <span className="text-destructive">*</span>
                   </Label>
                   <div className="relative">
                     <KeyRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -305,7 +323,10 @@ export default function Signup() {
                       className="pl-10"
                       value={adminFormData.adminKey}
                       onChange={(e) =>
-                        setAdminFormData({ ...adminFormData, adminKey: e.target.value })
+                        setAdminFormData({
+                          ...adminFormData,
+                          adminKey: e.target.value,
+                        })
                       }
                       required
                     />
@@ -315,7 +336,6 @@ export default function Signup() {
                   </p>
                 </div>
 
-                {/* First + Last Name */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="admin-first-name">
@@ -329,7 +349,10 @@ export default function Signup() {
                         className="pl-10"
                         value={adminFormData.firstName}
                         onChange={(e) =>
-                          setAdminFormData({ ...adminFormData, firstName: e.target.value })
+                          setAdminFormData({
+                            ...adminFormData,
+                            firstName: e.target.value,
+                          })
                         }
                         required
                       />
@@ -347,7 +370,10 @@ export default function Signup() {
                         className="pl-10"
                         value={adminFormData.lastName}
                         onChange={(e) =>
-                          setAdminFormData({ ...adminFormData, lastName: e.target.value })
+                          setAdminFormData({
+                            ...adminFormData,
+                            lastName: e.target.value,
+                          })
                         }
                         required
                       />
@@ -355,7 +381,6 @@ export default function Signup() {
                   </div>
                 </div>
 
-                {/* Email */}
                 <div className="space-y-2">
                   <Label htmlFor="admin-email">
                     Email Address <span className="text-destructive">*</span>
@@ -369,14 +394,16 @@ export default function Signup() {
                       className="pl-10"
                       value={adminFormData.email}
                       onChange={(e) =>
-                        setAdminFormData({ ...adminFormData, email: e.target.value })
+                        setAdminFormData({
+                          ...adminFormData,
+                          email: e.target.value,
+                        })
                       }
                       required
                     />
                   </div>
                 </div>
 
-                {/* Unit */}
                 <div className="space-y-2">
                   <Label htmlFor="admin-unit">
                     Unit <span className="text-destructive">*</span>
@@ -401,7 +428,6 @@ export default function Signup() {
                   </Select>
                 </div>
 
-                {/* Password + Confirm */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="admin-password">
@@ -416,7 +442,10 @@ export default function Signup() {
                         className="pl-10"
                         value={adminFormData.password}
                         onChange={(e) =>
-                          setAdminFormData({ ...adminFormData, password: e.target.value })
+                          setAdminFormData({
+                            ...adminFormData,
+                            password: e.target.value,
+                          })
                         }
                         required
                       />
@@ -424,7 +453,8 @@ export default function Signup() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="admin-confirm-password">
-                      Confirm Password <span className="text-destructive">*</span>
+                      Confirm Password{" "}
+                      <span className="text-destructive">*</span>
                     </Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -435,7 +465,10 @@ export default function Signup() {
                         className="pl-10"
                         value={adminFormData.confirmPassword}
                         onChange={(e) =>
-                          setAdminFormData({ ...adminFormData, confirmPassword: e.target.value })
+                          setAdminFormData({
+                            ...adminFormData,
+                            confirmPassword: e.target.value,
+                          })
                         }
                         required
                       />
@@ -453,7 +486,6 @@ export default function Signup() {
                 >
                   Create Admin Account
                 </Button>
-
                 <p className="text-center text-sm text-muted-foreground">
                   Already have an account?{" "}
                   <Link href="/login" className="font-medium hover:underline">
