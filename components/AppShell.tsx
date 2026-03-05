@@ -271,13 +271,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {/* Public nav */}
             {!isDashboardRoute && (
               <nav className="flex items-center gap-6">
-                <Link href="/submit" className="text-sm hover:text-accent transition-colors">
-                  Submit Feedback
-                </Link>
-                <Link href="/track" className="text-sm hover:text-accent transition-colors">
-                  Track Submission
-                </Link>
-
                 {isUserLoggedIn ? (
                   <div className="flex items-center gap-3">
                     <button
@@ -293,26 +286,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </Button>
                   </div>
                 ) : (
-                  <Link
-                    href="/login"
-                    className="text-sm bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent/90 transition-colors"
-                  >
-                    LogIn
-                  </Link>
+                  <>
+                    <Link href="/submit" className="text-sm hover:text-accent transition-colors">
+                      Submit Feedback
+                    </Link>
+                    <Link href="/track" className="text-sm hover:text-accent transition-colors">
+                      Track Submission
+                    </Link>
+                    <Link
+                      href="/login"
+                      className="text-sm bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent/90 transition-colors"
+                    >
+                      LogIn
+                    </Link>
+                  </>
                 )}
               </nav>
             )}
 
             {/* Admin nav */}
-            {isDashboardRoute && isAdminLoggedIn && (
-              <button
-                onClick={() => setIsProfileOpen(true)}
-                className="flex items-center gap-2 text-sm hover:text-accent transition-colors"
-              >
-                <AvatarDisplay src={adminAvatar} fallback={<UserCircle2 />} size="sm" accentColor="primary" />
-                <span className="font-medium">{adminName}</span>
-              </button>
-            )}
+{isDashboardRoute && isAdminLoggedIn && (
+  <div className="flex items-center gap-3">
+    <button
+      onClick={() => setIsProfileOpen(true)}
+      className="flex items-center gap-2 text-sm hover:text-accent transition-colors"
+    >
+      <AvatarDisplay src={adminAvatar} fallback={<UserCircle2 />} size="sm" accentColor="primary" />
+      <span className="font-medium">{adminName}</span>
+    </button>
+    <Button variant="ghost" size="sm" onClick={handleAdminLogout} className="text-sm">
+      <LogOut className="h-4 w-4 mr-1" />
+      Logout
+    </Button>
+  </div>
+)}
           </div>
         </div>
       </header>
