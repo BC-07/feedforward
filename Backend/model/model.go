@@ -48,13 +48,13 @@ type (
 )
 
 func (FeedbackModel) TableName() string {
-	return "feedbacks"
+	return "public.feedforward_feedback"
 }
 
 func (UserModel) TableName() string {
-	return "users"
+	return "public.feedforward_users"
 }
 
 func (AdminModel) TableName() string {
-	return "admins"
+	return "public.feedforward_admins"
 }

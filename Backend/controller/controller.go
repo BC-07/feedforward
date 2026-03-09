@@ -1,12 +1,17 @@
 package controller
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"intern_template_v1/middleware"
 	"intern_template_v1/model"
 	"intern_template_v1/model/errors"
 	"intern_template_v1/model/response"
 	"intern_template_v1/model/status"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -38,7 +43,20 @@ const (
 	feedbackTable = "public.feedforward_feedback"
 	userTable     = "public.feedforward_users"
 	adminTable    = "public.feedforward_admins"
+	superAdminTTL = 8 * time.Hour
 )
+
+const (
+	defaultSuperAdminUsername = "superadmin"
+	defaultSuperAdminPassword = "FeedForward-SuperAdmin"
+	defaultSuperAdminSecret   = "feedforward-superadmin-secret"
+)
+
+type superAdminSession struct {
+	Token     string    `json:"token"`
+	Username  string    `json:"username"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
 
 func Getnames(c *fiber.Ctx) error {
 	db := middleware.DBConn
@@ -411,6 +429,167 @@ func LoginAdmin(c *fiber.Ctx) error {
 	return success(c, fiber.StatusOK, admin)
 }
 
+func LoginSuperAdmin(c *fiber.Ctx) error {
+	var payload struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+
+	if err := parseBody(c, &payload); err != nil {
+		return parseError(c, "failed to parse superadmin login", err)
+	}
+
+	if strings.TrimSpace(payload.Username) != superAdminUsername() || strings.TrimSpace(payload.Password) != superAdminPassword() {
+		return unauthorized(c, "invalid superadmin credentials")
+	}
+
+	expiresAt := time.Now().Add(superAdminTTL)
+	return success(c, fiber.StatusOK, superAdminSession{
+		Token:     issueSuperAdminToken(expiresAt),
+		Username:  superAdminUsername(),
+		ExpiresAt: expiresAt,
+	})
+}
+
+func ListAdmins(c *fiber.Ctx) error {
+	if err := requireSuperAdmin(c); err != nil {
+		return err
+	}
+
+	var admins []model.AdminModel
+	if err := middleware.DBConn.Raw(
+		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, created_at, updated_at
+		FROM ` + adminTable + ` ORDER BY unit ASC, first_name ASC, last_name ASC`,
+	).Scan(&admins).Error; err != nil {
+		return serverError(c, "failed to fetch admins", err)
+	}
+
+	return success(c, fiber.StatusOK, admins)
+}
+
+func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
+	if err := requireSuperAdmin(c); err != nil {
+		return err
+	}
+
+	var payload model.AdminModel
+	if err := parseBody(c, &payload); err != nil {
+		return parseError(c, "failed to parse admin", err)
+	}
+
+	payload.FirstName = strings.TrimSpace(payload.FirstName)
+	payload.LastName = strings.TrimSpace(payload.LastName)
+	payload.Email = strings.TrimSpace(payload.Email)
+	payload.Password = strings.TrimSpace(payload.Password)
+	payload.Unit = strings.TrimSpace(payload.Unit)
+
+	if payload.FirstName == "" || payload.LastName == "" || payload.Email == "" || payload.Password == "" || payload.Unit == "" {
+		return invalidRequest(c, "missing required admin fields")
+	}
+	if !validUnits[payload.Unit] {
+		return invalidRequest(c, "invalid admin unit")
+	}
+
+	taken, err := adminUnitTaken(payload.Unit, "")
+	if err != nil {
+		return serverError(c, "failed to validate admin unit", err)
+	}
+	if taken {
+		return invalidRequest(c, "selected unit already has an admin")
+	}
+
+	payload.ID = "ADMIN-" + fmt.Sprintf("%d", time.Now().UnixMilli())
+	now := time.Now()
+	if err := middleware.DBConn.Exec(
+		`INSERT INTO `+adminTable+` (id, first_name, last_name, email, password, unit, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		payload.ID, payload.FirstName, payload.LastName, payload.Email, payload.Password, payload.Unit, now, now,
+	).Error; err != nil {
+		return serverError(c, "failed to create admin", err)
+	}
+
+	admin, err := fetchAdminByID(payload.ID)
+	if err != nil {
+		return serverError(c, "failed to fetch admin", err)
+	}
+	return success(c, fiber.StatusCreated, admin)
+}
+
+func UpdateAdminBySuperAdmin(c *fiber.Ctx) error {
+	if err := requireSuperAdmin(c); err != nil {
+		return err
+	}
+
+	var payload struct {
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
+		Email     string `json:"email"`
+		Unit      string `json:"unit"`
+		Password  string `json:"password"`
+	}
+	if err := parseBody(c, &payload); err != nil {
+		return parseError(c, "failed to parse admin update", err)
+	}
+
+	var sets []string
+	var args []any
+
+	if value := strings.TrimSpace(payload.FirstName); value != "" {
+		sets = append(sets, "first_name = ?")
+		args = append(args, value)
+	}
+	if value := strings.TrimSpace(payload.LastName); value != "" {
+		sets = append(sets, "last_name = ?")
+		args = append(args, value)
+	}
+	if value := strings.TrimSpace(payload.Email); value != "" {
+		sets = append(sets, "email = ?")
+		args = append(args, value)
+	}
+	if value := strings.TrimSpace(payload.Unit); value != "" {
+		if !validUnits[value] {
+			return invalidRequest(c, "invalid admin unit")
+		}
+		taken, err := adminUnitTaken(value, c.Params("id"))
+		if err != nil {
+			return serverError(c, "failed to validate admin unit", err)
+		}
+		if taken {
+			return invalidRequest(c, "selected unit already has an admin")
+		}
+		sets = append(sets, "unit = ?")
+		args = append(args, value)
+	}
+	if value := strings.TrimSpace(payload.Password); value != "" {
+		sets = append(sets, "password = ?")
+		args = append(args, value)
+	}
+
+	if len(sets) == 0 {
+		return invalidRequest(c, "no fields provided for admin update")
+	}
+
+	sets = append(sets, "updated_at = ?")
+	args = append(args, time.Now())
+	if err := execUpdateByID(adminTable, c.Params("id"), "failed to update admin", "admin not found", sets, args...); err != nil {
+		return respondDBResult(c, err)
+	}
+
+	admin, err := fetchAdminByID(c.Params("id"))
+	if err != nil {
+		return serverError(c, "failed to fetch admin", err)
+	}
+	return success(c, fiber.StatusOK, admin)
+}
+
+func DeleteAdminBySuperAdmin(c *fiber.Ctx) error {
+	if err := requireSuperAdmin(c); err != nil {
+		return err
+	}
+
+	return deleteByID(c, adminTable, "admin", c.Params("id"))
+}
+
 func UpdateUserProfile(c *fiber.Ctx) error {
 	//Storage preparation
 	var payload struct {
@@ -753,4 +932,92 @@ func deleteByID(c *fiber.Ctx, table string, entity string, id string) error {
 		return notFound(c, fmt.Sprintf("%s not found", entity), nil)
 	}
 	return success(c, fiber.StatusOK, map[string]string{"id": id})
+}
+
+// Enforce one admin per unit in application logic because the live schema does not.
+func adminUnitTaken(unit string, excludeID string) (bool, error) {
+	var count int64
+	query := `SELECT COUNT(*) FROM ` + adminTable + ` WHERE unit = ?`
+	args := []any{unit}
+	if excludeID != "" {
+		query += ` AND id <> ?`
+		args = append(args, excludeID)
+	}
+
+	if err := middleware.DBConn.Raw(query, args...).Scan(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+// Superadmin routes use a short-lived signed bearer token instead of normal admin login state.
+func requireSuperAdmin(c *fiber.Ctx) error {
+	header := strings.TrimSpace(c.Get("Authorization"))
+	if header == "" || !strings.HasPrefix(header, "Bearer ") {
+		return unauthorized(c, "superadmin authorization is required")
+	}
+
+	token := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
+	if !validateSuperAdminToken(token) {
+		return unauthorized(c, "invalid or expired superadmin session")
+	}
+
+	return nil
+}
+
+// The token is stateless: it only carries the expiry and an HMAC signature.
+func issueSuperAdminToken(expiresAt time.Time) string {
+	payload := fmt.Sprintf("%d", expiresAt.Unix())
+	mac := hmac.New(sha256.New, []byte(superAdminSecret()))
+	mac.Write([]byte(payload))
+	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	token := payload + "." + signature
+	return base64.RawURLEncoding.EncodeToString([]byte(token))
+}
+
+func validateSuperAdminToken(token string) bool {
+	decoded, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return false
+	}
+
+	parts := strings.Split(string(decoded), ".")
+	if len(parts) != 2 {
+		return false
+	}
+
+	mac := hmac.New(sha256.New, []byte(superAdminSecret()))
+	mac.Write([]byte(parts[0]))
+	expectedSignature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	if !hmac.Equal([]byte(parts[1]), []byte(expectedSignature)) {
+		return false
+	}
+
+	expiresAtUnix, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return false
+	}
+
+	return time.Now().Unix() <= expiresAtUnix
+}
+
+func superAdminUsername() string {
+	if value := strings.TrimSpace(os.Getenv("SUPERADMIN_USERNAME")); value != "" {
+		return value
+	}
+	return defaultSuperAdminUsername
+}
+
+func superAdminPassword() string {
+	if value := strings.TrimSpace(os.Getenv("SUPERADMIN_PASSWORD")); value != "" {
+		return value
+	}
+	return defaultSuperAdminPassword
+}
+
+func superAdminSecret() string {
+	if value := strings.TrimSpace(os.Getenv("SUPERADMIN_SECRET")); value != "" {
+		return value
+	}
+	return defaultSuperAdminSecret
 }
