@@ -33,6 +33,7 @@ var validPriorities = map[string]bool{
 	"High":   true,
 }
 
+// Keep table names centralized so SQL changes stay in one place.
 const (
 	feedbackTable = "public.feedforward_feedback"
 	userTable     = "public.feedforward_users"
@@ -98,6 +99,7 @@ func InsertExec(c *fiber.Ctx) error {
 func GetFeedbacks(c *fiber.Ctx) error {
 	db := middleware.DBConn
 
+	// Build the filter dynamically so the same handler supports admin and user views.
 	query := `SELECT id, type, category, subject, message, status, priority, user_id, user_name, is_anonymous, response, created_at, updated_at
 		FROM ` + feedbackTable
 	var args []any
@@ -191,6 +193,7 @@ func UpdateFeedback(c *fiber.Ctx) error {
 		return parseError(c, "failed to parse feedback update", err)
 	}
 
+	// Only update fields that were actually sent by the client.
 	var sets []string
 	var args []any
 
@@ -249,6 +252,7 @@ func UpdateFeedback(c *fiber.Ctx) error {
 		return invalidRequest(c, "no fields provided for update")
 	}
 
+	// Always stamp the latest write time on any feedback update.
 	sets = append(sets, "updated_at = ?")
 	args = append(args, time.Now(), c.Params("id"))
 
@@ -533,6 +537,7 @@ func updatePassword(c *fiber.Ctx, table string, entity string) error {
 
 func fetchFeedbackByID(id string) (model.FeedbackModel, error) {
 	var feedback model.FeedbackModel
+	// Select explicit columns so the API only depends on fields the frontend uses.
 	err := middleware.DBConn.Raw(
 		`SELECT id, type, category, subject, message, status, priority, user_id, user_name, is_anonymous, response, created_at, updated_at
 		FROM `+feedbackTable+` WHERE id = ?`,
@@ -543,6 +548,7 @@ func fetchFeedbackByID(id string) (model.FeedbackModel, error) {
 
 func fetchUserByID(id string) (model.UserModel, error) {
 	var user model.UserModel
+	// Compose the display name in SQL because the table stores first and last names separately.
 	err := middleware.DBConn.Raw(
 		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, created_at, updated_at
 		FROM `+userTable+` WHERE id = ?`,
@@ -553,6 +559,7 @@ func fetchUserByID(id string) (model.UserModel, error) {
 
 func fetchAdminByID(id string) (model.AdminModel, error) {
 	var admin model.AdminModel
+	// Compose the display name in SQL because the table stores first and last names separately.
 	err := middleware.DBConn.Raw(
 		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, created_at, updated_at
 		FROM `+adminTable+` WHERE id = ?`,
@@ -562,6 +569,7 @@ func fetchAdminByID(id string) (model.AdminModel, error) {
 }
 
 func normalizeFeedback(feedback *model.FeedbackModel) error {
+	// Normalize whitespace first so validation and inserts behave consistently.
 	feedback.ID = strings.TrimSpace(feedback.ID)
 	feedback.Type = strings.TrimSpace(feedback.Type)
 	feedback.Category = strings.TrimSpace(feedback.Category)
@@ -587,6 +595,7 @@ func normalizeFeedback(feedback *model.FeedbackModel) error {
 		return fmt.Errorf("invalid feedback priority")
 	}
 	if feedback.UserID != nil {
+		// Validate the foreign key in the app layer to return a clearer message than Postgres would.
 		trimmed := strings.TrimSpace(*feedback.UserID)
 		if trimmed == "" {
 			feedback.UserID = nil
@@ -613,6 +622,7 @@ func normalizeFeedback(feedback *model.FeedbackModel) error {
 		trimmed := strings.TrimSpace(*feedback.Response)
 		feedback.Response = &trimmed
 	} else {
+		// The live schema requires a non-null response value.
 		empty := ""
 		feedback.Response = &empty
 	}
@@ -624,6 +634,7 @@ func parseBody(c *fiber.Ctx, dest any) error {
 	return c.BodyParser(dest)
 }
 
+// success keeps the response shape consistent across all handlers.
 func success(c *fiber.Ctx, code int, data any) error {
 	return c.Status(code).JSON(response.ResponseModel{
 		RetCode: fmt.Sprintf("%d", code),
@@ -703,6 +714,7 @@ func (e *dbActionError) Error() string {
 }
 
 func execUpdateByID(table string, id string, failMessage string, notFoundMessage string, sets []string, args ...any) error {
+	// Reuse the same update flow for profile changes and similar single-row updates.
 	queryArgs := append(args, id)
 	result := middleware.DBConn.Exec(
 		fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", table, strings.Join(sets, ", ")),
@@ -732,6 +744,7 @@ func respondDBResult(c *fiber.Ctx, err error) error {
 }
 
 func deleteByID(c *fiber.Ctx, table string, entity string, id string) error {
+	// Reuse the same delete response pattern for user, admin, and feedback records.
 	result := middleware.DBConn.Exec("DELETE FROM "+table+" WHERE id = ?", id)
 	if result.Error != nil {
 		return serverError(c, fmt.Sprintf("failed to delete %s", entity), result.Error)
