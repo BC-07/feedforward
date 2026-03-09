@@ -13,17 +13,18 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
 
-var validUnits = map[string]bool{
-	"IT Unit":                    true,
-	"Finance & Registrar Office": true,
-	"Student Affair Office":      true,
-	"Guidance Office":            true,
-	"Faculty Office":             true,
+var defaultCategoryNames = []string{
+	"IT Unit",
+	"Finance & Registrar Office",
+	"Student Affair Office",
+	"Guidance Office",
+	"Faculty Office",
 }
 
 var validStatuses = map[string]bool{
@@ -40,9 +41,10 @@ var validPriorities = map[string]bool{
 
 // Keep table names centralized so SQL changes stay in one place.
 const (
-	feedbackTable = "public.feedforward_feedback"
-	userTable     = "public.feedforward_users"
-	adminTable    = "public.feedforward_admins"
+	feedbackTable = "public.feedbacks"
+	userTable     = "public.users"
+	adminTable    = "public.admins"
+	categoryTable = "public.categories"
 	superAdminTTL = 8 * time.Hour
 )
 
@@ -57,6 +59,11 @@ type superAdminSession struct {
 	Username  string    `json:"username"`
 	ExpiresAt time.Time `json:"expiresAt"`
 }
+
+var categoryTableInit sync.Once
+var categoryTableInitErr error
+var adminDisableColumnInit sync.Once
+var adminDisableColumnErr error
 
 func Getnames(c *fiber.Ctx) error {
 	db := middleware.DBConn
@@ -221,7 +228,11 @@ func UpdateFeedback(c *fiber.Ctx) error {
 	}
 	if raw, ok := payload["category"].(string); ok {
 		value := strings.TrimSpace(raw)
-		if !validUnits[value] {
+		ok, err := categoryExists(value)
+		if err != nil {
+			return serverError(c, "failed to validate feedback category", err)
+		}
+		if !ok {
 			return invalidRequest(c, "invalid feedback category")
 		}
 		sets = append(sets, "category = ?")
@@ -316,6 +327,14 @@ func RegisterUser(c *fiber.Ctx) error {
 		return invalidRequest(c, "missing required user fields")
 	}
 
+	inUse, err := emailInUse(payload.Email, "", "")
+	if err != nil {
+		return serverError(c, "failed to validate email", err)
+	}
+	if inUse {
+		return invalidRequest(c, "email is already in use")
+	}
+
 	payload.ID = "USER-" + fmt.Sprintf("%d", time.Now().UnixMilli())
 	now := time.Now()
 	if err := db.Exec(
@@ -335,6 +354,9 @@ func RegisterUser(c *fiber.Ctx) error {
 
 func RegisterAdmin(c *fiber.Ctx) error {
 	db := middleware.DBConn
+	if err := ensureAdminDisableColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
+	}
 
 	//Storage preparation
 	var payload model.AdminModel
@@ -352,16 +374,29 @@ func RegisterAdmin(c *fiber.Ctx) error {
 	if payload.FirstName == "" || payload.LastName == "" || payload.Email == "" || payload.Password == "" || payload.Unit == "" {
 		return invalidRequest(c, "missing required admin fields")
 	}
-	if !validUnits[payload.Unit] {
+
+	inUse, err := emailInUse(payload.Email, "", "")
+	if err != nil {
+		return serverError(c, "failed to validate email", err)
+	}
+	if inUse {
+		return invalidRequest(c, "email is already in use")
+	}
+
+	unitExists, err := categoryExists(payload.Unit)
+	if err != nil {
+		return serverError(c, "failed to validate admin unit", err)
+	}
+	if !unitExists {
 		return invalidRequest(c, "invalid admin unit")
 	}
 
 	payload.ID = "ADMIN-" + fmt.Sprintf("%d", time.Now().UnixMilli())
 	now := time.Now()
 	if err := db.Exec(
-		`INSERT INTO `+adminTable+` (id, first_name, last_name, email, password, unit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		payload.ID, payload.FirstName, payload.LastName, payload.Email, payload.Password, payload.Unit, now, now,
+		`INSERT INTO `+adminTable+` (id, first_name, last_name, email, password, unit, is_disabled, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		payload.ID, payload.FirstName, payload.LastName, payload.Email, payload.Password, payload.Unit, false, now, now,
 	).Error; err != nil {
 		return serverError(c, "failed to register admin", err)
 	}
@@ -402,6 +437,10 @@ func LoginUser(c *fiber.Ctx) error {
 }
 
 func LoginAdmin(c *fiber.Ctx) error {
+	if err := ensureAdminDisableColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
+	}
+
 	//Storage preparation
 	var payload struct {
 		Email    string `json:"email"`
@@ -415,7 +454,7 @@ func LoginAdmin(c *fiber.Ctx) error {
 
 	var admin model.AdminModel
 	if err := middleware.DBConn.Raw(
-		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, created_at, updated_at
+		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, created_at, updated_at
 		FROM `+adminTable+` WHERE email = ? AND password = ?`,
 		strings.TrimSpace(payload.Email),
 		strings.TrimSpace(payload.Password),
@@ -424,6 +463,9 @@ func LoginAdmin(c *fiber.Ctx) error {
 	}
 	if admin.ID == "" {
 		return unauthorized(c, "invalid email or password")
+	}
+	if admin.IsDisabled {
+		return unauthorized(c, "admin account is disabled")
 	}
 
 	return success(c, fiber.StatusOK, admin)
@@ -451,14 +493,232 @@ func LoginSuperAdmin(c *fiber.Ctx) error {
 	})
 }
 
-func ListAdmins(c *fiber.Ctx) error {
+func ListCategories(c *fiber.Ctx) error {
+	categories, err := listCategories()
+	if err != nil {
+		return serverError(c, "failed to fetch categories", err)
+	}
+
+	return success(c, fiber.StatusOK, categories)
+}
+
+func CreateCategoryBySuperAdmin(c *fiber.Ctx) error {
 	if err := requireSuperAdmin(c); err != nil {
 		return err
 	}
 
+	if err := ensureCategoryStore(); err != nil {
+		return serverError(c, "failed to initialize categories", err)
+	}
+
+	var payload struct {
+		Name string `json:"name"`
+	}
+	if err := parseBody(c, &payload); err != nil {
+		return parseError(c, "failed to parse category", err)
+	}
+
+	name := strings.TrimSpace(payload.Name)
+	if name == "" {
+		return invalidRequest(c, "category name is required")
+	}
+
+	exists, err := categoryExists(name)
+	if err != nil {
+		return serverError(c, "failed to validate category", err)
+	}
+	if exists {
+		return invalidRequest(c, "category already exists")
+	}
+
+	if err := middleware.DBConn.Exec(
+		`INSERT INTO `+categoryTable+` (name, created_at, updated_at) VALUES (?, ?, ?)`,
+		name, time.Now(), time.Now(),
+	).Error; err != nil {
+		return serverError(c, "failed to create category", err)
+	}
+
+	if err := syncCategoryConstraints(); err != nil {
+		return serverError(c, "failed to sync category constraints", err)
+	}
+
+	categories, err := listCategories()
+	if err != nil {
+		return serverError(c, "failed to fetch categories", err)
+	}
+
+	return success(c, fiber.StatusCreated, categories)
+}
+
+func UpdateCategoryBySuperAdmin(c *fiber.Ctx) error {
+	if err := requireSuperAdmin(c); err != nil {
+		return err
+	}
+
+	if err := ensureCategoryStore(); err != nil {
+		return serverError(c, "failed to initialize categories", err)
+	}
+
+	categoryID, err := strconv.Atoi(strings.TrimSpace(c.Params("id")))
+	if err != nil || categoryID <= 0 {
+		return invalidRequest(c, "invalid category id")
+	}
+
+	var payload struct {
+		Name string `json:"name"`
+	}
+	if err := parseBody(c, &payload); err != nil {
+		return parseError(c, "failed to parse category update", err)
+	}
+
+	newName := strings.TrimSpace(payload.Name)
+	if newName == "" {
+		return invalidRequest(c, "category name is required")
+	}
+
+	var existing model.CategoryModel
+	if err := middleware.DBConn.Raw(
+		`SELECT id, name, created_at, updated_at FROM `+categoryTable+` WHERE id = ?`,
+		categoryID,
+	).Scan(&existing).Error; err != nil {
+		return serverError(c, "failed to fetch category", err)
+	}
+	if existing.ID == 0 {
+		return notFound(c, "category not found", nil)
+	}
+
+	if strings.EqualFold(existing.Name, newName) {
+		categories, listErr := listCategories()
+		if listErr != nil {
+			return serverError(c, "failed to fetch categories", listErr)
+		}
+		return success(c, fiber.StatusOK, categories)
+	}
+
+	exists, err := categoryExists(newName)
+	if err != nil {
+		return serverError(c, "failed to validate category", err)
+	}
+	if exists {
+		return invalidRequest(c, "category already exists")
+	}
+
+	tx := middleware.DBConn.Begin()
+	if tx.Error != nil {
+		return serverError(c, "failed to start category update", tx.Error)
+	}
+
+	if err := tx.Exec(
+		`UPDATE `+categoryTable+` SET name = ?, updated_at = ? WHERE id = ?`,
+		newName, time.Now(), categoryID,
+	).Error; err != nil {
+		tx.Rollback()
+		return serverError(c, "failed to update category", err)
+	}
+
+	if err := tx.Exec(
+		`UPDATE `+adminTable+` SET unit = ?, updated_at = ? WHERE unit = ?`,
+		newName, time.Now(), existing.Name,
+	).Error; err != nil {
+		tx.Rollback()
+		return serverError(c, "failed to sync admin units", err)
+	}
+
+	if err := tx.Exec(
+		`UPDATE `+feedbackTable+` SET category = ?, updated_at = ? WHERE category = ?`,
+		newName, time.Now(), existing.Name,
+	).Error; err != nil {
+		tx.Rollback()
+		return serverError(c, "failed to sync feedback categories", err)
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return serverError(c, "failed to finalize category update", err)
+	}
+
+	if err := syncCategoryConstraints(); err != nil {
+		return serverError(c, "failed to sync category constraints", err)
+	}
+
+	categories, listErr := listCategories()
+	if listErr != nil {
+		return serverError(c, "failed to fetch categories", listErr)
+	}
+
+	return success(c, fiber.StatusOK, categories)
+}
+
+func DeleteCategoryBySuperAdmin(c *fiber.Ctx) error {
+	if err := requireSuperAdmin(c); err != nil {
+		return err
+	}
+
+	if err := ensureCategoryStore(); err != nil {
+		return serverError(c, "failed to initialize categories", err)
+	}
+
+	categoryID, err := strconv.Atoi(strings.TrimSpace(c.Params("id")))
+	if err != nil || categoryID <= 0 {
+		return invalidRequest(c, "invalid category id")
+	}
+
+	var existing model.CategoryModel
+	if err := middleware.DBConn.Raw(
+		`SELECT id, name, created_at, updated_at FROM `+categoryTable+` WHERE id = ?`,
+		categoryID,
+	).Scan(&existing).Error; err != nil {
+		return serverError(c, "failed to fetch category", err)
+	}
+	if existing.ID == 0 {
+		return notFound(c, "category not found", nil)
+	}
+
+	inUse, err := categoryInUse(existing.Name)
+	if err != nil {
+		return serverError(c, "failed to validate category usage", err)
+	}
+	if inUse {
+		return invalidRequest(c, "category is in use by admin accounts or feedbacks")
+	}
+
+	var categoryCount int64
+	if err := middleware.DBConn.Raw(`SELECT COUNT(*) FROM ` + categoryTable).Scan(&categoryCount).Error; err != nil {
+		return serverError(c, "failed to validate category count", err)
+	}
+	if categoryCount <= 1 {
+		return invalidRequest(c, "at least one category is required")
+	}
+
+	if err := middleware.DBConn.Exec(
+		`DELETE FROM `+categoryTable+` WHERE id = ?`,
+		categoryID,
+	).Error; err != nil {
+		return serverError(c, "failed to delete category", err)
+	}
+
+	if err := syncCategoryConstraints(); err != nil {
+		return serverError(c, "failed to sync category constraints", err)
+	}
+
+	categories, err := listCategories()
+	if err != nil {
+		return serverError(c, "failed to fetch categories", err)
+	}
+
+	return success(c, fiber.StatusOK, categories)
+}
+
+func ListAdmins(c *fiber.Ctx) error {
+	if err := requireSuperAdmin(c); err != nil {
+		return err
+	}
+	if err := ensureAdminDisableColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
+	}
+
 	var admins []model.AdminModel
 	if err := middleware.DBConn.Raw(
-		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, created_at, updated_at
+		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, created_at, updated_at
 		FROM ` + adminTable + ` ORDER BY unit ASC, first_name ASC, last_name ASC`,
 	).Scan(&admins).Error; err != nil {
 		return serverError(c, "failed to fetch admins", err)
@@ -470,6 +730,9 @@ func ListAdmins(c *fiber.Ctx) error {
 func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
 	if err := requireSuperAdmin(c); err != nil {
 		return err
+	}
+	if err := ensureAdminDisableColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
 	}
 
 	var payload model.AdminModel
@@ -486,7 +749,20 @@ func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
 	if payload.FirstName == "" || payload.LastName == "" || payload.Email == "" || payload.Password == "" || payload.Unit == "" {
 		return invalidRequest(c, "missing required admin fields")
 	}
-	if !validUnits[payload.Unit] {
+
+	inUse, err := emailInUse(payload.Email, "", "")
+	if err != nil {
+		return serverError(c, "failed to validate email", err)
+	}
+	if inUse {
+		return invalidRequest(c, "email is already in use")
+	}
+
+	unitExists, err := categoryExists(payload.Unit)
+	if err != nil {
+		return serverError(c, "failed to validate admin unit", err)
+	}
+	if !unitExists {
 		return invalidRequest(c, "invalid admin unit")
 	}
 
@@ -501,9 +777,9 @@ func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
 	payload.ID = "ADMIN-" + fmt.Sprintf("%d", time.Now().UnixMilli())
 	now := time.Now()
 	if err := middleware.DBConn.Exec(
-		`INSERT INTO `+adminTable+` (id, first_name, last_name, email, password, unit, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		payload.ID, payload.FirstName, payload.LastName, payload.Email, payload.Password, payload.Unit, now, now,
+		`INSERT INTO `+adminTable+` (id, first_name, last_name, email, password, unit, is_disabled, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		payload.ID, payload.FirstName, payload.LastName, payload.Email, payload.Password, payload.Unit, false, now, now,
 	).Error; err != nil {
 		return serverError(c, "failed to create admin", err)
 	}
@@ -543,11 +819,22 @@ func UpdateAdminBySuperAdmin(c *fiber.Ctx) error {
 		args = append(args, value)
 	}
 	if value := strings.TrimSpace(payload.Email); value != "" {
+		inUse, err := emailInUse(value, "", c.Params("id"))
+		if err != nil {
+			return serverError(c, "failed to validate email", err)
+		}
+		if inUse {
+			return invalidRequest(c, "email is already in use")
+		}
 		sets = append(sets, "email = ?")
 		args = append(args, value)
 	}
 	if value := strings.TrimSpace(payload.Unit); value != "" {
-		if !validUnits[value] {
+		unitExists, err := categoryExists(value)
+		if err != nil {
+			return serverError(c, "failed to validate admin unit", err)
+		}
+		if !unitExists {
 			return invalidRequest(c, "invalid admin unit")
 		}
 		taken, err := adminUnitTaken(value, c.Params("id"))
@@ -582,12 +869,32 @@ func UpdateAdminBySuperAdmin(c *fiber.Ctx) error {
 	return success(c, fiber.StatusOK, admin)
 }
 
-func DeleteAdminBySuperAdmin(c *fiber.Ctx) error {
+func DisableAdminBySuperAdmin(c *fiber.Ctx) error {
 	if err := requireSuperAdmin(c); err != nil {
 		return err
 	}
+	if err := ensureAdminDisableColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
+	}
 
-	return deleteByID(c, adminTable, "admin", c.Params("id"))
+	result := middleware.DBConn.Exec(
+		`UPDATE `+adminTable+` SET is_disabled = TRUE, updated_at = ? WHERE id = ?`,
+		time.Now(),
+		c.Params("id"),
+	)
+	if result.Error != nil {
+		return serverError(c, "failed to disable admin account", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return notFound(c, "admin not found", nil)
+	}
+
+	admin, err := fetchAdminByID(c.Params("id"))
+	if err != nil {
+		return serverError(c, "failed to fetch admin", err)
+	}
+
+	return success(c, fiber.StatusOK, admin)
 }
 
 func UpdateUserProfile(c *fiber.Ctx) error {
@@ -737,10 +1044,14 @@ func fetchUserByID(id string) (model.UserModel, error) {
 }
 
 func fetchAdminByID(id string) (model.AdminModel, error) {
+	if err := ensureAdminDisableColumn(); err != nil {
+		return model.AdminModel{}, err
+	}
+
 	var admin model.AdminModel
 	// Compose the display name in SQL because the table stores first and last names separately.
 	err := middleware.DBConn.Raw(
-		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, created_at, updated_at
+		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, created_at, updated_at
 		FROM `+adminTable+` WHERE id = ?`,
 		id,
 	).Scan(&admin).Error
@@ -764,7 +1075,11 @@ func normalizeFeedback(feedback *model.FeedbackModel) error {
 	if feedback.Priority == "" {
 		feedback.Priority = "Medium"
 	}
-	if !validUnits[feedback.Category] {
+	categoryOk, err := categoryExists(feedback.Category)
+	if err != nil {
+		return fmt.Errorf("failed to validate feedback category")
+	}
+	if !categoryOk {
 		return fmt.Errorf("invalid feedback category")
 	}
 	if !validStatuses[feedback.Status] {
@@ -807,6 +1122,212 @@ func normalizeFeedback(feedback *model.FeedbackModel) error {
 	}
 
 	return nil
+}
+
+func ensureCategoryStore() error {
+	categoryTableInit.Do(func() {
+		db := middleware.DBConn
+
+		categoryTableInitErr = db.Exec(
+			`CREATE TABLE IF NOT EXISTS ` + categoryTable + ` (
+				id BIGSERIAL PRIMARY KEY,
+				name VARCHAR(100) NOT NULL UNIQUE,
+				created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+				updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+			)`,
+		).Error
+		if categoryTableInitErr != nil {
+			return
+		}
+
+		for _, name := range defaultCategoryNames {
+			if err := db.Exec(
+				`INSERT INTO `+categoryTable+` (name) VALUES (?) ON CONFLICT (name) DO NOTHING`,
+				name,
+			).Error; err != nil {
+				categoryTableInitErr = err
+				return
+			}
+		}
+
+		if err := db.Exec(
+			`INSERT INTO ` + categoryTable + ` (name)
+			 SELECT DISTINCT TRIM(unit) FROM ` + adminTable + `
+			 WHERE unit IS NOT NULL AND TRIM(unit) <> ''
+			 ON CONFLICT (name) DO NOTHING`,
+		).Error; err != nil {
+			categoryTableInitErr = err
+			return
+		}
+
+		if err := db.Exec(
+			`INSERT INTO ` + categoryTable + ` (name)
+			 SELECT DISTINCT TRIM(category) FROM ` + feedbackTable + `
+			 WHERE category IS NOT NULL AND TRIM(category) <> ''
+			 ON CONFLICT (name) DO NOTHING`,
+		).Error; err != nil {
+			categoryTableInitErr = err
+		}
+	})
+
+	return categoryTableInitErr
+}
+
+func ensureAdminDisableColumn() error {
+	adminDisableColumnInit.Do(func() {
+		adminDisableColumnErr = middleware.DBConn.Exec(
+			`ALTER TABLE ` + adminTable + ` ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN NOT NULL DEFAULT FALSE`,
+		).Error
+	})
+	return adminDisableColumnErr
+}
+
+func listCategories() ([]model.CategoryModel, error) {
+	if err := ensureCategoryStore(); err != nil {
+		return nil, err
+	}
+
+	var categories []model.CategoryModel
+	if err := middleware.DBConn.Raw(
+		`SELECT id, name, created_at, updated_at FROM ` + categoryTable + ` ORDER BY name ASC`,
+	).Scan(&categories).Error; err != nil {
+		return nil, err
+	}
+
+	return categories, nil
+}
+
+func listCategoryNames() ([]string, error) {
+	categories, err := listCategories()
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]string, 0, len(categories))
+	for _, category := range categories {
+		names = append(names, category.Name)
+	}
+	return names, nil
+}
+
+func categoryExists(name string) (bool, error) {
+	if err := ensureCategoryStore(); err != nil {
+		return false, err
+	}
+
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return false, nil
+	}
+
+	var count int64
+	if err := middleware.DBConn.Raw(
+		`SELECT COUNT(*) FROM `+categoryTable+` WHERE LOWER(name) = LOWER(?)`,
+		trimmed,
+	).Scan(&count).Error; err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+func categoryInUse(name string) (bool, error) {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return false, nil
+	}
+
+	var adminCount int64
+	if err := middleware.DBConn.Raw(
+		`SELECT COUNT(*) FROM `+adminTable+` WHERE unit = ?`,
+		trimmed,
+	).Scan(&adminCount).Error; err != nil {
+		return false, err
+	}
+
+	var feedbackCount int64
+	if err := middleware.DBConn.Raw(
+		`SELECT COUNT(*) FROM `+feedbackTable+` WHERE category = ?`,
+		trimmed,
+	).Scan(&feedbackCount).Error; err != nil {
+		return false, err
+	}
+
+	return adminCount+feedbackCount > 0, nil
+}
+
+func syncCategoryConstraints() error {
+	names, err := listCategoryNames()
+	if err != nil {
+		return err
+	}
+
+	if len(names) == 0 {
+		return fmt.Errorf("at least one category is required")
+	}
+
+	literals := make([]string, 0, len(names))
+	for _, name := range names {
+		literals = append(literals, "'"+escapeSQLLiteral(name)+"'")
+	}
+	valueList := strings.Join(literals, ", ")
+
+	db := middleware.DBConn
+	if err := db.Exec(`ALTER TABLE ` + feedbackTable + ` DROP CONSTRAINT IF EXISTS chk_feedback_category`).Error; err != nil {
+		return err
+	}
+	if err := db.Exec(`ALTER TABLE ` + adminTable + ` DROP CONSTRAINT IF EXISTS chk_admin_unit`).Error; err != nil {
+		return err
+	}
+	if err := db.Exec(
+		`ALTER TABLE ` + feedbackTable + `
+		 ADD CONSTRAINT chk_feedback_category CHECK (category IN (` + valueList + `))`,
+	).Error; err != nil {
+		return err
+	}
+	if err := db.Exec(
+		`ALTER TABLE ` + adminTable + `
+		 ADD CONSTRAINT chk_admin_unit CHECK (unit IN (` + valueList + `))`,
+	).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func escapeSQLLiteral(value string) string {
+	return strings.ReplaceAll(value, "'", "''")
+}
+
+func emailInUse(email string, excludeUserID string, excludeAdminID string) (bool, error) {
+	normalized := strings.TrimSpace(email)
+	if normalized == "" {
+		return false, nil
+	}
+
+	var userCount int64
+	userQuery := `SELECT COUNT(*) FROM ` + userTable + ` WHERE LOWER(email) = LOWER(?)`
+	userArgs := []any{normalized}
+	if excludeUserID != "" {
+		userQuery += ` AND id <> ?`
+		userArgs = append(userArgs, excludeUserID)
+	}
+	if err := middleware.DBConn.Raw(userQuery, userArgs...).Scan(&userCount).Error; err != nil {
+		return false, err
+	}
+
+	var adminCount int64
+	adminQuery := `SELECT COUNT(*) FROM ` + adminTable + ` WHERE LOWER(email) = LOWER(?)`
+	adminArgs := []any{normalized}
+	if excludeAdminID != "" {
+		adminQuery += ` AND id <> ?`
+		adminArgs = append(adminArgs, excludeAdminID)
+	}
+	if err := middleware.DBConn.Raw(adminQuery, adminArgs...).Scan(&adminCount).Error; err != nil {
+		return false, err
+	}
+
+	return userCount+adminCount > 0, nil
 }
 
 func parseBody(c *fiber.Ctx, dest any) error {

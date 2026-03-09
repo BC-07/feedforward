@@ -3,7 +3,7 @@
 import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  deleteFeedback,
+  listCategories,
   listFeedbacks,
   updateFeedback,
   type Feedback,
@@ -60,18 +60,9 @@ import {
   AlertCircle,
   BarChart3,
   Pencil,
-  Trash2,
   Search,
   UserCircle2,
 } from "lucide-react";
-
-const UNITS = [
-  "IT Unit",
-  "Finance & Registrar Office",
-  "Student Affair Office",
-  "Guidance Office",
-  "Faculty Office",
-];
 
 interface AdminRecord {
   id: string;
@@ -113,6 +104,7 @@ export default function AdminDashboard() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [newUnit, setNewUnit] = useState("");
+  const [categories, setCategories] = useState<string[]>([]);
 
   async function loadFeedbacks(unit: string) {
     if (!unit.trim()) {
@@ -154,6 +146,18 @@ export default function AdminDashboard() {
     }
   }, [currentAdmin?.unit, router]);
 
+  useEffect(() => {
+    void listCategories()
+      .then((data) => {
+        setCategories(data.map((category) => category.name));
+      })
+      .catch((error) => {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load categories.",
+        );
+      });
+  }, []);
+
   const handleUpdateFeedback = async () => {
     if (!selectedFeedback) return;
 
@@ -175,27 +179,6 @@ export default function AdminDashboard() {
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to update feedback.",
-      );
-    }
-  };
-
-  const handleDeleteFeedback = async (feedbackId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this feedback? This action cannot be undone.",
-      )
-    )
-      return;
-
-    try {
-      await deleteFeedback(feedbackId);
-      if (currentAdmin?.unit) {
-        await loadFeedbacks(currentAdmin.unit);
-      }
-      toast.success("Feedback deleted successfully");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete feedback.",
       );
     }
   };
@@ -737,14 +720,6 @@ export default function AdminDashboard() {
                               )}
                             </DialogContent>
                           </Dialog>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteFeedback(feedback.id)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -808,7 +783,7 @@ export default function AdminDashboard() {
                   <SelectValue placeholder="Select a unit" />
                 </SelectTrigger>
                 <SelectContent>
-                  {UNITS.map((unit) => (
+                  {categories.map((unit) => (
                     <SelectItem key={unit} value={unit}>
                       {unit}
                     </SelectItem>

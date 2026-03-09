@@ -35,26 +35,38 @@ type (
 	}
 
 	AdminModel struct {
-		ID        string    `json:"id" gorm:"column:id;primaryKey"`
-		FirstName string    `json:"firstName" gorm:"column:first_name"`
-		LastName  string    `json:"lastName" gorm:"column:last_name"`
-		Name      string    `json:"name" gorm:"column:name;->"`
-		Email     string    `json:"email" gorm:"column:email"`
-		Password  string    `json:"password,omitempty" gorm:"column:password"`
-		Unit      string    `json:"unit" gorm:"column:unit"`
+		ID         string    `json:"id" gorm:"column:id;primaryKey"`
+		FirstName  string    `json:"firstName" gorm:"column:first_name"`
+		LastName   string    `json:"lastName" gorm:"column:last_name"`
+		Name       string    `json:"name" gorm:"column:name;->"`
+		Email      string    `json:"email" gorm:"column:email"`
+		Password   string    `json:"password,omitempty" gorm:"column:password"`
+		Unit       string    `json:"unit" gorm:"column:unit"`
+		IsDisabled bool      `json:"isDisabled" gorm:"column:is_disabled"`
+		CreatedAt  time.Time `json:"createdAt" gorm:"column:created_at"`
+		UpdatedAt  time.Time `json:"updatedAt" gorm:"column:updated_at"`
+	}
+
+	CategoryModel struct {
+		ID        int       `json:"id" gorm:"column:id;primaryKey"`
+		Name      string    `json:"name" gorm:"column:name"`
 		CreatedAt time.Time `json:"createdAt" gorm:"column:created_at"`
 		UpdatedAt time.Time `json:"updatedAt" gorm:"column:updated_at"`
 	}
 )
 
 func (FeedbackModel) TableName() string {
-	return "public.feedforward_feedback"
+	return "public.feedbacks"
 }
 
 func (UserModel) TableName() string {
-	return "public.feedforward_users"
+	return "public.users"
 }
 
 func (AdminModel) TableName() string {
-	return "public.feedforward_admins"
+	return "public.admins"
+}
+
+func (CategoryModel) TableName() string {
+	return "public.categories"
 }

@@ -31,6 +31,7 @@ export interface Admin {
   name: string;
   email: string;
   unit: string;
+  isDisabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,6 +40,13 @@ export interface SuperAdminSession {
   token: string;
   username: string;
   expiresAt: string;
+}
+
+export interface Category {
+  id: number;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface ApiResponse<T> {
@@ -188,7 +196,46 @@ export async function loginSuperAdmin(payload: {
 }
 
 export async function listAdmins(token: string): Promise<Admin[]> {
-  return apiFetch<Admin[]>("/superadmin/admins", {
+  const data = await apiFetch<Admin[] | null>("/superadmin/admins", {
+    headers: withAuthToken(token),
+  });
+  return Array.isArray(data) ? data : [];
+}
+
+export async function listCategories(): Promise<Category[]> {
+  const data = await apiFetch<Category[] | null>("/categories");
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createCategoryBySuperAdmin(
+  token: string,
+  payload: { name: string },
+): Promise<Category[]> {
+  return apiFetch<Category[]>("/superadmin/categories", {
+    method: "POST",
+    headers: withAuthToken(token),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateCategoryBySuperAdmin(
+  token: string,
+  id: number,
+  payload: { name: string },
+): Promise<Category[]> {
+  return apiFetch<Category[]>(`/superadmin/categories/${id}`, {
+    method: "PUT",
+    headers: withAuthToken(token),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteCategoryBySuperAdmin(
+  token: string,
+  id: number,
+): Promise<Category[]> {
+  return apiFetch<Category[]>(`/superadmin/categories/${id}`, {
+    method: "DELETE",
     headers: withAuthToken(token),
   });
 }
@@ -234,6 +281,16 @@ export async function deleteAdminBySuperAdmin(
 ): Promise<void> {
   await apiFetch(`/superadmin/admins/${encodeURIComponent(id)}`, {
     method: "DELETE",
+    headers: withAuthToken(token),
+  });
+}
+
+export async function disableAdminBySuperAdmin(
+  token: string,
+  id: string,
+): Promise<Admin> {
+  return apiFetch<Admin>(`/superadmin/admins/${encodeURIComponent(id)}/disable`, {
+    method: "PUT",
     headers: withAuthToken(token),
   });
 }

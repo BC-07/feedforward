@@ -30,11 +30,14 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/superadmin/admins", controller.ListAdmins)
 	app.Post("/superadmin/admins", controller.CreateAdminBySuperAdmin)
 	app.Put("/superadmin/admins/:id", controller.UpdateAdminBySuperAdmin)
-	app.Delete("/superadmin/admins/:id", controller.DeleteAdminBySuperAdmin)
+	app.Put("/superadmin/admins/:id/disable", controller.DisableAdminBySuperAdmin)
+	app.Get("/categories", controller.ListCategories)
+	app.Post("/superadmin/categories", controller.CreateCategoryBySuperAdmin)
+	app.Put("/superadmin/categories/:id", controller.UpdateCategoryBySuperAdmin)
+	app.Delete("/superadmin/categories/:id", controller.DeleteCategoryBySuperAdmin)
 	app.Get("/feedbacks", controller.GetFeedbacks)
 	app.Get("/feedbacks/:id", controller.GetFeedbackByID)
 	app.Post("/feedbacks", controller.CreateFeedback)
 	app.Put("/feedbacks/:id", controller.UpdateFeedback)
-	app.Delete("/feedbacks/:id", controller.DeleteFeedback)
 	// --------------------------
 }

@@ -14,16 +14,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { LogIn, Mail, Lock, User, Shield } from "lucide-react";
+import { LogIn, Mail, Lock } from "lucide-react";
 
 export default function Login() {
   const router = useRouter();
-  const [userEmail, setUserEmail] = useState("");
-  const [userPassword, setUserPassword] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [superAdminUsername, setSuperAdminUsername] = useState("");
   const [superAdminPassword, setSuperAdminPassword] = useState("");
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
@@ -41,38 +38,43 @@ export default function Login() {
     return () => window.removeEventListener("keydown", handleShortcut);
   }, []);
 
-  const handleUserLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
       const user = await loginUser({
-        email: userEmail,
-        password: userPassword,
+        email,
+        password,
       });
       localStorage.setItem("isUserLoggedIn", "true");
       localStorage.setItem("currentUserId", user.id);
       localStorage.setItem("currentUserName", user.name);
       localStorage.setItem("currentUserEmail", user.email);
+      localStorage.removeItem("isAdminLoggedIn");
+      localStorage.removeItem("currentAdminId");
+      localStorage.removeItem("currentAdminName");
+      localStorage.removeItem("currentAdminEmail");
+      localStorage.removeItem("currentAdminDepartment");
       toast.success(`Welcome back, ${user.name}!`);
       router.push("/user");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Invalid email or password",
-      );
+      return;
+    } catch {
+      // Try admin login with the same form credentials.
     }
-  };
 
-  const handleAdminLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
     try {
       const admin = await loginAdmin({
-        email: adminEmail,
-        password: adminPassword,
+        email,
+        password,
       });
       localStorage.setItem("isAdminLoggedIn", "true");
       localStorage.setItem("currentAdminId", admin.id);
       localStorage.setItem("currentAdminName", admin.name);
       localStorage.setItem("currentAdminEmail", admin.email);
       localStorage.setItem("currentAdminDepartment", admin.unit);
+      localStorage.removeItem("isUserLoggedIn");
+      localStorage.removeItem("currentUserId");
+      localStorage.removeItem("currentUserName");
+      localStorage.removeItem("currentUserEmail");
       toast.success(`Welcome back, ${admin.name}!`);
       router.push("/dashboard");
     } catch (error) {
@@ -123,122 +125,55 @@ export default function Login() {
             <LogIn className="h-8 w-8 text-accent" />
           </button>
           <CardTitle>Login to FeedForward</CardTitle>
-          <CardDescription>
-            Choose your account type to continue
-          </CardDescription>
+          <CardDescription>Sign in with your account credentials</CardDescription>
         </CardHeader>
 
         <CardContent>
-          <Tabs defaultValue="user" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="user" className="gap-2">
-                <User className="h-4 w-4" />
-                User
-              </TabsTrigger>
-              <TabsTrigger value="admin" className="gap-2">
-                <Shield className="h-4 w-4" />
-                Admin
-              </TabsTrigger>
-            </TabsList>
-
-            {/* USER LOGIN */}
-            <TabsContent value="user">
-              <form onSubmit={handleUserLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="user-email">Email Address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="user-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      className="pl-10"
-                      value={userEmail}
-                      onChange={(e) => setUserEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="user-password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="user-password"
-                      type="password"
-                      placeholder="Enter your password"
-                      className="pl-10"
-                      value={userPassword}
-                      onChange={(e) => setUserPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-accent hover:bg-accent/90"
-                  size="lg"
-                >
-                  Log In as User
-                </Button>
-                <p className="text-center text-sm text-muted-foreground">
-                  Don&apos;t have an account?{" "}
-                  <Link
-                    href="/register"
-                    className="text-accent hover:underline font-medium"
-                  >
-                    Sign up
-                  </Link>
-                </p>
-              </form>
-            </TabsContent>
-
-            {/* ADMIN LOGIN */}
-            <TabsContent value="admin">
-              <form onSubmit={handleAdminLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="admin-email">Email Address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="admin-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      className="pl-10"
-                      value={adminEmail}
-                      onChange={(e) => setAdminEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="admin-password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="admin-password"
-                      type="password"
-                      placeholder="Enter your password"
-                      className="pl-10"
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-black hover:bg-gray-800"
-                  size="lg"
-                >
-                  Log In as Admin
-                </Button>
-                <p className="text-center text-sm text-muted-foreground">
-                  Admin accounts are managed by superadmin.
-                </p>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  className="pl-10"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  className="pl-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-accent hover:bg-accent/90"
+              size="lg"
+            >
+              Log In
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Don&apos;t have an account?{" "}
+              <Link href="/register" className="text-accent hover:underline font-medium">
+                Sign up
+              </Link>
+            </p>
+          </form>
 
           {showSuperAdmin && (
             <div className="mt-6 border-t pt-6">

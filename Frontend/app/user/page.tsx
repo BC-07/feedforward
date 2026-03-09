@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import {
   createFeedback,
   getFeedback,
+  listCategories,
   listFeedbacks,
   type Feedback,
 } from "@/lib/api";
@@ -79,6 +80,7 @@ export default function UserProfile() {
     subject: "",
     message: "",
   });
+  const [categories, setCategories] = useState<string[]>([]);
 
   async function loadUserFeedbacks(userId: string) {
     try {
@@ -112,6 +114,18 @@ export default function UserProfile() {
         );
       });
   }, [router]);
+
+  useEffect(() => {
+    void listCategories()
+      .then((data) => {
+        setCategories(data.map((category) => category.name));
+      })
+      .catch((error) => {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load categories.",
+        );
+      });
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("isUserLoggedIn");
@@ -430,19 +444,11 @@ export default function UserProfile() {
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="IT Unit">IT Unit</SelectItem>
-                        <SelectItem value="Finance & Registrar Office">
-                          Finance &amp; Registrar Office
-                        </SelectItem>
-                        <SelectItem value="Student Affair Office">
-                          Student Affair Office
-                        </SelectItem>
-                        <SelectItem value="Guidance Office">
-                          Guidance Office
-                        </SelectItem>
-                        <SelectItem value="Faculty Office">
-                          Faculty Office
-                        </SelectItem>
+                        {categories.map((category) => (
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createFeedback } from "@/lib/api";
+import { createFeedback, listCategories } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,17 @@ export default function Submit() {
     message: "",
   });
   const [trackingId, setTrackingId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+
+  useEffect(() => {
+    void listCategories()
+      .then((data) => setCategories(data.map((category) => category.name)))
+      .catch((error) => {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load categories.",
+        );
+      });
+  }, []);
 
   const copyToClipboard = (text: string) => {
     const textArea = document.createElement("textarea");
@@ -204,19 +215,11 @@ export default function Submit() {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="IT Unit">IT Unit</SelectItem>
-                    <SelectItem value="Finance & Registrar Office">
-                      Finance & Registrar Office
-                    </SelectItem>
-                    <SelectItem value="Student Affair Office">
-                      Student Affair Office
-                    </SelectItem>
-                    <SelectItem value="Guidance Office">
-                      Guidance Office
-                    </SelectItem>
-                    <SelectItem value="Faculty Office">
-                      Faculty Office
-                    </SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
