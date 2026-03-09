@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { loginAdmin, loginUser } from "@/lib/api";
+import { loginAdmin, loginSuperAdmin, loginUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,22 @@ export default function Login() {
   const [userPassword, setUserPassword] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+  const [superAdminUsername, setSuperAdminUsername] = useState("");
+  const [superAdminPassword, setSuperAdminPassword] = useState("");
+  const [showSuperAdmin, setShowSuperAdmin] = useState(false);
+  const [secretTapCount, setSecretTapCount] = useState(0);
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        setShowSuperAdmin(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
 
   const handleUserLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -66,13 +82,46 @@ export default function Login() {
     }
   };
 
+  const handleSuperAdminLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    try {
+      const session = await loginSuperAdmin({
+        username: superAdminUsername,
+        password: superAdminPassword,
+      });
+      localStorage.setItem("isSuperAdminLoggedIn", "true");
+      localStorage.setItem("superAdminToken", session.token);
+      localStorage.setItem("superAdminName", session.username);
+      localStorage.setItem("superAdminExpiresAt", session.expiresAt);
+      toast.success("Superadmin access granted");
+      router.push("/superadmin");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Invalid superadmin credentials",
+      );
+    }
+  };
+
+  const handleSecretTap = () => {
+    const nextCount = secretTapCount + 1;
+    setSecretTapCount(nextCount);
+    if (nextCount >= 5) {
+      setShowSuperAdmin(true);
+      setSecretTapCount(0);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted p-4">
       <Card className="max-w-md w-full shadow-lg">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={handleSecretTap}
+            className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center"
+          >
             <LogIn className="h-8 w-8 text-accent" />
-          </div>
+          </button>
           <CardTitle>Login to FeedForward</CardTitle>
           <CardDescription>
             Choose your account type to continue
@@ -185,17 +234,52 @@ export default function Login() {
                   Log In as Admin
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
-                  Don&apos;t have an admin account?{" "}
-                  <Link
-                    href="/register"
-                    className="text-black hover:underline font-medium"
-                  >
-                    Register here
-                  </Link>
+                  Admin accounts are managed by superadmin.
                 </p>
               </form>
             </TabsContent>
           </Tabs>
+
+          {showSuperAdmin && (
+            <div className="mt-6 border-t pt-6">
+              <div className="mb-4 text-center">
+                <p className="text-sm font-semibold text-primary">
+                  Restricted Console
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Hidden access for system-level administration
+                </p>
+              </div>
+              <form onSubmit={handleSuperAdminLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="superadmin-username">Username</Label>
+                  <Input
+                    id="superadmin-username"
+                    value={superAdminUsername}
+                    onChange={(e) => setSuperAdminUsername(e.target.value)}
+                    placeholder="Enter superadmin username"
+                    autoComplete="username"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="superadmin-password">Password</Label>
+                  <Input
+                    id="superadmin-password"
+                    type="password"
+                    value={superAdminPassword}
+                    onChange={(e) => setSuperAdminPassword(e.target.value)}
+                    placeholder="Enter superadmin password"
+                    autoComplete="current-password"
+                    required
+                  />
+                </div>
+                <Button type="submit" className="w-full" variant="secondary">
+                  Open Superadmin Dashboard
+                </Button>
+              </form>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

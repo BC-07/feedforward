@@ -65,6 +65,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isDashboardRoute = pathname.startsWith("/dashboard");
+  const isSuperAdminRoute = pathname.startsWith("/superadmin");
   const [, setStorageVersion] = useState(0);
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
   const userAvatarInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +95,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     isBrowser && localStorage.getItem("isUserLoggedIn") === "true";
   const isAdminLoggedIn =
     isBrowser && localStorage.getItem("isAdminLoggedIn") === "true";
+  const isSuperAdminLoggedIn =
+    isBrowser && localStorage.getItem("isSuperAdminLoggedIn") === "true";
   const userId = isBrowser ? localStorage.getItem("currentUserId") || "" : "";
   const userName = isBrowser
     ? localStorage.getItem("currentUserName") || ""
@@ -117,6 +120,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     isBrowser && adminId
       ? localStorage.getItem(`adminAvatar_${adminId}`) || ""
       : "";
+  const superAdminName = isBrowser
+    ? localStorage.getItem("superAdminName") || "superadmin"
+    : "superadmin";
 
   // ── Avatar upload handlers ───────────────────────────────────────────────
   const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,6 +179,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setStorageVersion((value) => value + 1);
     toast.success("Admin logged out successfully");
     router.push("/");
+  };
+
+  const handleSuperAdminLogout = () => {
+    localStorage.removeItem("isSuperAdminLoggedIn");
+    localStorage.removeItem("superAdminToken");
+    localStorage.removeItem("superAdminName");
+    localStorage.removeItem("superAdminExpiresAt");
+    setStorageVersion((value) => value + 1);
+    toast.success("Superadmin logged out successfully");
+    router.push("/login");
   };
 
   const handlePasswordChange = async () => {
@@ -321,7 +337,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
 
             {/* Public nav */}
-            {!isDashboardRoute && (
+            {!isDashboardRoute && !isSuperAdminRoute && (
               <nav className="flex items-center gap-6">
                 {isUserLoggedIn ? (
                   <div className="flex items-center gap-3">
@@ -372,6 +388,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </Button>
   </div>
 )}
+            {isSuperAdminRoute && isSuperAdminLoggedIn && (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <UserCircle2 className="h-4 w-4 text-primary" />
+                  <span className="font-medium">{superAdminName}</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSuperAdminLogout}
+                  className="text-sm"
+                >
+                  <LogOut className="h-4 w-4 mr-1" />
+                  Logout
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </header>

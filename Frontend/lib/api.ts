@@ -35,6 +35,12 @@ export interface Admin {
   updatedAt: string;
 }
 
+export interface SuperAdminSession {
+  token: string;
+  username: string;
+  expiresAt: string;
+}
+
 interface ApiResponse<T> {
   retCode: string;
   message: string;
@@ -45,12 +51,14 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5566";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const { headers: initHeaders, ...restInit } = init ?? {};
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: {
       "Content-Type": "application/json",
-      ...(init?.headers || {}),
+      ...(initHeaders || {}),
     },
-    ...init,
+    ...restInit,
   });
 
   const payload = (await response.json()) as ApiResponse<T>;
@@ -66,6 +74,12 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return payload.data;
+}
+
+function withAuthToken(token: string): HeadersInit {
+  return {
+    Authorization: `Bearer ${token}`,
+  };
 }
 
 export async function listFeedbacks(filters?: {
@@ -160,6 +174,67 @@ export async function loginAdmin(payload: {
   return apiFetch<Admin>("/auth/admins/login", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function loginSuperAdmin(payload: {
+  username: string;
+  password: string;
+}): Promise<SuperAdminSession> {
+  return apiFetch<SuperAdminSession>("/auth/superadmin/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listAdmins(token: string): Promise<Admin[]> {
+  return apiFetch<Admin[]>("/superadmin/admins", {
+    headers: withAuthToken(token),
+  });
+}
+
+export async function createAdminBySuperAdmin(
+  token: string,
+  payload: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    unit: string;
+  },
+): Promise<Admin> {
+  return apiFetch<Admin>("/superadmin/admins", {
+    method: "POST",
+    headers: withAuthToken(token),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAdminBySuperAdmin(
+  token: string,
+  id: string,
+  payload: Partial<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+    unit: string;
+  }>,
+): Promise<Admin> {
+  return apiFetch<Admin>(`/superadmin/admins/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: withAuthToken(token),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAdminBySuperAdmin(
+  token: string,
+  id: string,
+): Promise<void> {
+  await apiFetch(`/superadmin/admins/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: withAuthToken(token),
   });
 }
 
