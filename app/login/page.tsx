@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { LogIn, Mail, Lock, User, Shield } from "lucide-react";
+import { loginUser, loginAdmin } from "@/frontend/api";
 
 export default function Login() {
   const router = useRouter();
@@ -23,48 +24,44 @@ export default function Login() {
   const [userPassword, setUserPassword] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleUserLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUserLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (typeof window === "undefined") return;
-
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const user = users.find(
-      (u: any) => u.email === userEmail && u.password === userPassword,
-    );
-
-    if (user) {
+    setIsLoading(true);
+    try {
+      const res = await loginUser({ email: userEmail, password: userPassword });
+      const user = res.data;
       localStorage.setItem("isUserLoggedIn", "true");
       localStorage.setItem("currentUserId", user.id);
       localStorage.setItem("currentUserName", user.name);
       localStorage.setItem("currentUserEmail", user.email);
       toast.success(`Welcome back, ${user.name}!`);
       router.push("/user");
-    } else {
-      toast.error("Invalid email or password");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Invalid email or password");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleAdminLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAdminLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (typeof window === "undefined") return;
-
-    const admins = JSON.parse(localStorage.getItem("admins") || "[]");
-    const admin = admins.find(
-      (a: any) => a.email === adminEmail && a.password === adminPassword,
-    );
-
-    if (admin) {
-      const adminUnit = admin.unit || admin.department || "";
+    setIsLoading(true);
+    try {
+      const res = await loginAdmin({ email: adminEmail, password: adminPassword });
+      const admin = res.data;
       localStorage.setItem("isAdminLoggedIn", "true");
       localStorage.setItem("currentAdminId", admin.id);
       localStorage.setItem("currentAdminName", admin.name);
       localStorage.setItem("currentAdminEmail", admin.email);
-      localStorage.setItem("currentAdminDepartment", adminUnit);
+      localStorage.setItem("currentAdminDepartment", admin.unit);
       toast.success(`Welcome back, ${admin.name}!`);
       router.push("/dashboard");
-    } else {
-      toast.error("Invalid email or password");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Invalid email or password");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -131,8 +128,9 @@ export default function Login() {
                   type="submit"
                   className="w-full bg-accent hover:bg-accent/90"
                   size="lg"
+                  disabled={isLoading}
                 >
-                  Log In as User
+                  {isLoading ? "Logging in..." : "Log In as User"}
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
                   Don&apos;t have an account?{" "}
@@ -183,8 +181,9 @@ export default function Login() {
                   type="submit"
                   className="w-full bg-black hover:bg-gray-800"
                   size="lg"
+                  disabled={isLoading}
                 >
-                  Log In as Admin
+                  {isLoading ? "Logging in..." : "Log In as Admin"}
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
                   Don&apos;t have an admin account?{" "}
@@ -203,3 +202,4 @@ export default function Login() {
     </div>
   );
 }
+

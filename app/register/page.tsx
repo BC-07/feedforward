@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -23,6 +23,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { UserPlus, Mail, Lock, User, Shield, KeyRound } from "lucide-react";
+import { registerUser, registerAdmin } from "@/frontend/api";
 
 const UNITS = [
   "IT Unit",
@@ -37,6 +38,7 @@ export default function Signup() {
   const searchParams = useSearchParams();
   const accountType = searchParams.get("type") || "user";
   const [activeTab, setActiveTab] = useState(accountType);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     setActiveTab(accountType);
@@ -60,9 +62,8 @@ export default function Signup() {
     confirmPassword: "",
   });
 
-  const handleUserSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUserSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (typeof window === "undefined") return;
 
     if (userFormData.password !== userFormData.confirmPassword) {
       toast.error("Passwords do not match");
@@ -73,35 +74,26 @@ export default function Signup() {
       return;
     }
 
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    if (users.some((u: any) => u.email === userFormData.email)) {
-      toast.error("Email already registered");
-      return;
+    setIsLoading(true);
+    try {
+      await registerUser({
+        firstName: userFormData.firstName,
+        lastName: userFormData.lastName,
+        email: userFormData.email,
+        password: userFormData.password,
+      });
+      toast.success("Account created successfully!");
+      router.push("/login");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setIsLoading(false);
     }
-
-    const newUser = {
-      id: `USER-${Date.now()}`,
-      name: `${userFormData.firstName} ${userFormData.lastName}`,
-      firstName: userFormData.firstName,
-      lastName: userFormData.lastName,
-      email: userFormData.email,
-      password: userFormData.password,
-      createdAt: new Date().toISOString(),
-    };
-    users.push(newUser);
-    localStorage.setItem("users", JSON.stringify(users));
-    toast.success("Account created successfully!");
-    router.push("/login");
   };
 
-  const handleAdminSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAdminSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (typeof window === "undefined") return;
 
-    if (adminFormData.adminKey !== "FEEDFORWARD2026") {
-      toast.error("Invalid admin registration key");
-      return;
-    }
     if (adminFormData.password !== adminFormData.confirmPassword) {
       toast.error("Passwords do not match");
       return;
@@ -115,28 +107,23 @@ export default function Signup() {
       return;
     }
 
-    const admins = JSON.parse(localStorage.getItem("admins") || "[]");
-    if (admins.some((a: any) => a.email === adminFormData.email)) {
-      toast.error("Email already registered");
-      return;
+    setIsLoading(true);
+    try {
+      await registerAdmin({
+        adminKey: adminFormData.adminKey,
+        firstName: adminFormData.firstName,
+        lastName: adminFormData.lastName,
+        email: adminFormData.email,
+        password: adminFormData.password,
+        unit: adminFormData.unit,
+      });
+      toast.success("Admin account created successfully!");
+      router.push("/login");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Registration failed");
+    } finally {
+      setIsLoading(false);
     }
-
-    // Explicitly construct — no spread to avoid stale/extra fields
-    const newAdmin = {
-      id: `ADMIN-${Date.now()}`,
-      name: `${adminFormData.firstName} ${adminFormData.lastName}`,
-      firstName: adminFormData.firstName,
-      lastName: adminFormData.lastName,
-      email: adminFormData.email,
-      password: adminFormData.password,
-      unit: adminFormData.unit, // e.g. "IT Unit"
-      department: adminFormData.unit, // same value, for login compatibility
-      createdAt: new Date().toISOString(),
-    };
-    admins.push(newAdmin);
-    localStorage.setItem("admins", JSON.stringify(admins));
-    toast.success("Admin account created successfully!");
-    router.push("/login");
   };
 
   return (
@@ -291,8 +278,9 @@ export default function Signup() {
                   type="submit"
                   className="w-full bg-accent hover:bg-accent/90"
                   size="lg"
+                  disabled={isLoading}
                 >
-                  Create User Account
+                  {isLoading ? "Creating account..." : "Create User Account"}
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
                   Already have an account?{" "}
@@ -483,8 +471,9 @@ export default function Signup() {
                   type="submit"
                   className="w-full bg-black hover:bg-gray-800"
                   size="lg"
+                  disabled={isLoading}
                 >
-                  Create Admin Account
+                  {isLoading ? "Creating account..." : "Create Admin Account"}
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
                   Already have an account?{" "}

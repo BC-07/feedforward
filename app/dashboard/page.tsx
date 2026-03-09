@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -59,23 +59,13 @@ import {
   Search,
   UserCircle2,
 } from "lucide-react";
-
-interface Feedback {
-  id: string;
-  type: string;
-  category: string;
-  subject: string;
-  message: string;
-  status: string;
-  priority: string;
-  userId?: string | null;
-  userName?: string;
-  submittedBy?: string;
-  isAnonymous?: boolean;
-  createdAt: string;
-  updatedAt: string;
-  response?: string;
-}
+import {
+  getFeedbacksByUnit,
+  updateFeedback,
+  deleteFeedback,
+  updateAdminUnit,
+  FeedbackData,
+} from "@/frontend/api";
 
 const UNITS = [
   "IT Unit",
@@ -93,10 +83,8 @@ export default function AdminDashboard() {
     email: string;
     unit: string;
   } | null>(null);
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
-  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
-    null,
-  );
+  const [feedbacks, setFeedbacks] = useState<FeedbackData[]>([]);
+  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackData | null>(null);
   const [response, setResponse] = useState("");
   const [newStatus, setNewStatus] = useState("");
   const [newPriority, setNewPriority] = useState("");
@@ -123,45 +111,22 @@ export default function AdminDashboard() {
     const adminEmail = localStorage.getItem("currentAdminEmail") || "";
     const adminUnit = localStorage.getItem("currentAdminDepartment") || "";
 
-    console.log("[Dashboard] adminUnit from localStorage:", adminUnit);
-
-    const admin = {
-      id: adminId,
-      name: adminName,
-      email: adminEmail,
-      unit: adminUnit,
-    };
+    const admin = { id: adminId, name: adminName, email: adminEmail, unit: adminUnit };
     setCurrentAdmin(admin);
 
-    const stored: Feedback[] = JSON.parse(
-      localStorage.getItem("feedbacks") || "[]",
-    );
-    console.log("[Dashboard] all feedbacks:", stored);
-    console.log(
-      "[Dashboard] feedbacks categories:",
-      stored.map((f) => f.category),
-    );
-    console.log("[Dashboard] filtering by unit:", adminUnit);
-
-    // FIX: case-insensitive + trimmed category match
-    const filtered = stored.filter(
-      (f) =>
-        f.category?.trim().toLowerCase() === adminUnit?.trim().toLowerCase(),
-    );
-    console.log("[Dashboard] filtered feedbacks:", filtered);
-    setFeedbacks(filtered);
+    if (adminUnit) {
+      loadFeedbacks(adminUnit);
+    }
   }, [router]);
 
-  const loadFeedbacks = (unit: string) => {
-    const stored: Feedback[] = JSON.parse(
-      localStorage.getItem("feedbacks") || "[]",
-    );
-    // FIX: case-insensitive + trimmed category match
-    setFeedbacks(
-      stored.filter(
-        (f) => f.category?.trim().toLowerCase() === unit?.trim().toLowerCase(),
-      ),
-    );
+  const loadFeedbacks = async (unit: string) => {
+    try {
+      const res = await getFeedbacksByUnit(unit);
+      setFeedbacks(res.data || []);
+    } catch (err: unknown) {
+      console.error("Failed to load feedbacks:", err);
+      toast.error("Failed to load feedbacks");
+    }
   };
 
   const handleLogout = () => {
@@ -174,91 +139,58 @@ export default function AdminDashboard() {
     router.push("/login");
   };
 
-  const handleUpdateFeedback = () => {
+  const handleUpdateFeedback = async () => {
     if (!selectedFeedback) return;
 
-    const allFeedbacks: Feedback[] = JSON.parse(
-      localStorage.getItem("feedbacks") || "[]",
-    );
-    const updated = allFeedbacks.map((f) =>
-      f.id === selectedFeedback.id
-        ? {
-            ...f,
-            status: newStatus || f.status,
-            response: response || f.response,
-            priority: newPriority || f.priority,
-            updatedAt: new Date().toISOString(),
-          }
-        : f,
-    );
-
-    localStorage.setItem("feedbacks", JSON.stringify(updated));
-    setFeedbacks(
-      updated.filter(
-        (f) =>
-          f.category?.trim().toLowerCase() ===
-          currentAdmin?.unit?.trim().toLowerCase(),
-      ),
-    );
-    toast.success("Feedback updated successfully");
-    setSelectedFeedback(null);
-    setResponse("");
-    setNewStatus("");
-    setNewPriority("");
-    setIsEditDialogOpen(false);
-  };
-
-  const handleDeleteFeedback = (feedbackId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this feedback? This action cannot be undone.",
-      )
-    )
-      return;
-
-    const allFeedbacks: Feedback[] = JSON.parse(
-      localStorage.getItem("feedbacks") || "[]",
-    );
-    const updated = allFeedbacks.filter((f) => f.id !== feedbackId);
-    localStorage.setItem("feedbacks", JSON.stringify(updated));
-    setFeedbacks(
-      updated.filter(
-        (f) =>
-          f.category?.trim().toLowerCase() ===
-          currentAdmin?.unit?.trim().toLowerCase(),
-      ),
-    );
-    toast.success("Feedback deleted successfully");
-  };
-
-  const handleUnitChange = () => {
-    if (!newUnit || newUnit === currentAdmin?.unit) return;
-
-    const admins = JSON.parse(localStorage.getItem("admins") || "[]");
-    const unitTaken = admins.some(
-      (a: any) =>
-        (a.unit === newUnit || a.department === newUnit) &&
-        a.id !== currentAdmin?.id,
-    );
-    if (unitTaken) {
-      toast.error("This unit already has an admin. Change is not allowed.");
-      return;
+    try {
+      const res = await updateFeedback(selectedFeedback.id, {
+        status: newStatus || selectedFeedback.status,
+        priority: newPriority || selectedFeedback.priority,
+        response: response || selectedFeedback.response,
+      });
+      const updated = res.data;
+      setFeedbacks((prev) =>
+        prev.map((f) => (f.id === updated.id ? updated : f)),
+      );
+      toast.success("Feedback updated successfully");
+      setSelectedFeedback(null);
+      setResponse("");
+      setNewStatus("");
+      setNewPriority("");
+      setIsEditDialogOpen(false);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to update feedback");
     }
+  };
 
-    const updatedAdmins = admins.map((a: any) =>
-      a.id === currentAdmin?.id
-        ? { ...a, unit: newUnit, department: newUnit }
-        : a,
-    );
-    localStorage.setItem("admins", JSON.stringify(updatedAdmins));
-    localStorage.setItem("currentAdminDepartment", newUnit);
+  const handleDeleteFeedback = async (feedbackId: string) => {
+    if (!confirm("Are you sure you want to delete this feedback? This action cannot be undone."))
+      return;
 
-    const updatedAdmin = { ...currentAdmin!, unit: newUnit };
-    setCurrentAdmin(updatedAdmin);
-    loadFeedbacks(newUnit);
-    setNewUnit("");
-    setIsProfileOpen(false);
-    toast.success("Unit updated successfully!");
+    try {
+      await deleteFeedback(feedbackId);
+      setFeedbacks((prev) => prev.filter((f) => f.id !== feedbackId));
+      toast.success("Feedback deleted successfully");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete feedback");
+    }
+  };
+
+  const handleUnitChange = async () => {
+    if (!newUnit || newUnit === currentAdmin?.unit || !currentAdmin) return;
+
+    try {
+      await updateAdminUnit(currentAdmin.id, newUnit);
+      localStorage.setItem("currentAdminDepartment", newUnit);
+      const updatedAdmin = { ...currentAdmin, unit: newUnit };
+      setCurrentAdmin(updatedAdmin);
+      loadFeedbacks(newUnit);
+      setNewUnit("");
+      setIsProfileOpen(false);
+      toast.success("Unit updated successfully!");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to update unit");
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -307,7 +239,6 @@ export default function AdminDashboard() {
         feedback.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
         feedback.id.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesType = filterType === "all" || feedback.type === filterType;
-      // FIX: use regex replace to remove ALL spaces for comparison
       const matchesStatus =
         filterStatus === "all" ||
         feedback.status.toLowerCase().replace(/\s+/g, "") === filterStatus;
@@ -319,10 +250,10 @@ export default function AdminDashboard() {
     .sort((a, b) => {
       if (filterName === "all" || filterName === "") return 0;
       const nameA = (
-        a.isAnonymous ? "*****" : a.submittedBy || a.userName || "*****"
+        a.isAnonymous ? "*****" : a.userName || "*****"
       ).toLowerCase();
       const nameB = (
-        b.isAnonymous ? "*****" : b.submittedBy || b.userName || "*****"
+        b.isAnonymous ? "*****" : b.userName || "*****"
       ).toLowerCase();
       return filterName === "asc"
         ? nameA.localeCompare(nameB)
@@ -347,6 +278,16 @@ export default function AdminDashboard() {
                   </span>
                 )}
               </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setIsProfileOpen(true)}>
+                <UserCircle2 className="mr-2 h-4 w-4" />
+                Profile
+              </Button>
+              <Button variant="secondary" onClick={handleLogout}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
             </div>
           </div>
         </div>
@@ -453,10 +394,7 @@ export default function AdminDashboard() {
                 </Select>
               </div>
               <div className="min-w-[130px]">
-                <Select
-                  value={filterPriority}
-                  onValueChange={setFilterPriority}
-                >
+                <Select value={filterPriority} onValueChange={setFilterPriority}>
                   <SelectTrigger>
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
@@ -534,11 +472,9 @@ export default function AdminDashboard() {
                         <TableCell className="font-mono text-sm">
                           {feedback.isAnonymous
                             ? "*****"
-                            : feedback.submittedBy
-                              ? feedback.submittedBy.split(" ")[0]
-                              : feedback.userName
-                                ? feedback.userName.split(" ")[0]
-                                : "*****"}
+                            : feedback.userName
+                              ? feedback.userName.split(" ")[0]
+                              : "*****"}
                         </TableCell>
                         <TableCell className="font-mono text-sm">
                           {feedback.id}
@@ -665,8 +601,7 @@ export default function AdminDashboard() {
                                         <p className="font-medium">
                                           {selectedFeedback.isAnonymous
                                             ? "*****"
-                                            : selectedFeedback.submittedBy ||
-                                              selectedFeedback.userName ||
+                                            : selectedFeedback.userName ||
                                               "*****"}
                                         </p>
                                       </div>
@@ -879,4 +814,5 @@ export default function AdminDashboard() {
       </Sheet>
     </div>
   );
+
 }

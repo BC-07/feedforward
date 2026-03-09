@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -35,34 +35,22 @@ import {
   UserX,
   ChevronLeft,
 } from "lucide-react";
-
-interface Feedback {
-  id: string;
-  type: string;
-  category: string;
-  subject: string;
-  message: string;
-  status: string;
-  priority: string;
-  createdAt: string;
-  updatedAt: string;
-  response?: string;
-  userId: string;
-  isAnonymous?: boolean;
-  submittedBy?: string;
-  userName?: string;
-}
+import {
+  submitFeedback,
+  getFeedbackById,
+  getFeedbacksByUser,
+  FeedbackData,
+} from "@/frontend/api";
 
 export default function UserProfile() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [feedbacks, setFeedbacks] = useState<FeedbackData[]>([]);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [searchTrackingId, setSearchTrackingId] = useState("");
-  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
-    null,
-  );
+  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackData | null>(null);
   const [isAnonymous, setIsAnonymous] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     type: "",
     category: "",
@@ -84,19 +72,18 @@ export default function UserProfile() {
       fullName: localStorage.getItem("currentUserName") || "",
       name: localStorage.getItem("currentUserName") || "",
       email: localStorage.getItem("currentUserEmail") || "",
-      school: localStorage.getItem("currentUserSchool") || "",
-      department: localStorage.getItem("currentUserDepartment") || "",
     };
     setCurrentUser(user);
     loadUserFeedbacks(userId);
   }, [router]);
 
-  const loadUserFeedbacks = (userId: string) => {
-    const allFeedbacks = JSON.parse(localStorage.getItem("feedbacks") || "[]");
-    const userFeedbacks = allFeedbacks.filter(
-      (f: Feedback) => f.userId === userId,
-    );
-    setFeedbacks(userFeedbacks);
+  const loadUserFeedbacks = async (userId: string) => {
+    try {
+      const res = await getFeedbacksByUser(userId);
+      setFeedbacks(res.data || []);
+    } catch (err: unknown) {
+      console.error("Failed to load feedbacks:", err);
+    }
   };
 
   const handleLogout = () => {
@@ -104,8 +91,6 @@ export default function UserProfile() {
     localStorage.removeItem("currentUserId");
     localStorage.removeItem("currentUserName");
     localStorage.removeItem("currentUserEmail");
-    localStorage.removeItem("currentUserSchool");
-    localStorage.removeItem("currentUserDepartment");
     toast.success("Logged out successfully");
     router.push("/login");
   };
@@ -122,70 +107,61 @@ export default function UserProfile() {
     try {
       document.execCommand("copy");
       toast.success("Tracking ID copied!");
-    } catch (err) {
+    } catch {
       toast.error("Failed to copy. Please copy manually.");
     }
     document.body.removeChild(textArea);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
 
-    const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
-    const allFeedbacks = JSON.parse(localStorage.getItem("feedbacks") || "[]");
-    const newFeedback = {
-      id: newTrackingId,
-      type: formData.type,
-      // FIX: ensure category is saved exactly as selected, trimmed
-      category: formData.category.trim(),
-      subject: formData.subject,
-      message: formData.message,
-      status: "Pending",
-      priority: "Medium",
-      isAnonymous,
-      userId: currentUser.id,
-      userName: currentUser.fullName,
-      submittedBy: isAnonymous ? "Anonymous" : currentUser.fullName,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    console.log(
-      "[UserDashboard] Saving feedback:",
-      JSON.stringify(newFeedback),
-    );
-    allFeedbacks.push(newFeedback);
-    localStorage.setItem("feedbacks", JSON.stringify(allFeedbacks));
+    setIsLoading(true);
+    try {
+      const res = await submitFeedback({
+        type: formData.type,
+        category: formData.category.trim(),
+        subject: formData.subject,
+        message: formData.message,
+        userId: currentUser.id,
+        userName: currentUser.fullName,
+        isAnonymous,
+      });
 
-    setTrackingId(newTrackingId);
-    loadUserFeedbacks(currentUser.id);
-    toast.success("Feedback submitted successfully!");
-    setFormData({ type: "", category: "", subject: "", message: "" });
+      const newId = res.data.id;
+      setTrackingId(newId);
+      await loadUserFeedbacks(currentUser.id);
+      toast.success("Feedback submitted successfully!");
+      setFormData({ type: "", category: "", subject: "", message: "" });
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit feedback");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // FIX: search ALL feedbacks in localStorage, not just the user's own list
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const allFeedbacks = JSON.parse(localStorage.getItem("feedbacks") || "[]");
-    const found = allFeedbacks.find(
-      (f: Feedback) => f.id === searchTrackingId.trim(),
-    );
-    if (found) {
-      setSelectedFeedback(found);
+    try {
+      const res = await getFeedbackById(searchTrackingId.trim());
+      setSelectedFeedback(res.data);
       toast.success("Feedback found!");
-    } else {
+    } catch {
       setSelectedFeedback(null);
       toast.error("Feedback not found. Please check your tracking ID.");
     }
   };
 
-  // FIX: reload from localStorage when viewing selected feedback to get latest admin updates
-  const handleViewFeedback = (feedback: Feedback) => {
-    const allFeedbacks = JSON.parse(localStorage.getItem("feedbacks") || "[]");
-    const latest =
-      allFeedbacks.find((f: Feedback) => f.id === feedback.id) || feedback;
-    setSelectedFeedback(latest);
-    setSearchTrackingId(latest.id);
+  const handleViewFeedback = async (feedback: FeedbackData) => {
+    try {
+      const res = await getFeedbackById(feedback.id);
+      setSelectedFeedback(res.data);
+      setSearchTrackingId(res.data.id);
+    } catch {
+      setSelectedFeedback(feedback);
+      setSearchTrackingId(feedback.id);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -250,25 +226,11 @@ export default function UserProfile() {
   const getStatusSteps = (currentStatus: string) => {
     const steps = [
       { name: "Submitted", description: "", completed: true },
-      {
-        name: "Under Review",
-        description: "Being assessed by our team",
-        completed: false,
-      },
-      {
-        name: "In Progress",
-        description: "Actions being taken",
-        completed: false,
-      },
+      { name: "Under Review", description: "Being assessed by our team", completed: false },
+      { name: "In Progress", description: "Actions being taken", completed: false },
       { name: "Resolved", description: "Issue addressed", completed: false },
     ];
-    const statusOrder = [
-      "pending",
-      "under review",
-      "in progress",
-      "resolved",
-      "closed",
-    ];
+    const statusOrder = ["pending", "under review", "in progress", "resolved", "closed"];
     const currentIndex = statusOrder.indexOf(currentStatus.toLowerCase());
     return steps.map((step, index) => ({
       ...step,
@@ -357,6 +319,10 @@ export default function UserProfile() {
                 Welcome, {currentUser?.fullName}
               </p>
             </div>
+            <Button variant="secondary" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
           </div>
         </div>
       </div>
@@ -483,9 +449,10 @@ export default function UserProfile() {
                   <Button
                     type="submit"
                     className="w-full bg-accent hover:bg-accent/90"
+                    disabled={isLoading}
                   >
                     <Send className="mr-2 h-4 w-4" />
-                    Submit Feedback
+                    {isLoading ? "Submitting..." : "Submit Feedback"}
                   </Button>
                 </form>
               </CardContent>
@@ -521,6 +488,35 @@ export default function UserProfile() {
                 </form>
               </CardContent>
             </Card>
+
+            {/* My Submissions List */}
+            {!selectedFeedback && feedbacks.length > 0 && (
+              <Card className="shadow-lg mb-6">
+                <CardHeader>
+                  <CardTitle>My Submissions</CardTitle>
+                  <CardDescription>{feedbacks.length} feedback(s) submitted</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {feedbacks.map((fb) => (
+                      <div
+                        key={fb.id}
+                        className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleViewFeedback(fb)}
+                      >
+                        <div className="flex-1 min-w-0 mr-3">
+                          <p className="font-mono text-xs text-muted-foreground">{fb.id}</p>
+                          <p className="font-medium text-sm truncate">{fb.subject}</p>
+                        </div>
+                        <Badge className={getStatusColor(fb.status)} variant="outline">
+                          {fb.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Detail view */}
             {selectedFeedback && (
@@ -625,9 +621,7 @@ export default function UserProfile() {
                       <p className="text-sm font-semibold text-muted-foreground mb-1">
                         Priority
                       </p>
-                      <p
-                        className={`capitalize ${getPriorityColor(selectedFeedback.priority)}`}
-                      >
+                      <p className={`capitalize ${getPriorityColor(selectedFeedback.priority)}`}>
                         {selectedFeedback.priority}
                       </p>
                     </div>
@@ -635,25 +629,19 @@ export default function UserProfile() {
                       <p className="text-sm font-semibold text-muted-foreground mb-1">
                         Subject
                       </p>
-                      <p className="font-semibold">
-                        {selectedFeedback.subject}
-                      </p>
+                      <p className="font-semibold">{selectedFeedback.subject}</p>
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-muted-foreground mb-1">
                         Message
                       </p>
-                      <p className="text-sm leading-relaxed">
-                        {selectedFeedback.message}
-                      </p>
+                      <p className="text-sm leading-relaxed">{selectedFeedback.message}</p>
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-muted-foreground mb-1">
                         Last Updated
                       </p>
-                      <p className="text-sm">
-                        {formatDate(selectedFeedback.updatedAt)}
-                      </p>
+                      <p className="text-sm">{formatDate(selectedFeedback.updatedAt)}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -674,62 +662,6 @@ export default function UserProfile() {
                   </Card>
                 )}
               </div>
-            )}
-
-            {/* Submissions list */}
-            {!selectedFeedback && feedbacks.length > 0 && (
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle>My Submissions</CardTitle>
-                  <CardDescription>
-                    Your recent feedback submissions
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {feedbacks.map((feedback) => (
-                    <div
-                      key={feedback.id}
-                      className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => handleViewFeedback(feedback)}
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <p className="font-semibold">{feedback.subject}</p>
-                        <Badge
-                          className={getStatusColor(feedback.status)}
-                          variant="outline"
-                        >
-                          {feedback.status}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                        {feedback.message}
-                      </p>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="font-mono">{feedback.id}</span>
-                        <span>
-                          {new Date(feedback.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-
-            {!selectedFeedback && feedbacks.length === 0 && (
-              <Card className="shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="text-center py-8">
-                    <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      No Submissions Yet
-                    </h3>
-                    <p className="text-muted-foreground">
-                      Submit your first feedback using the form on the left.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
             )}
           </div>
         </div>

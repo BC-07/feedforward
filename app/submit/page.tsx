@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ArrowRight, Send } from "lucide-react";
+import { submitFeedback } from "@/frontend/api";
 
 interface FormData {
   type: string;
@@ -37,6 +38,7 @@ export default function Submit() {
     message: "",
   });
   const [trackingId, setTrackingId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const copyToClipboard = (text: string) => {
     const textArea = document.createElement("textarea");
@@ -56,43 +58,31 @@ export default function Submit() {
     document.body.removeChild(textArea);
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
-
-    if (typeof window !== "undefined") {
-      const userId = localStorage.getItem("currentUserId") || null;
+    setIsLoading(true);
+    try {
+      const userId = localStorage.getItem("currentUserId") || "";
       const userName = localStorage.getItem("currentUserName") || "Anonymous";
-      const userSchool = localStorage.getItem("currentUserSchool") || null;
-      const userDepartment =
-        localStorage.getItem("currentUserDepartment") || null;
 
-      const feedbacks: object[] = JSON.parse(
-        localStorage.getItem("feedbacks") || "[]",
-      );
-
-      const newFeedback = {
-        id: newTrackingId,
-        ...formData,
+      const res = await submitFeedback({
+        type: formData.type,
+        category: formData.category,
+        subject: formData.subject,
+        message: formData.message,
         userId,
         userName,
-        userSchool,
-        userDepartment,
-        status: "Pending",
-        priority: "Medium",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+        isAnonymous: true,
+      });
 
-      feedbacks.push(newFeedback);
-      localStorage.setItem("feedbacks", JSON.stringify(feedbacks));
+      setTrackingId(res.data.id);
+      toast.success("Feedback submitted successfully!");
+      setFormData({ type: "", category: "", subject: "", message: "" });
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit feedback");
+    } finally {
+      setIsLoading(false);
     }
-
-    setTrackingId(newTrackingId);
-    toast.success("Feedback submitted successfully!");
-
-    setFormData({ type: "", category: "", subject: "", message: "" });
   };
 
   if (trackingId) {
@@ -241,9 +231,10 @@ export default function Submit() {
                 type="submit"
                 className="w-full bg-accent hover:bg-accent/90"
                 size="lg"
+                disabled={isLoading}
               >
                 <Send className="mr-2 h-4 w-4" />
-                Submit Feedback
+                {isLoading ? "Submitting..." : "Submit Feedback"}
               </Button>
             </form>
           </CardContent>

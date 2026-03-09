@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,38 +7,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Search, Clock, CheckCircle, Circle, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
-
-interface Feedback {
-  id: string;
-  type: string;
-  category: string;
-  subject: string;
-  message: string;
-  status: string;
-  priority: string;
-  createdAt: string;
-  updatedAt: string;
-  response?: string;
-}
+import { getFeedbackById, FeedbackData } from "@/frontend/api";
 
 export default function TrackFeedback() {
   const [trackingId, setTrackingId] = useState("");
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackData | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const feedbacks = JSON.parse(localStorage.getItem("feedbacks") || "[]");
-    const found = feedbacks.find((f: Feedback) => f.id === trackingId.trim());
-    
-    if (found) {
-      setFeedback(found);
+    setIsLoading(true);
+    try {
+      const res = await getFeedbackById(trackingId.trim());
+      setFeedback(res.data);
       setNotFound(false);
-    } else {
+    } catch {
       setFeedback(null);
       setNotFound(true);
       toast.error("Feedback not found. Please check your tracking ID.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -147,9 +136,9 @@ export default function TrackFeedback() {
                   required
                 />
               </div>
-              <Button type="submit" className="bg-accent hover:bg-accent/90">
+              <Button type="submit" className="bg-accent hover:bg-accent/90" disabled={isLoading}>
                 <Search className="mr-2 h-4 w-4" />
-                Search
+                {isLoading ? "Searching..." : "Search"}
               </Button>
             </form>
           </CardContent>
@@ -305,3 +294,4 @@ export default function TrackFeedback() {
     </div>
   );
 }
+
