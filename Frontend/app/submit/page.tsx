@@ -39,6 +39,10 @@ export default function Submit() {
     subject: "",
     message: "",
   });
+  const userEmail =
+    typeof window !== "undefined"
+      ? localStorage.getItem("currentUserEmail") || ""
+      : "";
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
 
@@ -90,6 +94,7 @@ export default function Submit() {
         ...formData,
         userId,
         userName,
+        userEmail: userEmail || undefined,
         isAnonymous: !userId,
         status: "Pending",
         priority: "Medium",
@@ -141,6 +146,15 @@ export default function Submit() {
               Please save this tracking ID to check the status of your
               submission.
             </p>
+            {userEmail ? (
+              <p className="text-xs text-muted-foreground text-center">
+                A copy of this tracking ID was sent to {userEmail}.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center">
+                Sign in to receive email updates when your feedback is resolved.
+              </p>
+            )}
             <div className="flex gap-3">
               <Button
                 variant="outline"
@@ -177,7 +191,8 @@ export default function Submit() {
           <CardHeader>
             <CardTitle>Feedback Form</CardTitle>
             <CardDescription>
-              All submissions are anonymous and confidential
+              All submissions are anonymous and confidential. If you are signed
+              in, we will email your tracking ID and resolution updates.
             </CardDescription>
           </CardHeader>
           <CardContent>

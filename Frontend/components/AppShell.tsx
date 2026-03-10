@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   Sheet,
   SheetContent,
@@ -23,6 +23,117 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+
+const SESSION_EVENT = "feedforward:session-change";
+
+type SessionSnapshot = {
+  isUserLoggedIn: boolean;
+  isAdminLoggedIn: boolean;
+  isSuperAdminLoggedIn: boolean;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userAvatar: string;
+  adminId: string;
+  adminName: string;
+  adminEmail: string;
+  adminUnit: string;
+  adminAvatar: string;
+  superAdminName: string;
+};
+
+const emptySessionSnapshot: SessionSnapshot = {
+  isUserLoggedIn: false,
+  isAdminLoggedIn: false,
+  isSuperAdminLoggedIn: false,
+  userId: "",
+  userName: "",
+  userEmail: "",
+  userAvatar: "",
+  adminId: "",
+  adminName: "",
+  adminEmail: "",
+  adminUnit: "",
+  adminAvatar: "",
+  superAdminName: "superadmin",
+};
+
+let cachedSessionSnapshot: SessionSnapshot | null = null;
+
+function readSessionSnapshotFromStorage(): SessionSnapshot {
+  const userId = localStorage.getItem("currentUserId") || "";
+  const adminId = localStorage.getItem("currentAdminId") || "";
+
+  return {
+    isUserLoggedIn: localStorage.getItem("isUserLoggedIn") === "true",
+    isAdminLoggedIn: localStorage.getItem("isAdminLoggedIn") === "true",
+    isSuperAdminLoggedIn: localStorage.getItem("isSuperAdminLoggedIn") === "true",
+    userId,
+    userName: localStorage.getItem("currentUserName") || "",
+    userEmail: localStorage.getItem("currentUserEmail") || "",
+    userAvatar: userId ? localStorage.getItem(`userAvatar_${userId}`) || "" : "",
+    adminId,
+    adminName: localStorage.getItem("currentAdminName") || "",
+    adminEmail: localStorage.getItem("currentAdminEmail") || "",
+    adminUnit: localStorage.getItem("currentAdminDepartment") || "",
+    adminAvatar: adminId
+      ? localStorage.getItem(`adminAvatar_${adminId}`) || ""
+      : "",
+    superAdminName: localStorage.getItem("superAdminName") || "superadmin",
+  };
+}
+
+function isSameSnapshot(a: SessionSnapshot, b: SessionSnapshot): boolean {
+  return (
+    a.isUserLoggedIn === b.isUserLoggedIn &&
+    a.isAdminLoggedIn === b.isAdminLoggedIn &&
+    a.isSuperAdminLoggedIn === b.isSuperAdminLoggedIn &&
+    a.userId === b.userId &&
+    a.userName === b.userName &&
+    a.userEmail === b.userEmail &&
+    a.userAvatar === b.userAvatar &&
+    a.adminId === b.adminId &&
+    a.adminName === b.adminName &&
+    a.adminEmail === b.adminEmail &&
+    a.adminUnit === b.adminUnit &&
+    a.adminAvatar === b.adminAvatar &&
+    a.superAdminName === b.superAdminName
+  );
+}
+
+function getSessionSnapshot(): SessionSnapshot {
+  if (typeof window === "undefined") {
+    return emptySessionSnapshot;
+  }
+
+  const nextSnapshot = readSessionSnapshotFromStorage();
+  if (cachedSessionSnapshot && isSameSnapshot(cachedSessionSnapshot, nextSnapshot)) {
+    return cachedSessionSnapshot;
+  }
+
+  cachedSessionSnapshot = nextSnapshot;
+  return nextSnapshot;
+}
+
+function subscribeSessionSnapshot(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const handler = () => onStoreChange();
+  window.addEventListener("storage", handler);
+  window.addEventListener(SESSION_EVENT, handler);
+  return () => {
+    window.removeEventListener("storage", handler);
+    window.removeEventListener(SESSION_EVENT, handler);
+  };
+}
+
+function announceSessionChange() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SESSION_EVENT));
+  }
+}
 
 // ── Reusable Avatar component ──────────────────────────────────────────────
 const AvatarDisplay = ({
@@ -66,7 +177,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isSuperAdminRoute = pathname.startsWith("/superadmin");
-  const [, setStorageVersion] = useState(0);
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
   const userAvatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -89,40 +199,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     newPassword: "",
     confirmPassword: "",
   });
+  const [isHydrated, setIsHydrated] = useState(false);
+  const session = useSyncExternalStore(
+    subscribeSessionSnapshot,
+    getSessionSnapshot,
+    () => emptySessionSnapshot,
+  );
+  const effectiveSession = isHydrated ? session : emptySessionSnapshot;
 
-  const isBrowser = typeof window !== "undefined";
-  const isUserLoggedIn =
-    isBrowser && localStorage.getItem("isUserLoggedIn") === "true";
-  const isAdminLoggedIn =
-    isBrowser && localStorage.getItem("isAdminLoggedIn") === "true";
-  const isSuperAdminLoggedIn =
-    isBrowser && localStorage.getItem("isSuperAdminLoggedIn") === "true";
-  const userId = isBrowser ? localStorage.getItem("currentUserId") || "" : "";
-  const userName = isBrowser
-    ? localStorage.getItem("currentUserName") || ""
-    : "";
-  const userEmail = isBrowser
-    ? localStorage.getItem("currentUserEmail") || ""
-    : "";
-  const userAvatar =
-    isBrowser && userId ? localStorage.getItem(`userAvatar_${userId}`) || "" : "";
-  const adminId = isBrowser ? localStorage.getItem("currentAdminId") || "" : "";
-  const adminName = isBrowser
-    ? localStorage.getItem("currentAdminName") || ""
-    : "";
-  const adminEmail = isBrowser
-    ? localStorage.getItem("currentAdminEmail") || ""
-    : "";
-  const adminUnit = isBrowser
-    ? localStorage.getItem("currentAdminDepartment") || ""
-    : "";
-  const adminAvatar =
-    isBrowser && adminId
-      ? localStorage.getItem(`adminAvatar_${adminId}`) || ""
-      : "";
-  const superAdminName = isBrowser
-    ? localStorage.getItem("superAdminName") || "superadmin"
-    : "superadmin";
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  const {
+    isUserLoggedIn,
+    isAdminLoggedIn,
+    isSuperAdminLoggedIn,
+    userId,
+    userName,
+    userEmail,
+    userAvatar,
+    adminId,
+    adminName,
+    adminEmail,
+    adminUnit,
+    adminAvatar,
+    superAdminName,
+  } = effectiveSession;
 
   // ── Avatar upload handlers ───────────────────────────────────────────────
   const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,7 +239,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     reader.onload = () => {
       const base64 = reader.result as string;
       localStorage.setItem(`adminAvatar_${adminId}`, base64);
-      setStorageVersion((value) => value + 1);
+      announceSessionChange();
       toast.success("Profile photo updated!");
     };
     reader.readAsDataURL(file);
@@ -153,7 +256,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     reader.onload = () => {
       const base64 = reader.result as string;
       localStorage.setItem(`userAvatar_${userId}`, base64);
-      setStorageVersion((value) => value + 1);
+      announceSessionChange();
       toast.success("Profile photo updated!");
     };
     reader.readAsDataURL(file);
@@ -165,7 +268,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("currentUserId");
     localStorage.removeItem("currentUserName");
     localStorage.removeItem("currentUserEmail");
-    setStorageVersion((value) => value + 1);
+    announceSessionChange();
     toast.success("Logged out successfully");
     router.push("/");
   };
@@ -176,7 +279,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("currentAdminName");
     localStorage.removeItem("currentAdminEmail");
     localStorage.removeItem("currentAdminDepartment");
-    setStorageVersion((value) => value + 1);
+    announceSessionChange();
     toast.success("Admin logged out successfully");
     router.push("/");
   };
@@ -186,7 +289,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("superAdminToken");
     localStorage.removeItem("superAdminName");
     localStorage.removeItem("superAdminExpiresAt");
-    setStorageVersion((value) => value + 1);
+    announceSessionChange();
     toast.success("Superadmin logged out successfully");
     router.push("/login");
   };
@@ -239,7 +342,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         firstName: "",
         lastName: "",
       });
-      setStorageVersion((value) => value + 1);
+      announceSessionChange();
       toast.success("Admin profile updated!");
     } catch (error) {
       toast.error(
@@ -313,7 +416,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         newPassword: "",
         confirmPassword: "",
       });
-      setStorageVersion((value) => value + 1);
+      announceSessionChange();
       toast.success("Profile updated!");
     } catch (error) {
       toast.error(

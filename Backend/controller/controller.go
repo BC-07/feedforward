@@ -64,6 +64,8 @@ var categoryTableInit sync.Once
 var categoryTableInitErr error
 var adminDisableColumnInit sync.Once
 var adminDisableColumnErr error
+var feedbackEmailColumnInit sync.Once
+var feedbackEmailColumnErr error
 
 func Getnames(c *fiber.Ctx) error {
 	db := middleware.DBConn
@@ -123,9 +125,12 @@ func InsertExec(c *fiber.Ctx) error {
 
 func GetFeedbacks(c *fiber.Ctx) error {
 	db := middleware.DBConn
+	if err := ensureFeedbackEmailColumn(); err != nil {
+		return serverError(c, "failed to initialize feedback email storage", err)
+	}
 
 	// Build the filter dynamically so the same handler supports admin and user views.
-	query := `SELECT id, type, category, subject, message, status, priority, user_id, user_name, is_anonymous, response, created_at, updated_at
+	query := `SELECT id, type, category, subject, message, status, priority, user_id, user_name, user_email, is_anonymous, response, created_at, updated_at
 		FROM ` + feedbackTable
 	var args []any
 	var conditions []string
@@ -162,6 +167,9 @@ func GetFeedbackByID(c *fiber.Ctx) error {
 
 func CreateFeedback(c *fiber.Ctx) error {
 	db := middleware.DBConn
+	if err := ensureFeedbackEmailColumn(); err != nil {
+		return serverError(c, "failed to initialize feedback email storage", err)
+	}
 
 	//Storage preparation
 	var feedback model.FeedbackModel
@@ -175,6 +183,36 @@ func CreateFeedback(c *fiber.Ctx) error {
 		return invalidRequest(c, err.Error())
 	}
 
+	if feedback.UserID == nil && feedback.UserEmail != nil {
+		user, err := fetchUserByEmail(*feedback.UserEmail)
+		if err != nil {
+			return serverError(c, "failed to validate feedback user email", err)
+		}
+		if user.ID == "" {
+			return invalidRequest(c, "user account not found; please log in again")
+		}
+		feedback.UserID = &user.ID
+		if feedback.UserName == nil || strings.TrimSpace(*feedback.UserName) == "" {
+			name := user.Name
+			feedback.UserName = &name
+		}
+		if feedback.UserEmail == nil || strings.TrimSpace(*feedback.UserEmail) == "" {
+			email := user.Email
+			feedback.UserEmail = &email
+		}
+	}
+
+	if feedback.UserID != nil && (feedback.UserEmail == nil || strings.TrimSpace(*feedback.UserEmail) == "") {
+		user, err := fetchUserByID(strings.TrimSpace(*feedback.UserID))
+		if err != nil {
+			return serverError(c, "failed to load feedback user", err)
+		}
+		if user.Email != "" {
+			email := user.Email
+			feedback.UserEmail = &email
+		}
+	}
+
 	now := time.Now()
 	if feedback.CreatedAt.IsZero() {
 		feedback.CreatedAt = now
@@ -183,8 +221,8 @@ func CreateFeedback(c *fiber.Ctx) error {
 
 	if err := db.Exec(
 		`INSERT INTO `+feedbackTable+`
-			(id, type, category, subject, message, status, priority, user_id, user_name, is_anonymous, response, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			(id, type, category, subject, message, status, priority, user_id, user_name, user_email, is_anonymous, response, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		feedback.ID,
 		feedback.Type,
 		feedback.Category,
@@ -194,6 +232,7 @@ func CreateFeedback(c *fiber.Ctx) error {
 		feedback.Priority,
 		feedback.UserID,
 		feedback.UserName,
+		feedback.UserEmail,
 		feedback.IsAnonymous,
 		feedback.Response,
 		feedback.CreatedAt,
@@ -207,11 +246,26 @@ func CreateFeedback(c *fiber.Ctx) error {
 		return serverError(c, "failed to fetch feedback", err)
 	}
 
+	if err := sendTrackingEmailForFeedback(created); err != nil {
+		fmt.Printf("email: failed to send tracking notification for %s: %v\n", created.ID, err)
+	}
+
 	return success(c, fiber.StatusCreated, created)
 }
 
 func UpdateFeedback(c *fiber.Ctx) error {
 	db := middleware.DBConn
+	if err := ensureFeedbackEmailColumn(); err != nil {
+		return serverError(c, "failed to initialize feedback email storage", err)
+	}
+
+	existing, err := fetchFeedbackByID(c.Params("id"))
+	if err != nil {
+		return serverError(c, "failed to fetch feedback", err)
+	}
+	if existing.ID == "" {
+		return notFound(c, "feedback not found", nil)
+	}
 
 	var payload map[string]any
 	if err := parseBody(c, &payload); err != nil {
@@ -299,6 +353,10 @@ func UpdateFeedback(c *fiber.Ctx) error {
 	updated, err := fetchFeedbackByID(c.Params("id"))
 	if err != nil {
 		return serverError(c, "failed to fetch feedback", err)
+	}
+
+	if err := notifyResolvedIfNeeded(existing, updated); err != nil {
+		fmt.Printf("email: failed to send resolved notification for %s: %v\n", updated.ID, err)
 	}
 
 	return success(c, fiber.StatusOK, updated)
@@ -1022,10 +1080,13 @@ func updatePassword(c *fiber.Ctx, table string, entity string) error {
 }
 
 func fetchFeedbackByID(id string) (model.FeedbackModel, error) {
+	if err := ensureFeedbackEmailColumn(); err != nil {
+		return model.FeedbackModel{}, err
+	}
 	var feedback model.FeedbackModel
 	// Select explicit columns so the API only depends on fields the frontend uses.
 	err := middleware.DBConn.Raw(
-		`SELECT id, type, category, subject, message, status, priority, user_id, user_name, is_anonymous, response, created_at, updated_at
+		`SELECT id, type, category, subject, message, status, priority, user_id, user_name, user_email, is_anonymous, response, created_at, updated_at
 		FROM `+feedbackTable+` WHERE id = ?`,
 		id,
 	).Scan(&feedback).Error
@@ -1039,6 +1100,20 @@ func fetchUserByID(id string) (model.UserModel, error) {
 		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, created_at, updated_at
 		FROM `+userTable+` WHERE id = ?`,
 		id,
+	).Scan(&user).Error
+	return user, err
+}
+
+func fetchUserByEmail(email string) (model.UserModel, error) {
+	var user model.UserModel
+	trimmed := strings.TrimSpace(email)
+	if trimmed == "" {
+		return user, nil
+	}
+	err := middleware.DBConn.Raw(
+		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, created_at, updated_at
+		FROM `+userTable+` WHERE LOWER(email) = LOWER(?)`,
+		trimmed,
 	).Scan(&user).Error
 	return user, err
 }
@@ -1112,6 +1187,14 @@ func normalizeFeedback(feedback *model.FeedbackModel) error {
 			feedback.UserName = &trimmed
 		}
 	}
+	if feedback.UserEmail != nil {
+		trimmed := strings.TrimSpace(*feedback.UserEmail)
+		if trimmed == "" {
+			feedback.UserEmail = nil
+		} else {
+			feedback.UserEmail = &trimmed
+		}
+	}
 	if feedback.Response != nil {
 		trimmed := strings.TrimSpace(*feedback.Response)
 		feedback.Response = &trimmed
@@ -1180,6 +1263,26 @@ func ensureAdminDisableColumn() error {
 		).Error
 	})
 	return adminDisableColumnErr
+}
+
+func ensureFeedbackEmailColumn() error {
+	feedbackEmailColumnInit.Do(func() {
+		db := middleware.DBConn
+		if err := db.Exec(
+			`ALTER TABLE ` + feedbackTable + ` ADD COLUMN IF NOT EXISTS user_email VARCHAR(255)`,
+		).Error; err != nil {
+			feedbackEmailColumnErr = err
+			return
+		}
+
+		feedbackEmailColumnErr = db.Exec(
+			`UPDATE `+feedbackTable+` f
+			 SET user_email = u.email
+			 FROM `+userTable+` u
+			 WHERE f.user_id = u.id AND (f.user_email IS NULL OR f.user_email = '')`,
+		).Error
+	})
+	return feedbackEmailColumnErr
 }
 
 func listCategories() ([]model.CategoryModel, error) {

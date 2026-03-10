@@ -45,28 +45,14 @@ import {
 
 export default function UserProfile() {
   const router = useRouter();
-  const [currentUser] = useState<{
+  const [currentUser, setCurrentUser] = useState<{
     id: string;
     fullName: string;
     name: string;
     email: string;
     school: string;
     department: string;
-  } | null>(() => {
-    if (typeof window === "undefined") {
-      return null;
-    }
-
-    const userId = localStorage.getItem("currentUserId") || "";
-    return {
-      id: userId,
-      fullName: localStorage.getItem("currentUserName") || "",
-      name: localStorage.getItem("currentUserName") || "",
-      email: localStorage.getItem("currentUserEmail") || "",
-      school: localStorage.getItem("currentUserSchool") || "",
-      department: localStorage.getItem("currentUserDepartment") || "",
-    };
-  });
+  } | null>(null);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [searchTrackingId, setSearchTrackingId] = useState("");
@@ -94,6 +80,8 @@ export default function UserProfile() {
   }
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const isLoggedIn = localStorage.getItem("isUserLoggedIn");
     const userId = localStorage.getItem("currentUserId");
 
@@ -102,7 +90,20 @@ export default function UserProfile() {
       return;
     }
 
-    void listFeedbacks({ userId })
+    setCurrentUser({
+      id: userId,
+      fullName: localStorage.getItem("currentUserName") || "",
+      name: localStorage.getItem("currentUserName") || "",
+      email: localStorage.getItem("currentUserEmail") || "",
+      school: localStorage.getItem("currentUserSchool") || "",
+      department: localStorage.getItem("currentUserDepartment") || "",
+    });
+  }, [router]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    void listFeedbacks({ userId: currentUser.id })
       .then((userFeedbacks) => {
         startTransition(() => {
           setFeedbacks(userFeedbacks);
@@ -113,7 +114,7 @@ export default function UserProfile() {
           error instanceof Error ? error.message : "Failed to load feedbacks.",
         );
       });
-  }, [router]);
+  }, [currentUser?.id]);
 
   useEffect(() => {
     void listCategories()
@@ -174,6 +175,7 @@ export default function UserProfile() {
         isAnonymous,
         userId: currentUser.id,
         userName: currentUser.fullName,
+        userEmail: currentUser.email,
         response: "",
       });
 
@@ -296,10 +298,6 @@ export default function UserProfile() {
                   Welcome, {currentUser?.fullName}
                 </p>
               </div>
-              <Button variant="secondary" onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
             </div>
           </div>
         </div>
@@ -328,6 +326,11 @@ export default function UserProfile() {
                   Please save this tracking ID to check the status of your
                   submission.
                 </p>
+                {currentUser?.email && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    A copy of this tracking ID was sent to {currentUser.email}.
+                  </p>
+                )}
                 <div className="flex gap-3">
                   <Button
                     variant="outline"

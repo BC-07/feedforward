@@ -17,6 +17,7 @@ type (
 		Priority    string    `json:"priority" gorm:"column:priority"`
 		UserID      *string   `json:"userId" gorm:"column:user_id"`
 		UserName    *string   `json:"userName" gorm:"column:user_name"`
+		UserEmail   *string   `json:"userEmail" gorm:"column:user_email"`
 		IsAnonymous bool      `json:"isAnonymous" gorm:"column:is_anonymous"`
 		Response    *string   `json:"response" gorm:"column:response"`
 		CreatedAt   time.Time `json:"createdAt" gorm:"column:created_at"`

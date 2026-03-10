@@ -1,0 +1,18 @@
+[00:00:02.639] Server  LOG     ✓ Ready in 1927ms
+[00:00:20.819] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[03:15:15.813] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:15.927] Server  ERROR   ⨯ "unhandledRejection:" Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:15.966] Server  ERROR   ⨯ "unhandledRejection: " Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:16.904] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:16.912] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:16.945] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:16.957] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:16.977] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:16.984] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:17.009] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:17.018] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:17.065] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:17.078] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:17.092] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:17.099] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Internship Time Logs\feedforward\app'
+[03:15:17.112] Server  LOG     ✓ Compiled in 2.2s

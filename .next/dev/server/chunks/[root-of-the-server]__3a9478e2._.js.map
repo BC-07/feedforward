@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 46, "column": 0}, "map": {"version":3,"sources":["file:///C:/Internship%20Time%20Logs/feedforward/proxy.ts"],"sourcesContent":["import { NextResponse } from \"next/server\";\r\nimport type { NextRequest } from \"next/server\";\r\n\r\nexport function proxy(request: NextRequest) {\r\n  // Auth is handled client-side via localStorage.\r\n  // Only protect routes that should not be publicly accessible.\r\n  const { pathname } = request.nextUrl;\r\n\r\n  // Allow all public routes through without restriction\r\n  return NextResponse.next();\r\n}\r\n\r\nexport const config = {\r\n  matcher: [],\r\n};\r\n"],"names":[],"mappings":";;;;;;AAAA;;AAGO,SAAS,MAAM,OAAoB;IACxC,gDAAgD;IAChD,8DAA8D;IAC9D,MAAM,EAAE,QAAQ,EAAE,GAAG,QAAQ,OAAO;IAEpC,sDAAsD;IACtD,OAAO,8IAAY,CAAC,IAAI;AAC1B;AAEO,MAAM,SAAS;IACpB,SAAS,EAAE;AACb"}}]
+}

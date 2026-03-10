@@ -77,18 +77,7 @@ export default function AdminDashboard() {
     name: string;
     email: string;
     unit: string;
-  } | null>(() => {
-    if (typeof window === "undefined") {
-      return null;
-    }
-
-    return {
-      id: localStorage.getItem("currentAdminId") || "",
-      name: localStorage.getItem("currentAdminName") || "",
-      email: localStorage.getItem("currentAdminEmail") || "",
-      unit: localStorage.getItem("currentAdminDepartment") || "",
-    };
-  });
+  } | null>(null);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
@@ -131,20 +120,29 @@ export default function AdminDashboard() {
       return;
     }
 
-    if (currentAdmin?.unit) {
-      void listFeedbacks({ category: currentAdmin.unit })
-        .then((data) => {
-          startTransition(() => {
-            setFeedbacks(data);
-          });
-        })
-        .catch((error) => {
-          toast.error(
-            error instanceof Error ? error.message : "Failed to load feedbacks.",
-          );
+    setCurrentAdmin({
+      id: localStorage.getItem("currentAdminId") || "",
+      name: localStorage.getItem("currentAdminName") || "",
+      email: localStorage.getItem("currentAdminEmail") || "",
+      unit: localStorage.getItem("currentAdminDepartment") || "",
+    });
+  }, [router]);
+
+  useEffect(() => {
+    if (!currentAdmin?.unit) return;
+
+    void listFeedbacks({ category: currentAdmin.unit })
+      .then((data) => {
+        startTransition(() => {
+          setFeedbacks(data);
         });
-    }
-  }, [currentAdmin?.unit, router]);
+      })
+      .catch((error) => {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load feedbacks.",
+        );
+      });
+  }, [currentAdmin?.unit]);
 
   useEffect(() => {
     void listCategories()
@@ -207,7 +205,6 @@ export default function AdminDashboard() {
 
     const updatedAdmin = { ...currentAdmin!, unit: newUnit };
     setCurrentAdmin(updatedAdmin);
-    void loadFeedbacks(newUnit);
     setNewUnit("");
     setIsProfileOpen(false);
     toast.success("Unit updated successfully!");
@@ -709,6 +706,11 @@ export default function AdminDashboard() {
                                         }
                                       />
                                     </div>
+                                    <p className="text-xs text-muted-foreground">
+                                      Marking a submission as Resolved will
+                                      email the user if they registered an
+                                      account.
+                                    </p>
                                     <Button
                                       onClick={handleUpdateFeedback}
                                       className="w-full bg-accent hover:bg-accent/90"
