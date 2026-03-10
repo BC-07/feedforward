@@ -1,22 +1,29 @@
 "use client";
+
 import { useState } from "react";
 import { getFeedback, type Feedback } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Search, Clock, CheckCircle, Circle, MessageCircle } from "lucide-react";
+import { Search, Clock, CheckCircle, Circle, MessageCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { PriorityBadge, StatusBadge } from "@/components/ux/badges";
 
 export default function TrackFeedback() {
   const [trackingId, setTrackingId] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearch = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!trackingId.trim()) {
+      toast.error("Tracking ID is required.");
+      return;
+    }
 
+    setIsSearching(true);
     try {
       const found = await getFeedback(trackingId.trim());
       setFeedback(found);
@@ -25,65 +32,34 @@ export default function TrackFeedback() {
       setFeedback(null);
       setNotFound(true);
       toast.error("Feedback not found. Please check your tracking ID.");
+    } finally {
+      setIsSearching(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "pending":
-        return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20";
-      case "in progress":
-        return "bg-purple-500/10 text-purple-700 border-purple-500/20";
-      case "resolved":
-        return "bg-green-500/10 text-green-700 border-green-500/20";
-      default:
-        return "bg-gray-500/10 text-gray-700 border-gray-500/20";
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority.toLowerCase()) {
-      case "low":
-        return "text-gray-600";
-      case "medium":
-        return "text-yellow-600";
-      case "high":
-        return "text-orange-600";
-      default:
-        return "text-gray-600";
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
 
   const getStatusMessage = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "pending":
-        return "Your feedback has been received and is awaiting review.";
-      case "in progress":
-        return "We are actively working on addressing your feedback.";
-      case "resolved":
-        return "Your feedback has been addressed and resolved.";
-      default:
-        return "Your feedback is being processed.";
-    }
+    const normalized = status.toLowerCase();
+    if (normalized === "pending") return "Your feedback has been received and is awaiting review.";
+    if (normalized === "in progress") return "We are actively working on your feedback.";
+    if (normalized === "resolved") return "Your feedback has been addressed and resolved.";
+    return "Your feedback is being processed.";
   };
 
   const getStatusSteps = (currentStatus: string) => {
     const steps = [
-      { name: "Submitted", description: "", completed: true },
-      { name: "In Progress", description: "Actions being taken", completed: false },
-      { name: "Resolved", description: "Issue addressed", completed: false },
+      { name: "Submitted", description: "" },
+      { name: "In Progress", description: "Actions being taken" },
+      { name: "Resolved", description: "Issue addressed" },
     ];
-
     const statusOrder = ["pending", "in progress", "resolved"];
     const currentIndex = statusOrder.indexOf(currentStatus.toLowerCase());
 
@@ -94,19 +70,19 @@ export default function TrackFeedback() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted p-4 py-12">
+    <div className="ff-page-shell p-4 py-12">
       <div className="container mx-auto max-w-3xl">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-3">Track Your Submission</h1>
-          <p className="text-muted-foreground">
-            Enter your tracking ID to check the status of your feedback
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold">Track Your Submission</h1>
+          <p className="mt-2 text-muted-foreground">
+            Enter your tracking ID to check feedback status.
           </p>
         </div>
 
-        <Card className="shadow-lg mb-6">
+        <Card className="ff-surface mb-6 shadow-lg">
           <CardHeader>
             <CardTitle>Enter Tracking ID</CardTitle>
-            <CardDescription>Your tracking ID was provided when you submitted feedback</CardDescription>
+            <CardDescription>Your tracking ID was provided after feedback submission.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSearch} className="flex gap-3">
@@ -118,12 +94,12 @@ export default function TrackFeedback() {
                   id="tracking-id"
                   placeholder="e.g., FF-ABC123XYZ"
                   value={trackingId}
-                  onChange={(e) => setTrackingId(e.target.value)}
+                  onChange={(event) => setTrackingId(event.target.value)}
                   required
                 />
               </div>
-              <Button type="submit" className="bg-accent hover:bg-accent/90">
-                <Search className="mr-2 h-4 w-4" />
+              <Button type="submit" className="bg-accent hover:bg-accent/90" disabled={isSearching}>
+                {isSearching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
                 Search
               </Button>
             </form>
@@ -131,18 +107,15 @@ export default function TrackFeedback() {
         </Card>
 
         {notFound && (
-          <Card className="shadow-lg border-destructive/50">
+          <Card className="ff-surface border-destructive/50 shadow-lg">
             <CardContent className="pt-6">
-              <div className="text-center py-8">
-                <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
+              <div className="py-8 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
                   <Search className="h-8 w-8 text-destructive" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">Feedback Not Found</h3>
+                <h3 className="mb-2 text-lg font-semibold">Feedback Not Found</h3>
                 <p className="text-muted-foreground">
                   No feedback was found with tracking ID: <strong>{trackingId}</strong>
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Please check your tracking ID and try again.
                 </p>
               </div>
             </CardContent>
@@ -151,55 +124,37 @@ export default function TrackFeedback() {
 
         {feedback && (
           <div className="space-y-6">
-            {/* Status Card */}
-            <Card className="shadow-lg">
+            <Card className="ff-surface shadow-lg">
               <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-1">
-                      Status: <span className="uppercase">{feedback.status}</span>
-                    </h3>
-                  </div>
-                  <Badge className={getStatusColor(feedback.status)} variant="outline">
-                    {feedback.status.toLowerCase()}
-                  </Badge>
+                <div className="mb-6 flex items-start justify-between">
+                  <h3 className="text-lg font-semibold">Status: {feedback.status}</h3>
+                  <StatusBadge status={feedback.status} />
                 </div>
 
-                <div className="flex items-start gap-3 mb-8 p-4 bg-muted/50 rounded-lg">
-                  <Clock className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                <div className="mb-8 flex items-start gap-3 rounded-lg bg-muted/50 p-4">
+                  <Clock className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
                   <p className="text-sm">{getStatusMessage(feedback.status)}</p>
                 </div>
 
-                {/* Status Timeline */}
                 <div className="space-y-4">
                   {getStatusSteps(feedback.status).map((step, index) => (
-                    <div key={index} className="flex gap-4">
+                    <div key={step.name} className="flex gap-4">
                       <div className="flex flex-col items-center">
-                        <div
-                          className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            step.completed ? "bg-green-500/20" : "bg-gray-200"
-                          }`}
-                        >
+                        <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${step.completed ? "bg-green-500/20" : "bg-gray-200"}`}>
                           {step.completed ? (
                             <CheckCircle className="h-5 w-5 text-green-700" />
                           ) : (
                             <Circle className="h-5 w-5 text-gray-400" />
                           )}
                         </div>
-                        {index < getStatusSteps(feedback.status).length - 1 && (
-                          <div className="h-12 w-px bg-border"></div>
-                        )}
+                        {index < getStatusSteps(feedback.status).length - 1 && <div className="h-12 w-px bg-border" />}
                       </div>
-                      <div className="pb-4 flex-1">
+                      <div className="flex-1 pb-4">
                         <p className="font-semibold">{step.name}</p>
                         {step.name === "Submitted" && (
-                          <p className="text-sm text-muted-foreground">
-                            {formatDate(feedback.createdAt)}
-                          </p>
+                          <p className="text-sm text-muted-foreground">{formatDate(feedback.createdAt)}</p>
                         )}
-                        {step.description && (
-                          <p className="text-sm text-muted-foreground">{step.description}</p>
-                        )}
+                        {step.description && <p className="text-sm text-muted-foreground">{step.description}</p>}
                       </div>
                     </div>
                   ))}
@@ -207,49 +162,40 @@ export default function TrackFeedback() {
               </CardContent>
             </Card>
 
-            {/* Feedback Details Card */}
-            <Card className="shadow-lg">
+            <Card className="ff-surface shadow-lg">
               <CardHeader>
                 <CardTitle>Your Feedback Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Type</p>
+                  <p className="mb-1 text-sm font-semibold text-muted-foreground">Type</p>
                   <p className="capitalize">{feedback.type}</p>
                 </div>
-
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Category</p>
+                  <p className="mb-1 text-sm font-semibold text-muted-foreground">Category</p>
                   <p>{feedback.category}</p>
                 </div>
-
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Priority</p>
-                  <p className={`capitalize ${getPriorityColor(feedback.priority)}`}>
-                    {feedback.priority}
-                  </p>
+                  <p className="mb-1 text-sm font-semibold text-muted-foreground">Priority</p>
+                  <PriorityBadge priority={feedback.priority} />
                 </div>
-
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Subject</p>
+                  <p className="mb-1 text-sm font-semibold text-muted-foreground">Subject</p>
                   <p className="font-semibold">{feedback.subject}</p>
                 </div>
-
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Message</p>
+                  <p className="mb-1 text-sm font-semibold text-muted-foreground">Message</p>
                   <p className="text-sm leading-relaxed">{feedback.message}</p>
                 </div>
-
                 <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Last Updated</p>
+                  <p className="mb-1 text-sm font-semibold text-muted-foreground">Last Updated</p>
                   <p className="text-sm">{formatDate(feedback.updatedAt)}</p>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Admin Response Card */}
             {feedback.response && (
-              <Card className="shadow-lg bg-blue-50/50 border-blue-200">
+              <Card className="ff-surface border-blue-200 bg-blue-50/50 shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-blue-900">
                     <MessageCircle className="h-5 w-5" />
@@ -257,26 +203,14 @@ export default function TrackFeedback() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-blue-900/80 leading-relaxed">{feedback.response}</p>
+                  <p className="text-sm leading-relaxed text-blue-900/80">{feedback.response}</p>
                 </CardContent>
               </Card>
             )}
-
-            {/* Footer Message */}
-            <Card className="shadow-lg bg-muted/30 border-muted">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-3">
-                  <MessageCircle className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                  <p className="text-sm text-muted-foreground">
-                    Thank you for submitting your feedback. We appreciate your contribution to improving our
-                    services. Save your tracking ID to check for updates later.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )}
       </div>
     </div>
   );
 }
+

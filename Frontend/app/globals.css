@@ -3,6 +3,7 @@
 
 :root {
   --font-size: 16px;
+  --font-family-display: "Geist", "Segoe UI", sans-serif;
   --background: #ffffff;
   --foreground: #000000;
   --card: #ffffff;
@@ -32,6 +33,35 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   --radius: 0.625rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-pill: 999px;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --surface-1: #ffffff;
+  --surface-2: #fafafa;
+  --surface-3: #f4f4f5;
+  --focus-ring: #ff9500;
+  --action-edit-hover: #ff9500;
+  --action-disable-hover: #dc2626;
+  --action-delete-hover: #dc143c;
+  --status-pending-bg: #fef3c7;
+  --status-pending-fg: #a16207;
+  --status-progress-bg: #dbeafe;
+  --status-progress-fg: #1d4ed8;
+  --status-resolved-bg: #dcfce7;
+  --status-resolved-fg: #166534;
+  --priority-low-bg: #e5e7eb;
+  --priority-low-fg: #374151;
+  --priority-medium-bg: #fef3c7;
+  --priority-medium-fg: #a16207;
+  --priority-high-bg: #ffedd5;
+  --priority-high-fg: #c2410c;
   --sidebar: #f5f5f5;
   --sidebar-foreground: #000000;
   --sidebar-primary: #000000;
@@ -127,6 +157,7 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-family-display);
   }
 
   /**
@@ -178,5 +209,128 @@
     font-size: var(--text-base, 1rem);
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
+  }
+
+  a,
+  button,
+  input,
+  textarea,
+  [role="button"],
+  [role="link"] {
+    @apply outline-none;
+  }
+
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [role="link"]:focus-visible {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 34%, transparent);
+  }
+}
+
+@layer components {
+  .ff-page-shell {
+    @apply min-h-[calc(100vh-200px)] bg-gradient-to-br from-white via-slate-50 to-orange-50;
+  }
+
+  .ff-section-title {
+    @apply text-2xl font-semibold tracking-tight text-foreground;
+  }
+
+  .ff-surface {
+    @apply rounded-xl border bg-card shadow-sm;
+  }
+
+  .ff-required {
+    @apply text-destructive;
+  }
+
+  .ff-field-error {
+    @apply mt-1 text-xs text-destructive;
+  }
+
+  .ff-field-hint {
+    @apply mt-1 text-xs text-muted-foreground;
+  }
+
+  .ff-state-card {
+    @apply rounded-xl border bg-card p-6 text-center;
+  }
+
+  .ff-table-shell {
+    @apply overflow-hidden rounded-xl border;
+  }
+
+  .ff-table-header {
+    @apply sticky top-0 z-10 bg-muted/80 backdrop-blur supports-[backdrop-filter]:bg-muted/60;
+  }
+
+  .ff-table-row {
+    @apply h-14 border-b border-border/70 hover:bg-muted/40;
+  }
+
+  .ff-action-btn {
+    @apply h-9 rounded-lg border border-transparent bg-transparent px-3 text-sm font-medium text-black transition-colors;
+  }
+
+  .ff-action-btn[data-action="edit"]:hover {
+    background: var(--action-edit-hover);
+    color: #000;
+  }
+
+  .ff-action-btn[data-action="disable"]:hover {
+    background: var(--action-disable-hover);
+    color: #000;
+  }
+
+  .ff-action-btn[data-action="delete"]:hover {
+    background: var(--action-delete-hover);
+    color: #000;
+  }
+
+  .ff-badge {
+    @apply inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium;
+  }
+
+  .ff-badge[data-status="pending"] {
+    background: var(--status-pending-bg);
+    color: var(--status-pending-fg);
+    border-color: color-mix(in srgb, var(--status-pending-fg) 18%, transparent);
+  }
+
+  .ff-badge[data-status="in-progress"] {
+    background: var(--status-progress-bg);
+    color: var(--status-progress-fg);
+    border-color: color-mix(in srgb, var(--status-progress-fg) 20%, transparent);
+  }
+
+  .ff-badge[data-status="resolved"] {
+    background: var(--status-resolved-bg);
+    color: var(--status-resolved-fg);
+    border-color: color-mix(in srgb, var(--status-resolved-fg) 18%, transparent);
+  }
+
+  .ff-badge[data-priority="low"] {
+    background: var(--priority-low-bg);
+    color: var(--priority-low-fg);
+    border-color: color-mix(in srgb, var(--priority-low-fg) 18%, transparent);
+  }
+
+  .ff-badge[data-priority="medium"] {
+    background: var(--priority-medium-bg);
+    color: var(--priority-medium-fg);
+    border-color: color-mix(in srgb, var(--priority-medium-fg) 18%, transparent);
+  }
+
+  .ff-badge[data-priority="high"] {
+    background: var(--priority-high-bg);
+    color: var(--priority-high-fg);
+    border-color: color-mix(in srgb, var(--priority-high-fg) 18%, transparent);
+  }
+
+  .ff-role-badge {
+    @apply inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.06em];
   }
 }

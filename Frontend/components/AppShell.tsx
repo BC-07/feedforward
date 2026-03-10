@@ -3,7 +3,6 @@
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  deleteAdminAccount,
   deleteUserAccount,
   updateAdminProfile,
   updateAdminPassword,
@@ -15,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { useState, useRef } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import {
   Sheet,
   SheetContent,
@@ -23,6 +22,71 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+
+const defaultAuthSnapshot = {
+  isUserLoggedIn: false,
+  isAdminLoggedIn: false,
+  isSuperAdminLoggedIn: false,
+  userId: "",
+  userName: "",
+  userEmail: "",
+  userAvatar: "",
+  adminId: "",
+  adminName: "",
+  adminEmail: "",
+  adminUnit: "",
+  adminAvatar: "",
+  superAdminName: "superadmin",
+};
+
+let authCache = defaultAuthSnapshot;
+
+const readAuthFromStorage = () => {
+  if (typeof window === "undefined") return defaultAuthSnapshot;
+  const userId = localStorage.getItem("currentUserId") || "";
+  const adminId = localStorage.getItem("currentAdminId") || "";
+  authCache = {
+    isUserLoggedIn: localStorage.getItem("isUserLoggedIn") === "true",
+    isAdminLoggedIn: localStorage.getItem("isAdminLoggedIn") === "true",
+    isSuperAdminLoggedIn:
+      localStorage.getItem("isSuperAdminLoggedIn") === "true",
+    userId,
+    userName: localStorage.getItem("currentUserName") || "",
+    userEmail: localStorage.getItem("currentUserEmail") || "",
+    userAvatar: userId ? localStorage.getItem(`userAvatar_${userId}`) || "" : "",
+    adminId,
+    adminName: localStorage.getItem("currentAdminName") || "",
+    adminEmail: localStorage.getItem("currentAdminEmail") || "",
+    adminUnit: localStorage.getItem("currentAdminDepartment") || "",
+    adminAvatar: adminId
+      ? localStorage.getItem(`adminAvatar_${adminId}`) || ""
+      : "",
+    superAdminName: localStorage.getItem("superAdminName") || "superadmin",
+  };
+};
+
+// initialize cache once on the client to avoid empty first render
+if (typeof window !== "undefined") {
+  readAuthFromStorage();
+}
+
+const getClientAuthSnapshot = () => authCache;
+const getServerAuthSnapshot = () => defaultAuthSnapshot;
+
+const subscribeAuth = (callback: () => void) => {
+  if (typeof window === "undefined") return () => undefined;
+  const handle = () => {
+    readAuthFromStorage();
+    callback();
+  };
+  window.addEventListener("storage", handle);
+  window.addEventListener("ff-auth", handle as EventListener);
+  handle();
+  return () => {
+    window.removeEventListener("storage", handle);
+    window.removeEventListener("ff-auth", handle as EventListener);
+  };
+};
 
 // ── Reusable Avatar component ──────────────────────────────────────────────
 const AvatarDisplay = ({
@@ -67,6 +131,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isSuperAdminRoute = pathname.startsWith("/superadmin");
   const [, setStorageVersion] = useState(0);
+
+  const refreshAuthCache = () => {
+    if (typeof window === "undefined") return;
+    readAuthFromStorage();
+    setStorageVersion((value) => value + 1);
+    window.dispatchEvent(new Event("ff-auth"));
+  };
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
   const userAvatarInputRef = useRef<HTMLInputElement>(null);
 
@@ -90,39 +161,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     confirmPassword: "",
   });
 
-  const isBrowser = typeof window !== "undefined";
-  const isUserLoggedIn =
-    isBrowser && localStorage.getItem("isUserLoggedIn") === "true";
-  const isAdminLoggedIn =
-    isBrowser && localStorage.getItem("isAdminLoggedIn") === "true";
-  const isSuperAdminLoggedIn =
-    isBrowser && localStorage.getItem("isSuperAdminLoggedIn") === "true";
-  const userId = isBrowser ? localStorage.getItem("currentUserId") || "" : "";
-  const userName = isBrowser
-    ? localStorage.getItem("currentUserName") || ""
-    : "";
-  const userEmail = isBrowser
-    ? localStorage.getItem("currentUserEmail") || ""
-    : "";
-  const userAvatar =
-    isBrowser && userId ? localStorage.getItem(`userAvatar_${userId}`) || "" : "";
-  const adminId = isBrowser ? localStorage.getItem("currentAdminId") || "" : "";
-  const adminName = isBrowser
-    ? localStorage.getItem("currentAdminName") || ""
-    : "";
-  const adminEmail = isBrowser
-    ? localStorage.getItem("currentAdminEmail") || ""
-    : "";
-  const adminUnit = isBrowser
-    ? localStorage.getItem("currentAdminDepartment") || ""
-    : "";
-  const adminAvatar =
-    isBrowser && adminId
-      ? localStorage.getItem(`adminAvatar_${adminId}`) || ""
-      : "";
-  const superAdminName = isBrowser
-    ? localStorage.getItem("superAdminName") || "superadmin"
-    : "superadmin";
+  const authState = useSyncExternalStore(subscribeAuth, getClientAuthSnapshot, getServerAuthSnapshot);
+
+  const {
+    isUserLoggedIn,
+    isAdminLoggedIn,
+    isSuperAdminLoggedIn,
+    userId,
+    userName,
+    userEmail,
+    userAvatar,
+    adminId,
+    adminName,
+    adminEmail,
+    adminUnit,
+    adminAvatar,
+    superAdminName,
+  } = authState;
 
   // ── Avatar upload handlers ───────────────────────────────────────────────
   const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,7 +191,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     reader.onload = () => {
       const base64 = reader.result as string;
       localStorage.setItem(`adminAvatar_${adminId}`, base64);
-      setStorageVersion((value) => value + 1);
+      refreshAuthCache();
       toast.success("Profile photo updated!");
     };
     reader.readAsDataURL(file);
@@ -153,7 +208,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     reader.onload = () => {
       const base64 = reader.result as string;
       localStorage.setItem(`userAvatar_${userId}`, base64);
-      setStorageVersion((value) => value + 1);
+      refreshAuthCache();
       toast.success("Profile photo updated!");
     };
     reader.readAsDataURL(file);
@@ -165,7 +220,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("currentUserId");
     localStorage.removeItem("currentUserName");
     localStorage.removeItem("currentUserEmail");
-    setStorageVersion((value) => value + 1);
+    refreshAuthCache();
     toast.success("Logged out successfully");
     router.push("/");
   };
@@ -176,7 +231,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("currentAdminName");
     localStorage.removeItem("currentAdminEmail");
     localStorage.removeItem("currentAdminDepartment");
-    setStorageVersion((value) => value + 1);
+    refreshAuthCache();
     toast.success("Admin logged out successfully");
     router.push("/");
   };
@@ -186,7 +241,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("superAdminToken");
     localStorage.removeItem("superAdminName");
     localStorage.removeItem("superAdminExpiresAt");
-    setStorageVersion((value) => value + 1);
+    refreshAuthCache();
     toast.success("Superadmin logged out successfully");
     router.push("/login");
   };
@@ -239,7 +294,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         firstName: "",
         lastName: "",
       });
-      setStorageVersion((value) => value + 1);
+      refreshAuthCache();
       toast.success("Admin profile updated!");
     } catch (error) {
       toast.error(
@@ -248,17 +303,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleDeleteAdminAccount = async () => {
-    if (!window.confirm("Are you sure you want to delete your admin account? This cannot be undone.")) return;
-    try {
-      await deleteAdminAccount(adminId);
-      handleAdminLogout();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete admin account.",
-      );
-    }
-  };
 
   const handleDeleteUserAccount = async () => {
     if (!window.confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
@@ -313,7 +357,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         newPassword: "",
         confirmPassword: "",
       });
-      setStorageVersion((value) => value + 1);
+      refreshAuthCache();
       toast.success("Profile updated!");
     } catch (error) {
       toast.error(
@@ -533,11 +577,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Button>
             </div>
 
-            <div className="pt-2 border-t pb-6">
-              <Button variant="destructive" className="w-full" onClick={handleDeleteAdminAccount}>
-                Delete Account
-              </Button>
-            </div>
+
           </div>
         </SheetContent>
       </Sheet>
