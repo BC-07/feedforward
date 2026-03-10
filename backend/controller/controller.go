@@ -13,6 +13,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // ===================== USER ENDPOINTS =====================
@@ -683,14 +684,8 @@ func Delete_sample_data(c *fiber.Ctx) error {
 	// Kumonekta sa database gamit ang ating middleware
 	db := middleware.DBConn
 
-	// Kunin ang ID mula sa URL parameter
-	// Halimbawa: kung ang URL ay /delete/5, ang id = "5"
 	id := c.Params("id")
 
-	// ACTUAL NA PAG-DELETE SA DATABASE
-	// - db.Table("public.sample_table") -> Sabihin sa GORM kung saang table magde-delete
-	// - Where("uid = ?", id)            -> Hanapin ang row na may specific na ID
-	// - Delete(&map[string]any{})       -> Burahin ang nahanap na row
 	if err := db.Table("public.students").Where("id = ?", id).Delete(&map[string]any{}).Error; err != nil {
 		return c.Status(500).JSON(response.ResponseModel{
 			RetCode: "500",
@@ -703,9 +698,6 @@ func Delete_sample_data(c *fiber.Ctx) error {
 		})
 	}
 
-	// Kung matagumpay ang delete, ibalik ang 200 OK
-	// Kasama rin nating ibalik kung anong ID ang nabura para
-	// malaman ng user na tama ang na-delete
 	return c.Status(200).JSON(response.ResponseModel{
 		RetCode: "200",
 		Message: "Success!!",
@@ -715,10 +707,8 @@ func Delete_sample_data(c *fiber.Ctx) error {
 
 // ===================== SUPERADMIN ENDPOINTS =====================
 
-const SuperAdminKey = "SUPERADMIN-FEEDFORWARD-2026"
-
 func superAdminAuth(c *fiber.Ctx) bool {
-	return c.Get("X-SuperAdmin-Token") == SuperAdminKey
+	return c.Get("X-SuperAdmin-Token") == middleware.GetEnv("SUPERADMIN_KEY")
 }
 
 func SuperAdminLogin(c *fiber.Ctx) error {
@@ -732,7 +722,7 @@ func SuperAdminLogin(c *fiber.Ctx) error {
 			Data:    errors.ErrorModel{Message: "Invalid request body", IsSuccess: false, Error: err},
 		})
 	}
-	if req.Key != SuperAdminKey {
+	if req.Key != middleware.GetEnv("SUPERADMIN_KEY") {
 		return c.Status(401).JSON(response.ResponseModel{
 			RetCode: "401",
 			Message: "Invalid superadmin key",
@@ -744,7 +734,7 @@ func SuperAdminLogin(c *fiber.Ctx) error {
 		RetCode: "200",
 		Message: "Superadmin login successful",
 		Data: map[string]any{
-			"token":     SuperAdminKey,
+			"token":     middleware.GetEnv("SUPERADMIN_KEY"),
 			"name":      "Superadmin",
 			"expiresAt": expiresAt,
 		},
@@ -939,5 +929,154 @@ func SuperAdminDeleteAdmin(c *fiber.Ctx) error {
 		RetCode: "200",
 		Message: "Admin deleted successfully",
 		Data:    "Admin " + id + " deleted",
+	})
+}
+
+// ===================== CATEGORY MANAGEMENT =====================
+
+func listAllCategories(db *gorm.DB) ([]model.Category, error) {
+	var categories []model.Category
+	err := db.Table("public.categories").Order("id ASC").Find(&categories).Error
+	return categories, err
+}
+
+func SuperAdminListCategories(c *fiber.Ctx) error {
+	db := middleware.DBConn
+	categories, err := listAllCategories(db)
+	if err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to fetch categories", IsSuccess: false, Error: err},
+		})
+	}
+	return c.Status(200).JSON(response.ResponseModel{
+		RetCode: "200",
+		Message: "Success",
+		Data:    categories,
+	})
+}
+
+func SuperAdminCreateCategory(c *fiber.Ctx) error {
+	if !superAdminAuth(c) {
+		return c.Status(401).JSON(response.ResponseModel{
+			RetCode: "401",
+			Message: "Unauthorized superadmin access",
+			Data:    errors.ErrorModel{Message: "Invalid or missing superadmin token", IsSuccess: false},
+		})
+	}
+	db := middleware.DBConn
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Name) == "" {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Category name is required", IsSuccess: false},
+		})
+	}
+
+	category := model.Category{Name: strings.TrimSpace(req.Name)}
+	if err := db.Table("public.categories").Create(&category).Error; err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to create category", IsSuccess: false, Error: err},
+		})
+	}
+
+	categories, err := listAllCategories(db)
+	if err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to fetch updated categories", IsSuccess: false, Error: err},
+		})
+	}
+	return c.Status(201).JSON(response.ResponseModel{
+		RetCode: "201",
+		Message: "Category created successfully",
+		Data:    categories,
+	})
+}
+
+func SuperAdminUpdateCategory(c *fiber.Ctx) error {
+	if !superAdminAuth(c) {
+		return c.Status(401).JSON(response.ResponseModel{
+			RetCode: "401",
+			Message: "Unauthorized superadmin access",
+			Data:    errors.ErrorModel{Message: "Invalid or missing superadmin token", IsSuccess: false},
+		})
+	}
+	db := middleware.DBConn
+	id := c.Params("id")
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := c.BodyParser(&req); err != nil || strings.TrimSpace(req.Name) == "" {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Category name is required", IsSuccess: false},
+		})
+	}
+
+	if err := db.Table("public.categories").Where("id = ?", id).Update("name", strings.TrimSpace(req.Name)).Error; err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to update category", IsSuccess: false, Error: err},
+		})
+	}
+
+	categories, err := listAllCategories(db)
+	if err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to fetch updated categories", IsSuccess: false, Error: err},
+		})
+	}
+	return c.Status(200).JSON(response.ResponseModel{
+		RetCode: "200",
+		Message: "Category updated successfully",
+		Data:    categories,
+	})
+}
+
+func SuperAdminDeleteCategory(c *fiber.Ctx) error {
+	if !superAdminAuth(c) {
+		return c.Status(401).JSON(response.ResponseModel{
+			RetCode: "401",
+			Message: "Unauthorized superadmin access",
+			Data:    errors.ErrorModel{Message: "Invalid or missing superadmin token", IsSuccess: false},
+		})
+	}
+	db := middleware.DBConn
+	id := c.Params("id")
+
+	if err := db.Table("public.categories").Where("id = ?", id).Delete(&model.Category{}).Error; err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to delete category", IsSuccess: false, Error: err},
+		})
+	}
+
+	categories, err := listAllCategories(db)
+	if err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to fetch updated categories", IsSuccess: false, Error: err},
+		})
+	}
+	return c.Status(200).JSON(response.ResponseModel{
+		RetCode: "200",
+		Message: "Category deleted successfully",
+		Data:    categories,
 	})
 }

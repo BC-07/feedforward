@@ -83,4 +83,10 @@ type (
 		Priority string `json:"priority"`
 		Response string `json:"response"`
 	}
+
+	// Category represents a feedback/unit category managed by the superadmin
+	Category struct {
+		ID   int    `json:"id" gorm:"column:id;primaryKey;autoIncrement"`
+		Name string `json:"name" gorm:"column:name"`
+	}
 )

@@ -3,11 +3,16 @@
 import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  createCategoryBySuperAdmin,
   createAdminBySuperAdmin,
-  deleteAdminBySuperAdmin,
+  disableAdminBySuperAdmin,
+  deleteCategoryBySuperAdmin,
   listAdmins,
+  listCategories,
+  updateCategoryBySuperAdmin,
   updateAdminBySuperAdmin,
   type Admin,
+  type Category,
 } from "@/frontend/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,16 +47,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Shield, UserCog, UserPlus, Trash2, Pencil } from "lucide-react";
+import { Shield, UserCog, UserPlus, Trash2, Pencil, Tag, Save, Ban } from "lucide-react";
 import { toast } from "sonner";
-
-const UNITS = [
-  "IT Unit",
-  "Finance & Registrar Office",
-  "Student Affair Office",
-  "Guidance Office",
-  "Faculty Office",
-];
 
 const emptyCreateForm = {
   firstName: "",
@@ -107,10 +104,15 @@ export default function SuperAdminDashboard() {
       : localStorage.getItem("superAdminToken") || "",
   );
   const [admins, setAdmins] = useState<Admin[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [createForm, setCreateForm] = useState(emptyCreateForm);
   const [editForm, setEditForm] = useState(emptyEditForm);
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [editingCategoryOriginalName, setEditingCategoryOriginalName] = useState("");
 
   const stats = {
     total: admins.length,
@@ -120,6 +122,31 @@ export default function SuperAdminDashboard() {
         .map((admin) => new Date(admin.updatedAt).getTime())
         .sort((a, b) => b - a)[0] ?? null,
   };
+
+  const getUnitClass = (unit: string) => {
+    const normalized = unit.trim().toLowerCase();
+    if (normalized.includes("it")) {
+      return "bg-blue-500/10 text-blue-700 border-blue-500/30";
+    }
+    if (normalized.includes("finance") || normalized.includes("registrar")) {
+      return "bg-emerald-500/10 text-emerald-700 border-emerald-500/30";
+    }
+    if (normalized.includes("student")) {
+      return "bg-violet-500/10 text-violet-700 border-violet-500/30";
+    }
+    if (normalized.includes("guidance")) {
+      return "bg-cyan-500/10 text-cyan-700 border-cyan-500/30";
+    }
+    if (normalized.includes("faculty")) {
+      return "bg-amber-500/10 text-amber-700 border-amber-500/30";
+    }
+    return "bg-gray-500/10 text-gray-700 border-gray-500/30";
+  };
+
+  const getStatusClass = (isDisabled?: boolean) =>
+    isDisabled
+      ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
+      : "bg-blue-500/10 text-blue-700 border-blue-500/30";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -142,6 +169,15 @@ export default function SuperAdminDashboard() {
     void fetchAdmins(sessionToken, setAdmins, () =>
       clearSuperAdminSession(() => router.push("/login")),
     );
+    void listCategories()
+      .then((data: Category[]) => {
+        setCategories(data);
+      })
+      .catch((error: unknown) => {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load categories.",
+        );
+      });
   }, [router]);
 
   const handleCreateAdmin = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -193,19 +229,110 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleDeleteAdmin = async (admin: Admin) => {
+  const handleDisableAdmin = async (admin: Admin) => {
     if (!token) return;
-    if (!window.confirm(`Delete admin account for ${admin.name}?`)) return;
+    if (!window.confirm(`Disable admin access for ${admin.name}?`)) return;
 
     try {
-      await deleteAdminBySuperAdmin(token, admin.id);
+      await disableAdminBySuperAdmin(token, admin.id);
       await fetchAdmins(token, setAdmins, () =>
         clearSuperAdminSession(() => router.push("/login")),
       );
-      toast.success("Admin deleted successfully");
+      toast.success("Admin account disabled");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to delete admin.",
+        error instanceof Error ? error.message : "Failed to disable admin.",
+      );
+    }
+  };
+
+  const handleCreateCategory = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!token) return;
+
+    try {
+      const updated = await createCategoryBySuperAdmin(token, {
+        name: newCategoryName,
+      });
+      setCategories(updated);
+      setNewCategoryName("");
+      toast.success("Category created successfully");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to create category.",
+      );
+    }
+  };
+
+  const handleStartCategoryEdit = (category: Category) => {
+    setEditingCategoryId(category.id);
+    setEditingCategoryName(category.name);
+    setEditingCategoryOriginalName(category.name);
+  };
+
+  const handleSaveCategoryEdit = async () => {
+    if (!token || editingCategoryId === null) return;
+
+    try {
+      const updated = await updateCategoryBySuperAdmin(token, editingCategoryId, {
+        name: editingCategoryName,
+      });
+      setCategories(updated);
+      await fetchAdmins(token, setAdmins, () =>
+        clearSuperAdminSession(() => router.push("/login")),
+      );
+      setCreateForm((current) => ({
+        ...current,
+        unit:
+          current.unit === editingCategoryOriginalName
+            ? editingCategoryName.trim()
+            : current.unit,
+      }));
+      setEditForm((current) => ({
+        ...current,
+        unit:
+          current.unit === editingCategoryOriginalName
+            ? editingCategoryName.trim()
+            : current.unit,
+      }));
+      setEditingCategoryId(null);
+      setEditingCategoryName("");
+      setEditingCategoryOriginalName("");
+      toast.success("Category updated successfully");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update category.",
+      );
+    }
+  };
+
+  const handleDeleteCategory = async (category: Category) => {
+    if (!token) return;
+    if (!window.confirm(`Delete category "${category.name}"?`)) return;
+
+    try {
+      const updated = await deleteCategoryBySuperAdmin(token, category.id);
+      setCategories(updated);
+      await fetchAdmins(token, setAdmins, () =>
+        clearSuperAdminSession(() => router.push("/login")),
+      );
+      setCreateForm((current) => ({
+        ...current,
+        unit: current.unit === category.name ? "" : current.unit,
+      }));
+      setEditForm((current) => ({
+        ...current,
+        unit: current.unit === category.name ? "" : current.unit,
+      }));
+      if (editingCategoryId === category.id) {
+        setEditingCategoryId(null);
+        setEditingCategoryName("");
+        setEditingCategoryOriginalName("");
+      }
+      toast.success("Category deleted successfully");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete category.",
       );
     }
   };
@@ -268,102 +395,186 @@ export default function SuperAdminDashboard() {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <Card className="h-fit">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserPlus className="h-5 w-5" />
-                Create Admin
-              </CardTitle>
-              <CardDescription>
-                Provision a new unit admin directly from the control console.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCreateAdmin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="create-first-name">First Name</Label>
+          <div className="space-y-6">
+            <Card className="h-fit">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserPlus className="h-5 w-5" />
+                  Create Admin
+                </CardTitle>
+                <CardDescription>
+                  Provision a new unit admin directly from the control console.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleCreateAdmin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="create-first-name">First Name</Label>
+                    <Input
+                      id="create-first-name"
+                      value={createForm.firstName}
+                      onChange={(event) =>
+                        setCreateForm((current) => ({
+                          ...current,
+                          firstName: event.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="create-last-name">Last Name</Label>
+                    <Input
+                      id="create-last-name"
+                      value={createForm.lastName}
+                      onChange={(event) =>
+                        setCreateForm((current) => ({
+                          ...current,
+                          lastName: event.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="create-email">Email</Label>
+                    <Input
+                      id="create-email"
+                      type="email"
+                      value={createForm.email}
+                      onChange={(event) =>
+                        setCreateForm((current) => ({
+                          ...current,
+                          email: event.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="create-password">Temporary Password</Label>
+                    <Input
+                      id="create-password"
+                      type="password"
+                      value={createForm.password}
+                      onChange={(event) =>
+                        setCreateForm((current) => ({
+                          ...current,
+                          password: event.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Unit</Label>
+                    <Select
+                      value={createForm.unit}
+                      onValueChange={(value) =>
+                        setCreateForm((current) => ({ ...current, unit: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.name}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="submit" className="w-full">
+                    Create Admin Account
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="h-fit">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Tag className="h-5 w-5" />
+                  Category Control
+                </CardTitle>
+                <CardDescription>
+                  Create or rename categories and sync them across admin units
+                  and feedback categories.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form onSubmit={handleCreateCategory} className="flex gap-2">
                   <Input
-                    id="create-first-name"
-                    value={createForm.firstName}
-                    onChange={(event) =>
-                      setCreateForm((current) => ({
-                        ...current,
-                        firstName: event.target.value,
-                      }))
-                    }
+                    placeholder="New category name"
+                    value={newCategoryName}
+                    onChange={(event) => setNewCategoryName(event.target.value)}
                     required
                   />
-                </div>
+                  <Button type="submit" variant="secondary">
+                    Add
+                  </Button>
+                </form>
+
                 <div className="space-y-2">
-                  <Label htmlFor="create-last-name">Last Name</Label>
-                  <Input
-                    id="create-last-name"
-                    value={createForm.lastName}
-                    onChange={(event) =>
-                      setCreateForm((current) => ({
-                        ...current,
-                        lastName: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="create-email">Email</Label>
-                  <Input
-                    id="create-email"
-                    type="email"
-                    value={createForm.email}
-                    onChange={(event) =>
-                      setCreateForm((current) => ({
-                        ...current,
-                        email: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="create-password">Temporary Password</Label>
-                  <Input
-                    id="create-password"
-                    type="password"
-                    value={createForm.password}
-                    onChange={(event) =>
-                      setCreateForm((current) => ({
-                        ...current,
-                        password: event.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Unit</Label>
-                  <Select
-                    value={createForm.unit}
-                    onValueChange={(value) =>
-                      setCreateForm((current) => ({ ...current, unit: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {UNITS.map((unit) => (
-                        <SelectItem key={unit} value={unit}>
-                          {unit}
-                        </SelectItem>
+                  {categories.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No categories found.
+                    </p>
+                  ) : (
+                    <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+                      {categories.map((category) => (
+                        <div
+                          key={category.id}
+                          className="flex items-center gap-2 rounded-md border p-2"
+                        >
+                          {editingCategoryId === category.id ? (
+                            <>
+                              <Input
+                                value={editingCategoryName}
+                                onChange={(event) =>
+                                  setEditingCategoryName(event.target.value)
+                                }
+                              />
+                              <Button
+                                size="sm"
+                                onClick={handleSaveCategoryEdit}
+                                type="button"
+                              >
+                                <Save className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <p className="flex-1 truncate text-sm">{category.name}</p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                type="button"
+                                onClick={() => handleStartCategoryEdit(category)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                type="button"
+                                onClick={() => handleDeleteCategory(category)}
+                                className="border-border text-foreground hover:border-red-600 hover:bg-red-600 hover:text-black"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  )}
                 </div>
-                <Button type="submit" className="w-full">
-                  Create Admin Account
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardHeader>
@@ -383,6 +594,7 @@ export default function SuperAdminDashboard() {
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Unit</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -391,7 +603,7 @@ export default function SuperAdminDashboard() {
                     {admins.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={6}
                           className="py-10 text-center text-muted-foreground"
                         >
                           No admin accounts found.
@@ -410,7 +622,20 @@ export default function SuperAdminDashboard() {
                           </TableCell>
                           <TableCell>{admin.email}</TableCell>
                           <TableCell>
-                            <Badge variant="secondary">{admin.unit}</Badge>
+                            <Badge
+                              variant="outline"
+                              className={getUnitClass(admin.unit)}
+                            >
+                              {admin.unit}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={getStatusClass(admin.isDisabled)}
+                            >
+                              {admin.isDisabled ? "Disabled" : "Active"}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             {new Date(admin.createdAt).toLocaleDateString()}
@@ -421,17 +646,20 @@ export default function SuperAdminDashboard() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleOpenEdit(admin)}
+                                className="border-transparent bg-transparent text-black hover:bg-amber-600 hover:text-black"
                               >
                                 <Pencil className="mr-2 h-4 w-4" />
                                 Edit
                               </Button>
                               <Button
-                                variant="destructive"
+                                variant="outline"
                                 size="sm"
-                                onClick={() => handleDeleteAdmin(admin)}
+                                onClick={() => handleDisableAdmin(admin)}
+                                disabled={Boolean(admin.isDisabled)}
+                                className="border-transparent bg-transparent text-black hover:bg-red-600 hover:text-black disabled:opacity-60"
                               >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
+                                <Ban className="mr-2 h-4 w-4" />
+                                {admin.isDisabled ? "Disabled" : "Disable"}
                               </Button>
                             </div>
                           </TableCell>
@@ -523,9 +751,9 @@ export default function SuperAdminDashboard() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {UNITS.map((unit) => (
-                    <SelectItem key={unit} value={unit}>
-                      {unit}
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.name}>
+                      {category.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

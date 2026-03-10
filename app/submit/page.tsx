@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ArrowRight, Send } from "lucide-react";
-import { submitFeedback } from "@/frontend/api";
+import { submitFeedback, listCategories, type Category } from "@/frontend/api";
 
 interface FormData {
   type: string;
@@ -39,6 +39,15 @@ export default function Submit() {
   });
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    listCategories()
+      .then(setCategories)
+      .catch(() => {
+        toast.error("Failed to load categories.");
+      });
+  }, []);
 
   const copyToClipboard = (text: string) => {
     const textArea = document.createElement("textarea");
@@ -183,19 +192,17 @@ export default function Submit() {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="IT Unit">IT Unit</SelectItem>
-                    <SelectItem value="Finance & Registrar Office">
-                      Finance & Registrar Office
-                    </SelectItem>
-                    <SelectItem value="Student Affair Office">
-                      Student Affair Office
-                    </SelectItem>
-                    <SelectItem value="Guidance Office">
-                      Guidance Office
-                    </SelectItem>
-                    <SelectItem value="Faculty Office">
-                      Faculty Office
-                    </SelectItem>
+                    {categories.length === 0 ? (
+                      <SelectItem value="__none" disabled>
+                        No categories available
+                      </SelectItem>
+                    ) : (
+                      categories.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.name}>
+                          {cat.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -13,44 +13,77 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { LogIn, Mail, Lock, User, Shield } from "lucide-react";
-import { loginUser, loginAdmin } from "@/frontend/api";
+import { LogIn, Mail, Lock, KeyRound } from "lucide-react";
+import { loginUser, loginAdmin, superAdminLogin } from "@/frontend/api";
 
 export default function Login() {
   const router = useRouter();
-  const [userEmail, setUserEmail] = useState("");
-  const [userPassword, setUserPassword] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuperAdmin, setShowSuperAdmin] = useState(false);
+  const [superAdminKey, setSuperAdminKey] = useState("");
+  const [isSuperAdminLoading, setIsSuperAdminLoading] = useState(false);
 
-  const handleUserLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === "S") {
+        e.preventDefault();
+        setShowSuperAdmin((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const handleSuperAdminLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSuperAdminLoading(true);
+    try {
+      const res = await superAdminLogin(superAdminKey);
+      const { token, name, expiresAt } = res.data;
+      localStorage.setItem("isSuperAdminLoggedIn", "true");
+      localStorage.setItem("superAdminToken", token);
+      localStorage.setItem("superAdminName", name);
+      localStorage.setItem("superAdminExpiresAt", expiresAt);
+      toast.success(`Welcome, ${name}!`);
+      router.push("/superadmin");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Invalid access key");
+    } finally {
+      setIsSuperAdminLoading(false);
+      setSuperAdminKey("");
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const res = await loginUser({ email: userEmail, password: userPassword });
-      const user = res.data;
+      // Try user login first
+      const userRes = await loginUser({ email, password });
+      const user = userRes.data;
       localStorage.setItem("isUserLoggedIn", "true");
       localStorage.setItem("currentUserId", user.id);
       localStorage.setItem("currentUserName", user.name);
       localStorage.setItem("currentUserEmail", user.email);
       toast.success(`Welcome back, ${user.name}!`);
       router.push("/user");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Invalid email or password");
-    } finally {
-      setIsLoading(false);
+      return;
+    } catch {
+      // Not a user — try admin
     }
-  };
-
-  const handleAdminLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
     try {
-      const res = await loginAdmin({ email: adminEmail, password: adminPassword });
-      const admin = res.data;
+      const adminRes = await loginAdmin({ email, password });
+      const admin = adminRes.data;
       localStorage.setItem("isAdminLoggedIn", "true");
       localStorage.setItem("currentAdminId", admin.id);
       localStorage.setItem("currentAdminName", admin.name);
@@ -58,8 +91,8 @@ export default function Login() {
       localStorage.setItem("currentAdminDepartment", admin.unit);
       toast.success(`Welcome back, ${admin.name}!`);
       router.push("/dashboard");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Invalid email or password");
+    } catch {
+      toast.error("Invalid email or password");
     } finally {
       setIsLoading(false);
     }
@@ -74,132 +107,103 @@ export default function Login() {
           </div>
           <CardTitle>Login to FeedForward</CardTitle>
           <CardDescription>
-            Choose your account type to continue
+            Enter your credentials to continue
           </CardDescription>
         </CardHeader>
 
         <CardContent>
-          <Tabs defaultValue="user" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="user" className="gap-2">
-                <User className="h-4 w-4" />
-                User
-              </TabsTrigger>
-              <TabsTrigger value="admin" className="gap-2">
-                <Shield className="h-4 w-4" />
-                Admin
-              </TabsTrigger>
-            </TabsList>
-
-            {/* USER LOGIN */}
-            <TabsContent value="user">
-              <form onSubmit={handleUserLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="user-email">Email Address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="user-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      className="pl-10"
-                      value={userEmail}
-                      onChange={(e) => setUserEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="user-password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="user-password"
-                      type="password"
-                      placeholder="Enter your password"
-                      className="pl-10"
-                      value={userPassword}
-                      onChange={(e) => setUserPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-accent hover:bg-accent/90"
-                  size="lg"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Logging in..." : "Log In as User"}
-                </Button>
-                <p className="text-center text-sm text-muted-foreground">
-                  Don&apos;t have an account?{" "}
-                  <Link
-                    href="/register"
-                    className="text-accent hover:underline font-medium"
-                  >
-                    Sign up
-                  </Link>
-                </p>
-              </form>
-            </TabsContent>
-
-            {/* ADMIN LOGIN */}
-            <TabsContent value="admin">
-              <form onSubmit={handleAdminLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="admin-email">Email Address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="admin-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      className="pl-10"
-                      value={adminEmail}
-                      onChange={(e) => setAdminEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="admin-password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="admin-password"
-                      type="password"
-                      placeholder="Enter your password"
-                      className="pl-10"
-                      value={adminPassword}
-                      onChange={(e) => setAdminPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-black hover:bg-gray-800"
-                  size="lg"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Logging in..." : "Log In as Admin"}
-                </Button>
-                <p className="text-center text-sm text-muted-foreground">
-                  Don&apos;t have an admin account?{" "}
-                  <Link
-                    href="/register"
-                    className="text-black hover:underline font-medium"
-                  >
-                    Register here
-                  </Link>
-                </p>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  className="pl-10"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  className="pl-10"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-accent hover:bg-accent/90"
+              size="lg"
+              disabled={isLoading}
+            >
+              {isLoading ? "Logging in..." : "Log In"}
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/register"
+                className="text-accent hover:underline font-medium"
+              >
+                Sign up
+              </Link>
+            </p>
+          </form>
         </CardContent>
       </Card>
+
+      {/* Hidden superadmin login — revealed only via Ctrl+Shift+S */}
+      <Dialog open={showSuperAdmin} onOpenChange={setShowSuperAdmin}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <div className="mx-auto mb-2 h-12 w-12 rounded-full bg-slate-900/10 flex items-center justify-center">
+              <KeyRound className="h-6 w-6 text-slate-900" />
+            </div>
+            <DialogTitle className="text-center">Restricted Access</DialogTitle>
+            <DialogDescription className="text-center">
+              Enter the system access key to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSuperAdminLogin} className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="superadmin-key">Access Key</Label>
+              <div className="relative">
+                <KeyRound className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="superadmin-key"
+                  type="password"
+                  placeholder="Enter access key"
+                  className="pl-10"
+                  value={superAdminKey}
+                  onChange={(e) => setSuperAdminKey(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-slate-900 hover:bg-slate-700"
+              size="lg"
+              disabled={isSuperAdminLoading}
+            >
+              {isSuperAdminLoading ? "Verifying..." : "Access Console"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-

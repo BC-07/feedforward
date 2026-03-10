@@ -30,8 +30,14 @@ export interface Admin {
   name: string;
   email: string;
   unit: string;
+  isDisabled?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Category {
+  id: number;
+  name: string;
 }
 
 export interface FeedbackData {
@@ -196,3 +202,46 @@ export const updateAdminBySuperAdmin = (
 
 export const deleteAdminBySuperAdmin = (token: string, id: string) =>
   requestWithToken<string>(`/superadmin/admins/${id}`, token, { method: "DELETE" });
+
+export const disableAdminBySuperAdmin = (token: string, id: string) =>
+  requestWithToken<Admin>(`/superadmin/admins/${id}/disable`, token, { method: "PATCH" });
+
+// ===================== CATEGORY API =====================
+
+export const listCategories = async (): Promise<Category[]> => {
+  const res = await request<Category[]>("/superadmin/categories", { method: "GET" });
+  return res.data;
+};
+
+export const createCategoryBySuperAdmin = async (
+  token: string,
+  data: { name: string },
+): Promise<Category[]> => {
+  const res = await requestWithToken<Category[]>("/superadmin/categories", token, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return res.data;
+};
+
+export const updateCategoryBySuperAdmin = async (
+  token: string,
+  id: number,
+  data: { name: string },
+): Promise<Category[]> => {
+  const res = await requestWithToken<Category[]>(`/superadmin/categories/${id}`, token, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+  return res.data;
+};
+
+export const deleteCategoryBySuperAdmin = async (
+  token: string,
+  id: number,
+): Promise<Category[]> => {
+  const res = await requestWithToken<Category[]>(`/superadmin/categories/${id}`, token, {
+    method: "DELETE",
+  });
+  return res.data;
+};
