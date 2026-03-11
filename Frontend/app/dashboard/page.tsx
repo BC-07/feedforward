@@ -257,7 +257,12 @@ export default function AdminDashboard() {
       const matchesPriority =
         filterPriority === "all" ||
         feedback.priority?.toLowerCase() === filterPriority;
-      return matchesSearch && matchesType && matchesStatus && matchesPriority;
+      return (
+        matchesSearch &&
+        matchesType &&
+        matchesStatus &&
+        matchesPriority
+      );
     })
     .sort((a, b) => {
       if (filterName === "all" || filterName === "") return 0;
@@ -455,7 +460,7 @@ export default function AdminDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>

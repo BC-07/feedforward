@@ -3,7 +3,6 @@
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  deleteAdminAccount,
   deleteUserAccount,
   updateAdminProfile,
   updateAdminPassword,
@@ -177,10 +176,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isSuperAdminRoute = pathname.startsWith("/superadmin");
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
   const userAvatarInputRef = useRef<HTMLInputElement>(null);
-
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [passwordEdit, setPasswordEdit] = useState({
     current: "",
     next: "",
@@ -351,18 +349,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleDeleteAdminAccount = async () => {
-    if (!window.confirm("Are you sure you want to delete your admin account? This cannot be undone.")) return;
-    try {
-      await deleteAdminAccount(adminId);
-      handleAdminLogout();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete admin account.",
-      );
-    }
-  };
-
   const handleDeleteUserAccount = async () => {
     if (!window.confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
     try {
@@ -428,7 +414,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-white">
+      <header className="sticky top-0 z-50 border-b border-border bg-white">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
@@ -636,11 +622,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Button>
             </div>
 
-            <div className="pt-2 border-t pb-6">
-              <Button variant="destructive" className="w-full" onClick={handleDeleteAdminAccount}>
-                Delete Account
-              </Button>
-            </div>
           </div>
         </SheetContent>
       </Sheet>

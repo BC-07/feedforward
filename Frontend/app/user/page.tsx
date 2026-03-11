@@ -688,7 +688,7 @@ export default function UserProfile() {
                     Your recent feedback submissions
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 max-h-[600px] overflow-y-auto">
                   {feedbacks.map((feedback) => (
                     <div
                       key={feedback.id}

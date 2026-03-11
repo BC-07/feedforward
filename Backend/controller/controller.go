@@ -212,6 +212,23 @@ func CreateFeedback(c *fiber.Ctx) error {
 			feedback.UserEmail = &email
 		}
 	}
+	if feedback.UserID != nil && strings.TrimSpace(*feedback.UserID) != "" {
+		user, err := fetchUserByID(strings.TrimSpace(*feedback.UserID))
+		if err != nil {
+			return serverError(c, "failed to load feedback user", err)
+		}
+		if user.ID == "" {
+			return invalidRequest(c, "user account not found; please log in again")
+		}
+		if user.Name != "" {
+			name := user.Name
+			feedback.UserName = &name
+		}
+		if user.Email != "" {
+			email := user.Email
+			feedback.UserEmail = &email
+		}
+	}
 
 	now := time.Now()
 	if feedback.CreatedAt.IsZero() {
@@ -1041,7 +1058,7 @@ func UpdateAdminPassword(c *fiber.Ctx) error {
 }
 
 func DeleteAdminAccount(c *fiber.Ctx) error {
-	return deleteByID(c, adminTable, "admin", c.Params("id"))
+	return unauthorized(c, "admin self-deletion is not allowed")
 }
 
 func updatePassword(c *fiber.Ctx, table string, entity string) error {
