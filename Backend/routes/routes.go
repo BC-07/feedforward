@@ -14,8 +14,7 @@ func AppRoutes(app *fiber.App) {
 
 	// CREATE YOUR ENDPOINTS HERE
 
-	app.Get("Getnames", controller.Getnames)
-	app.Post("InsertExec", controller.InsertExec)
+
 	app.Post("/auth/users/register", controller.RegisterUser)
 	app.Post("/auth/users/login", controller.LoginUser)
 	app.Put("/auth/users/:id/profile", controller.UpdateUserProfile)
