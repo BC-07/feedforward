@@ -20,7 +20,7 @@ func ConnectDB() bool {
 	// Database Confg
 	dns := fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s sslmode=%s TimeZone=%s",
 		GetEnv("DB_HOST"), GetEnv("DB_PORT"), GetEnv("DB_NAME"),
-		GetEnv("DB_UNME"), GetEnv("DB_PWRD"), GetEnv("DB_SSLM"),
+		GetEnv("DB_USER"), GetEnv("DB_PASS"), GetEnv("DB_SSLM"),
 		GetEnv("DB_TMEZ"))
 
 	DBConn, DBErr = gorm.Open(postgres.Open(dns), &gorm.Config{})

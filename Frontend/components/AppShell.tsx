@@ -24,6 +24,14 @@ import {
 } from "@/components/ui/sheet";
 
 const SESSION_EVENT = "feedforward:session-change";
+const emailLikePattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+
+function containsEmailLike(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (trimmed.includes("@")) return true;
+  return emailLikePattern.test(trimmed);
+}
 
 type SessionSnapshot = {
   isUserLoggedIn: boolean;
@@ -329,6 +337,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         adminProfileEdit.lastName.trim() ||
         currentNameParts.slice(1).join(" ") ||
         "";
+      if (containsEmailLike(lastName)) {
+        toast.error("Last name must not contain an email");
+        return;
+      }
 
       const updatedAdmin = await updateAdminProfile(adminId, {
         firstName,
@@ -381,6 +393,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         userProfileEdit.lastName.trim() ||
         currentNameParts.slice(1).join(" ") ||
         "";
+      if (containsEmailLike(lastName)) {
+        toast.error("Last name must not contain an email");
+        return;
+      }
 
       const updatedUser = await updateUserProfile(userId, {
         firstName,
@@ -566,6 +582,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Label htmlFor="adm-fname" className="text-xs text-muted-foreground">First Name</Label>
                 <Input
                   id="adm-fname"
+                  name="firstName"
+                  autoComplete="given-name"
                   placeholder="Enter first name"
                   value={adminProfileEdit.firstName}
                   onChange={(e) => setAdminProfileEdit({ ...adminProfileEdit, firstName: e.target.value })}
@@ -575,9 +593,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Label htmlFor="adm-lname" className="text-xs text-muted-foreground">Last Name</Label>
                 <Input
                   id="adm-lname"
+                  name="lastName"
+                  autoComplete="family-name"
                   placeholder="Enter last name"
                   value={adminProfileEdit.lastName}
-                  onChange={(e) => setAdminProfileEdit({ ...adminProfileEdit, lastName: e.target.value })}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (containsEmailLike(next)) {
+                      toast.error("Last name must not contain an email");
+                      return;
+                    }
+                    setAdminProfileEdit({ ...adminProfileEdit, lastName: next });
+                  }}
                 />
               </div>
               <Button className="w-full" variant="outline" onClick={handleAdminProfileSave}>
@@ -678,6 +705,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Label htmlFor="u-fname" className="text-xs text-muted-foreground">First Name</Label>
                 <Input
                   id="u-fname"
+                  name="firstName"
+                  autoComplete="given-name"
                   placeholder="Enter first name"
                   value={userProfileEdit.firstName}
                   onChange={(e) => setUserProfileEdit({ ...userProfileEdit, firstName: e.target.value })}
@@ -687,9 +716,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Label htmlFor="u-lname" className="text-xs text-muted-foreground">Last Name</Label>
                 <Input
                   id="u-lname"
+                  name="lastName"
+                  autoComplete="family-name"
                   placeholder="Enter last name"
                   value={userProfileEdit.lastName}
-                  onChange={(e) => setUserProfileEdit({ ...userProfileEdit, lastName: e.target.value })}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (containsEmailLike(next)) {
+                      toast.error("Last name must not contain an email");
+                      return;
+                    }
+                    setUserProfileEdit({ ...userProfileEdit, lastName: next });
+                  }}
                 />
               </div>
             </div>

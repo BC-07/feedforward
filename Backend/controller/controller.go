@@ -11,6 +11,7 @@ import (
 	"intern_template_v1/model/response"
 	"intern_template_v1/model/status"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -989,6 +990,9 @@ func UpdateUserProfile(c *fiber.Ctx) error {
 	if payload.FirstName == "" || payload.LastName == "" {
 		return invalidRequest(c, "first name and last name are required")
 	}
+	if containsEmailLike(payload.LastName) {
+		return invalidRequest(c, "last name must not contain an email")
+	}
 
 	if err := execUpdateByID(
 		userTable,
@@ -1024,6 +1028,9 @@ func UpdateAdminProfile(c *fiber.Ctx) error {
 	payload.LastName = strings.TrimSpace(payload.LastName)
 	if payload.FirstName == "" || payload.LastName == "" {
 		return invalidRequest(c, "first name and last name are required")
+	}
+	if containsEmailLike(payload.LastName) {
+		return invalidRequest(c, "last name must not contain an email")
 	}
 
 	if err := execUpdateByID(
@@ -1448,6 +1455,19 @@ func emailInUse(email string, excludeUserID string, excludeAdminID string) (bool
 	}
 
 	return userCount+adminCount > 0, nil
+}
+
+var emailLikePattern = regexp.MustCompile(`(?i)[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}`)
+
+func containsEmailLike(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return false
+	}
+	if strings.Contains(trimmed, "@") {
+		return true
+	}
+	return emailLikePattern.MatchString(trimmed)
 }
 
 func parseBody(c *fiber.Ctx, dest any) error {

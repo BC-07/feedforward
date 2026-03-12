@@ -483,9 +483,13 @@ func detailRow(label string, value string) string {
 }
 
 func primaryButton(label string, url string) string {
-	return fmt.Sprintf(`<div style="margin:20px 0 8px 0;">
-  <a href="%s" style="display:inline-block;background:%s;color:#000000;text-decoration:none;font-size:14px;font-weight:600;padding:12px 18px;border-radius:10px;">%s</a>
-</div>`, esc(url), emailAccent, esc(label))
+	return fmt.Sprintf(`<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:20px auto 8px auto;">
+  <tr>
+    <td align="center" bgcolor="%s" style="border-radius:10px;">
+      <a href="%s" style="display:inline-block;background:%s;color:#000000;text-decoration:none;font-size:14px;font-weight:600;padding:12px 18px;border-radius:10px;">%s</a>
+    </td>
+  </tr>
+</table>`, emailAccent, esc(url), emailAccent, esc(label))
 }
 
 func formatMultiline(value string) string {
