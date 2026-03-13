@@ -1,5 +1,11 @@
 "use client";
-import { startTransition, useEffect, useRef, useState } from "react";
+import {
+  startTransition,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   createFeedback,
@@ -70,6 +76,9 @@ export default function UserProfile() {
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const leftColumnRef = useRef<HTMLDivElement | null>(null);
+  const submissionsScrollRef = useRef<HTMLDivElement | null>(null);
+  const submissionsScrollTop = useRef(0);
+  const submissionsScrollKey = "userDashboardSubmissionsScrollTop";
 
   async function loadUserFeedbacks(userId: string) {
     try {
@@ -163,6 +172,38 @@ export default function UserProfile() {
     return () => observer.disconnect();
   }, [isLargeScreen]);
 
+  const restoreSubmissionsScroll = (force = false) => {
+    if (!force && (selectedFeedback || trackingId)) return;
+    const node = submissionsScrollRef.current;
+    if (!node) return;
+    const top = submissionsScrollTop.current;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        node.scrollTop = top;
+      });
+    });
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem(submissionsScrollKey);
+    if (stored) {
+      const value = Number.parseInt(stored, 10);
+      submissionsScrollTop.current = Number.isNaN(value) ? 0 : value;
+    }
+  }, [submissionsScrollKey]);
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    if (selectedFeedback || trackingId) return;
+    const stored = window.localStorage.getItem(submissionsScrollKey);
+    if (stored) {
+      const value = Number.parseInt(stored, 10);
+      submissionsScrollTop.current = Number.isNaN(value) ? 0 : value;
+    }
+    restoreSubmissionsScroll();
+  }, [feedbacks.length, selectedFeedback, trackingId, leftColumnHeight]);
+
   const handleLogout = () => {
     localStorage.removeItem("isUserLoggedIn");
     localStorage.removeItem("currentUserId");
@@ -233,9 +274,25 @@ export default function UserProfile() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    const inputId = searchTrackingId.trim();
+    if (!inputId) {
+      toast.error("Please enter your tracking ID.");
+      return;
+    }
+    const matched = feedbacks.find(
+      (feedback) => feedback.id.toLowerCase() === inputId.toLowerCase(),
+    );
+    if (!matched) {
+      setSelectedFeedback(null);
+      toast.error(
+        "Tracking ID not found in your submissions. Please use the ID provided by the system.",
+      );
+      return;
+    }
     try {
-      const found = await getFeedback(searchTrackingId.trim());
+      const found = await getFeedback(matched.id);
       setSelectedFeedback(found);
+      setSearchTrackingId(matched.id);
       toast.success("Feedback found!");
     } catch {
       setSelectedFeedback(null);
@@ -321,23 +378,11 @@ export default function UserProfile() {
     }));
   };
 
-  if (trackingId) {
-    return (
-      <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
-        <div className="bg-accent text-accent-foreground">
-          <div className="container mx-auto px-4 py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold">User Dashboard</h1>
-                <p className="text-accent-foreground/80 mt-1">
-                  Welcome, {currentUser?.fullName}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="container mx-auto px-4 py-12">
-          <div className="max-w-lg mx-auto">
+  return (
+    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
+      {trackingId && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-8">
+          <div className="w-full max-w-lg">
             <Card className="shadow-lg">
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
@@ -379,6 +424,9 @@ export default function UserProfile() {
                     onClick={() => {
                       setTrackingId(null);
                       setSelectedFeedback(null);
+                      setTimeout(() => {
+                        restoreSubmissionsScroll(true);
+                      }, 200);
                     }}
                   >
                     Back to Dashboard
@@ -388,12 +436,7 @@ export default function UserProfile() {
             </Card>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
+      )}
       <div className="bg-accent text-accent-foreground">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
@@ -737,7 +780,20 @@ export default function UserProfile() {
                     Your recent feedback submissions
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 flex-1 min-h-0 overflow-y-auto">
+                <CardContent
+                  ref={submissionsScrollRef}
+                  className="space-y-4 flex-1 min-h-0 overflow-y-auto"
+                  onScroll={(event) => {
+                    const top = event.currentTarget.scrollTop;
+                    submissionsScrollTop.current = top;
+                    if (typeof window !== "undefined") {
+                      window.localStorage.setItem(
+                        submissionsScrollKey,
+                        top.toString(),
+                      );
+                    }
+                  }}
+                >
                   {feedbacks.map((feedback) => (
                     <div
                       key={feedback.id}
