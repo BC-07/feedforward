@@ -384,7 +384,7 @@ export default function SuperAdminDashboard() {
               <CardDescription>Latest Change</CardDescription>
               <CardTitle className="text-lg">
                 {stats.latestUpdate
-                  ? new Date(stats.latestUpdate).toLocaleString()
+                  ? new Date(stats.latestUpdate).toLocaleString("en-US")
                   : "No updates yet"}
               </CardTitle>
             </CardHeader>
@@ -638,7 +638,9 @@ export default function SuperAdminDashboard() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            {new Date(admin.createdAt).toLocaleDateString()}
+                            {new Date(admin.createdAt).toLocaleDateString(
+                              "en-US",
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
