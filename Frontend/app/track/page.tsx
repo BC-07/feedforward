@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { getFeedback, type Feedback } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,15 +11,14 @@ import { Search, Clock, CheckCircle, Circle, MessageCircle } from "lucide-react"
 import { toast } from "sonner";
 
 export default function TrackFeedback() {
+  const searchParams = useSearchParams();
   const [trackingId, setTrackingId] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [notFound, setNotFound] = useState(false);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const searchFeedback = async (id: string) => {
     try {
-      const found = await getFeedback(trackingId.trim());
+      const found = await getFeedback(id.trim());
       setFeedback(found);
       setNotFound(false);
     } catch {
@@ -27,6 +27,18 @@ export default function TrackFeedback() {
       toast.error("Feedback not found. Please check your tracking ID.");
     }
   };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await searchFeedback(trackingId);
+  };
+
+  useEffect(() => {
+    const param = searchParams.get("trackingId");
+    if (!param) return;
+    setTrackingId(param);
+    void searchFeedback(param);
+  }, [searchParams]);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html"
 	"mime"
+	"net/url"
 	"net/smtp"
 	"strconv"
 	"strings"
@@ -269,7 +270,7 @@ func buildTrackingEmailBody(user model.UserModel, feedback model.FeedbackModel, 
 		`<p style="margin:20px 0 12px 0;font-size:14px;line-height:22px;color:#666666;">Please keep this tracking ID to check updates later.</p>`
 
 	cta := ""
-	if url := trackingPortalURL(); url != "" {
+	if url := trackingPortalURLWithID(feedback.ID); url != "" {
 		cta = primaryButton("Track submission", url)
 	}
 
@@ -293,7 +294,7 @@ func buildTrackingEmailTextBody(user model.UserModel, feedback model.FeedbackMod
 	builder.WriteString(fmt.Sprintf("Subject: %s\n", feedback.Subject))
 	builder.WriteString("Status: Pending\n\n")
 	builder.WriteString("Please keep this tracking ID to check updates later.\n")
-	if url := trackingPortalURL(); url != "" {
+	if url := trackingPortalURLWithID(feedback.ID); url != "" {
 		builder.WriteString(fmt.Sprintf("Track here: %s\n", url))
 	}
 	builder.WriteString("\nThank you,\nFeedForward")
@@ -339,7 +340,7 @@ func buildResolvedEmailBody(user model.UserModel, feedback model.FeedbackModel, 
 	body := intro + detailTable(rows) + responseBlock
 
 	cta := ""
-	if url := trackingPortalURL(); url != "" {
+	if url := trackingPortalURLWithID(feedback.ID); url != "" {
 		cta = primaryButton("View details", url)
 	}
 
@@ -369,7 +370,7 @@ func buildResolvedEmailTextBody(user model.UserModel, feedback model.FeedbackMod
 	builder.WriteString("Admin response:\n")
 	builder.WriteString(response)
 	builder.WriteString("\n\n")
-	if url := trackingPortalURL(); url != "" {
+	if url := trackingPortalURLWithID(feedback.ID); url != "" {
 		builder.WriteString(fmt.Sprintf("View details: %s\n", url))
 	}
 	builder.WriteString("\nThank you,\nFeedForward")
@@ -396,6 +397,18 @@ func trackingPortalURL() string {
 	}
 	trimmed := strings.TrimRight(base, "/")
 	return trimmed + "/track"
+}
+
+func trackingPortalURLWithID(trackingID string) string {
+	base := trackingPortalURL()
+	if base == "" {
+		return ""
+	}
+	trimmed := strings.TrimSpace(trackingID)
+	if trimmed == "" {
+		return base
+	}
+	return base + "?trackingId=" + url.QueryEscape(trimmed)
 }
 
 const emailAccent = "#FF9500"

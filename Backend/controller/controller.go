@@ -72,6 +72,11 @@ var feedbackEmailColumnErr error
 var feedbackTimingLoggerOnce sync.Once
 var feedbackTimingLogger *log.Logger
 var feedbackTimingLoggerErr error
+var feedbackTimingFile *os.File
+var feedbackTimingMu sync.Mutex
+var feedbackTimingEntries int
+
+const feedbackTimingMaxEntries = 3
 
 func Getnames(c *fiber.Ctx) error {
 	db := middleware.DBConn
@@ -175,7 +180,7 @@ func CreateFeedback(c *fiber.Ctx) error {
 	started := time.Now()
 	stepStart := started
 	logPrefix := fmt.Sprintf("CreateFeedback %s", c.IP())
-	logTimingf("%s start", logPrefix)
+	logTimingStart(logPrefix, "")
 	db := middleware.DBConn
 	if err := ensureFeedbackEmailColumn(); err != nil {
 		return serverError(c, "failed to initialize feedback email storage", err)
@@ -194,6 +199,7 @@ func CreateFeedback(c *fiber.Ctx) error {
 	if err := normalizeFeedback(&feedback); err != nil {
 		return invalidRequest(c, err.Error())
 	}
+	logTimingf("%s trackingId=%s", logPrefix, feedback.ID)
 	logTimingf("%s parse+normalize=%s", logPrefix, time.Since(stepStart))
 	stepStart = time.Now()
 
@@ -302,10 +308,16 @@ func CreateFeedback(c *fiber.Ctx) error {
 }
 
 func UpdateFeedback(c *fiber.Ctx) error {
+	started := time.Now()
+	stepStart := started
+	logPrefix := fmt.Sprintf("UpdateFeedback %s", c.IP())
+	logTimingStart(logPrefix, c.Params("id"))
 	db := middleware.DBConn
 	if err := ensureFeedbackEmailColumn(); err != nil {
 		return serverError(c, "failed to initialize feedback email storage", err)
 	}
+	logTimingf("%s ensureFeedbackEmailColumn=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
 
 	existing, err := fetchFeedbackByID(c.Params("id"))
 	if err != nil {
@@ -314,11 +326,15 @@ func UpdateFeedback(c *fiber.Ctx) error {
 	if existing.ID == "" {
 		return notFound(c, "feedback not found", nil)
 	}
+	logTimingf("%s fetchExisting=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
 
 	var payload map[string]any
 	if err := parseBody(c, &payload); err != nil {
 		return parseError(c, "failed to parse feedback update", err)
 	}
+	logTimingf("%s parsePayload=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
 
 	// Only update fields that were actually sent by the client.
 	var sets []string
@@ -397,15 +413,32 @@ func UpdateFeedback(c *fiber.Ctx) error {
 	if result.RowsAffected == 0 {
 		return notFound(c, "feedback not found", nil)
 	}
+	logTimingf("%s updateFeedback=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
 
 	updated, err := fetchFeedbackByID(c.Params("id"))
 	if err != nil {
 		return serverError(c, "failed to fetch feedback", err)
 	}
+	logTimingf("%s fetchUpdated=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
 
-	if err := notifyResolvedIfNeeded(existing, updated); err != nil {
-		fmt.Printf("email: failed to send resolved notification for %s: %v\n", updated.ID, err)
+	if shouldSendResolvedEmail(existing, updated) {
+		queuedAt := time.Now()
+		updatedCopy := updated
+		go func(feedback model.FeedbackModel, queued time.Time) {
+			emailStart := time.Now()
+			if err := sendResolvedEmailForFeedback(feedback); err != nil {
+				fmt.Printf("email: failed to send resolved notification for %s: %v\n", feedback.ID, err)
+				return
+			}
+			logTimingf("%s sendResolvedEmail async duration=%s queuedDelay=%s", logPrefix, time.Since(emailStart), emailStart.Sub(queued))
+		}(updatedCopy, queuedAt)
+		logTimingf("%s sendResolvedEmail queued=%s", logPrefix, time.Since(stepStart))
+		stepStart = time.Now()
 	}
+
+	logTimingf("%s total=%s", logPrefix, time.Since(started))
 
 	return success(c, fiber.StatusOK, updated)
 }
@@ -1713,6 +1746,13 @@ func superAdminSecret() string {
 	return defaultSuperAdminSecret
 }
 
+func shouldSendResolvedEmail(previous model.FeedbackModel, updated model.FeedbackModel) bool {
+	if strings.EqualFold(previous.Status, "Resolved") {
+		return false
+	}
+	return strings.EqualFold(updated.Status, "Resolved")
+}
+
 func logTimingf(format string, args ...any) {
 	logger, err := feedbackTimingLoggerHandle()
 	if err != nil || logger == nil {
@@ -1723,13 +1763,10 @@ func logTimingf(format string, args ...any) {
 
 func feedbackTimingLoggerHandle() (*log.Logger, error) {
 	feedbackTimingLoggerOnce.Do(func() {
-		path := feedbackTimingLogPath()
-		file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
+		if err := feedbackTimingOpenLogger(false); err != nil {
 			feedbackTimingLoggerErr = err
 			return
 		}
-		feedbackTimingLogger = log.New(file, "", log.LstdFlags)
 	})
 	return feedbackTimingLogger, feedbackTimingLoggerErr
 }
@@ -1744,4 +1781,47 @@ func feedbackTimingLogPath() string {
 		return filepath.Join(parent, "feedback-timing.log")
 	}
 	return filepath.Join(cwd, "feedback-timing.log")
+}
+
+func logTimingStart(prefix string, id string) {
+	feedbackTimingMu.Lock()
+	defer feedbackTimingMu.Unlock()
+
+	if feedbackTimingEntries >= feedbackTimingMaxEntries {
+		_ = feedbackTimingOpenLogger(true)
+		feedbackTimingEntries = 0
+	}
+	feedbackTimingEntries++
+
+	logger, err := feedbackTimingLoggerHandle()
+	if err != nil || logger == nil {
+		return
+	}
+
+	divider := strings.Repeat("-", 72)
+	meta := prefix
+	if strings.TrimSpace(id) != "" {
+		meta = fmt.Sprintf("%s id=%s", prefix, strings.TrimSpace(id))
+	}
+	logger.Printf("%s", divider)
+	logger.Printf("%s", meta)
+	logger.Printf("%s", divider)
+}
+
+func feedbackTimingOpenLogger(truncate bool) error {
+	path := feedbackTimingLogPath()
+	flags := os.O_CREATE | os.O_APPEND | os.O_WRONLY
+	if truncate {
+		flags = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
+	}
+	file, err := os.OpenFile(path, flags, 0644)
+	if err != nil {
+		return err
+	}
+	if feedbackTimingFile != nil {
+		_ = feedbackTimingFile.Close()
+	}
+	feedbackTimingFile = file
+	feedbackTimingLogger = log.New(file, "", log.LstdFlags)
+	return nil
 }
