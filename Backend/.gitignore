@@ -33,10 +33,19 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+<<<<<<< HEAD
 .gocache/
 # vercel
 .vercel
 
+=======
+# vercel
+.vercel
+
+# go cache
+.gocache/
+
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 # typescript
 *.tsbuildinfo
 next-env.d.ts

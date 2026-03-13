@@ -386,9 +386,43 @@ export default function SuperAdminDashboard() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8 grid gap-4 md:grid-cols-3">
+<<<<<<< HEAD
           <Card className="ff-surface"><CardHeader className="pb-3"><CardDescription>Total Admins</CardDescription><CardTitle className="text-3xl">{stats.total}</CardTitle></CardHeader></Card>
           <Card className="ff-surface"><CardHeader className="pb-3"><CardDescription>Occupied Units</CardDescription><CardTitle className="text-3xl">{stats.occupiedUnits}</CardTitle></CardHeader></Card>
           <Card className="ff-surface"><CardHeader className="pb-3"><CardDescription>Latest Change</CardDescription><CardTitle className="text-lg">{stats.latestUpdate ? new Date(stats.latestUpdate).toLocaleString() : "No updates yet"}</CardTitle></CardHeader></Card>
+=======
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Total Admins</CardDescription>
+              <CardTitle className="text-3xl">{stats.total}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Accounts currently under system control
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Occupied Units</CardDescription>
+              <CardTitle className="text-3xl">{stats.occupiedUnits}</CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Units already assigned to an admin
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Latest Change</CardDescription>
+              <CardTitle className="text-lg">
+                {stats.latestUpdate
+                  ? new Date(stats.latestUpdate).toLocaleString("en-US")
+                  : "No updates yet"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              Most recent admin record update time
+            </CardContent>
+          </Card>
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -488,6 +522,7 @@ export default function SuperAdminDashboard() {
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </div>
+<<<<<<< HEAD
                             <div className="flex flex-wrap gap-2"><UnitBadge unit={admin.unit} /><AccountStatusBadge disabled={admin.isDisabled || isPending} /><RoleBadge role="admin" /></div>
                             <p className="text-xs text-muted-foreground">Created {new Date(admin.createdAt).toLocaleDateString()}</p>
                           </CardContent>
@@ -497,6 +532,60 @@ export default function SuperAdminDashboard() {
                   </div>
                 </>
               )}
+=======
+                          </TableCell>
+                          <TableCell>{admin.email}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={getUnitClass(admin.unit)}
+                            >
+                              {admin.unit}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={getStatusClass(admin.isDisabled)}
+                            >
+                              {admin.isDisabled ? "Disabled" : "Active"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(admin.createdAt).toLocaleDateString(
+                              "en-US",
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenEdit(admin)}
+                                className="border-transparent bg-transparent text-black hover:bg-amber-600 hover:text-black"
+                              >
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDisableAdmin(admin)}
+                                disabled={Boolean(admin.isDisabled)}
+                                className="border-transparent bg-transparent text-black hover:bg-red-600 hover:text-black disabled:opacity-60"
+                              >
+                                <Ban className="mr-2 h-4 w-4" />
+                                {admin.isDisabled ? "Disabled" : "Disable"}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
             </CardContent>
           </Card>
         </div>

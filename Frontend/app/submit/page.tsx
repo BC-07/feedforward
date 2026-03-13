@@ -31,7 +31,14 @@ export default function Submit() {
     subject: "",
     message: "",
   });
+<<<<<<< HEAD
   const [errors, setErrors] = useState<FormErrors>({});
+=======
+  const userEmail =
+    typeof window !== "undefined"
+      ? localStorage.getItem("currentUserEmail") || ""
+      : "";
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
@@ -94,6 +101,7 @@ export default function Submit() {
         ...formData,
         userId,
         userName,
+        userEmail: userEmail || undefined,
         isAnonymous: !userId,
         status: "Pending",
         priority: "Medium",
@@ -140,6 +148,15 @@ export default function Submit() {
             <p className="text-center text-sm text-muted-foreground">
               Save this ID so you can track your submission later.
             </p>
+            {userEmail ? (
+              <p className="text-xs text-muted-foreground text-center">
+                A copy of this tracking ID was sent to {userEmail}.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center">
+                Sign in to receive email updates when your feedback is resolved.
+              </p>
+            )}
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1" onClick={() => void copyToClipboard(trackingId)}>
                 Copy ID
@@ -167,7 +184,14 @@ export default function Submit() {
         <Card className="ff-surface shadow-lg">
           <CardHeader>
             <CardTitle>Feedback Form</CardTitle>
+<<<<<<< HEAD
             <CardDescription>All submissions are treated confidentially.</CardDescription>
+=======
+            <CardDescription>
+              All submissions are anonymous and confidential. If you are signed
+              in, we will email your tracking ID and resolution updates.
+            </CardDescription>
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
           </CardHeader>
           <CardContent>
             {isLoadingCategories ? (

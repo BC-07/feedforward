@@ -1,6 +1,11 @@
 "use client";
+<<<<<<< HEAD
 
 import { useState } from "react";
+=======
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 import { getFeedback, type Feedback } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,11 +16,13 @@ import { toast } from "sonner";
 import { PriorityBadge, StatusBadge } from "@/components/ux/badges";
 
 export default function TrackFeedback() {
+  const searchParams = useSearchParams();
   const [trackingId, setTrackingId] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
+<<<<<<< HEAD
   const handleSearch = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!trackingId.trim()) {
@@ -24,8 +31,11 @@ export default function TrackFeedback() {
     }
 
     setIsSearching(true);
+=======
+  const searchFeedback = async (id: string) => {
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
     try {
-      const found = await getFeedback(trackingId.trim());
+      const found = await getFeedback(id.trim());
       setFeedback(found);
       setNotFound(false);
     } catch {
@@ -37,8 +47,51 @@ export default function TrackFeedback() {
     }
   };
 
+<<<<<<< HEAD
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString("en-US", {
+=======
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await searchFeedback(trackingId);
+  };
+
+  useEffect(() => {
+    const param = searchParams.get("trackingId");
+    if (!param) return;
+    setTrackingId(param);
+    void searchFeedback(param);
+  }, [searchParams]);
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20";
+      case "in progress":
+        return "bg-purple-500/10 text-purple-700 border-purple-500/20";
+      case "resolved":
+        return "bg-green-500/10 text-green-700 border-green-500/20";
+      default:
+        return "bg-gray-500/10 text-gray-700 border-gray-500/20";
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority.toLowerCase()) {
+      case "low":
+        return "text-gray-600";
+      case "medium":
+        return "text-yellow-600";
+      case "high":
+        return "text-orange-600";
+      default:
+        return "text-gray-600";
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
       year: "numeric",
       month: "long",
       day: "numeric",

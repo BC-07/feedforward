@@ -8,6 +8,7 @@ export interface Feedback {
   priority: string;
   userId?: string | null;
   userName?: string;
+  userEmail?: string;
   isAnonymous?: boolean;
   createdAt: string;
   updatedAt: string;

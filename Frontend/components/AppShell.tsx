@@ -14,7 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+<<<<<<< HEAD
 import { useRef, useState, useSyncExternalStore } from "react";
+=======
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 import {
   Sheet,
   SheetContent,
@@ -23,7 +27,37 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 
+<<<<<<< HEAD
 const defaultAuthSnapshot = {
+=======
+const SESSION_EVENT = "feedforward:session-change";
+const emailLikePattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+
+function containsEmailLike(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (trimmed.includes("@")) return true;
+  return emailLikePattern.test(trimmed);
+}
+
+type SessionSnapshot = {
+  isUserLoggedIn: boolean;
+  isAdminLoggedIn: boolean;
+  isSuperAdminLoggedIn: boolean;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userAvatar: string;
+  adminId: string;
+  adminName: string;
+  adminEmail: string;
+  adminUnit: string;
+  adminAvatar: string;
+  superAdminName: string;
+};
+
+const emptySessionSnapshot: SessionSnapshot = {
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
   isUserLoggedIn: false,
   isAdminLoggedIn: false,
   isSuperAdminLoggedIn: false,
@@ -39,6 +73,7 @@ const defaultAuthSnapshot = {
   superAdminName: "superadmin",
 };
 
+<<<<<<< HEAD
 let authCache = defaultAuthSnapshot;
 
 const readAuthFromStorage = () => {
@@ -50,6 +85,18 @@ const readAuthFromStorage = () => {
     isAdminLoggedIn: localStorage.getItem("isAdminLoggedIn") === "true",
     isSuperAdminLoggedIn:
       localStorage.getItem("isSuperAdminLoggedIn") === "true",
+=======
+let cachedSessionSnapshot: SessionSnapshot | null = null;
+
+function readSessionSnapshotFromStorage(): SessionSnapshot {
+  const userId = localStorage.getItem("currentUserId") || "";
+  const adminId = localStorage.getItem("currentAdminId") || "";
+
+  return {
+    isUserLoggedIn: localStorage.getItem("isUserLoggedIn") === "true",
+    isAdminLoggedIn: localStorage.getItem("isAdminLoggedIn") === "true",
+    isSuperAdminLoggedIn: localStorage.getItem("isSuperAdminLoggedIn") === "true",
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
     userId,
     userName: localStorage.getItem("currentUserName") || "",
     userEmail: localStorage.getItem("currentUserEmail") || "",
@@ -63,6 +110,7 @@ const readAuthFromStorage = () => {
       : "",
     superAdminName: localStorage.getItem("superAdminName") || "superadmin",
   };
+<<<<<<< HEAD
 };
 
 // initialize cache once on the client to avoid empty first render
@@ -87,6 +135,61 @@ const subscribeAuth = (callback: () => void) => {
     window.removeEventListener("ff-auth", handle as EventListener);
   };
 };
+=======
+}
+
+function isSameSnapshot(a: SessionSnapshot, b: SessionSnapshot): boolean {
+  return (
+    a.isUserLoggedIn === b.isUserLoggedIn &&
+    a.isAdminLoggedIn === b.isAdminLoggedIn &&
+    a.isSuperAdminLoggedIn === b.isSuperAdminLoggedIn &&
+    a.userId === b.userId &&
+    a.userName === b.userName &&
+    a.userEmail === b.userEmail &&
+    a.userAvatar === b.userAvatar &&
+    a.adminId === b.adminId &&
+    a.adminName === b.adminName &&
+    a.adminEmail === b.adminEmail &&
+    a.adminUnit === b.adminUnit &&
+    a.adminAvatar === b.adminAvatar &&
+    a.superAdminName === b.superAdminName
+  );
+}
+
+function getSessionSnapshot(): SessionSnapshot {
+  if (typeof window === "undefined") {
+    return emptySessionSnapshot;
+  }
+
+  const nextSnapshot = readSessionSnapshotFromStorage();
+  if (cachedSessionSnapshot && isSameSnapshot(cachedSessionSnapshot, nextSnapshot)) {
+    return cachedSessionSnapshot;
+  }
+
+  cachedSessionSnapshot = nextSnapshot;
+  return nextSnapshot;
+}
+
+function subscribeSessionSnapshot(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const handler = () => onStoreChange();
+  window.addEventListener("storage", handler);
+  window.addEventListener(SESSION_EVENT, handler);
+  return () => {
+    window.removeEventListener("storage", handler);
+    window.removeEventListener(SESSION_EVENT, handler);
+  };
+}
+
+function announceSessionChange() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SESSION_EVENT));
+  }
+}
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 
 // ── Reusable Avatar component ──────────────────────────────────────────────
 const AvatarDisplay = ({
@@ -130,6 +233,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isSuperAdminRoute = pathname.startsWith("/superadmin");
+<<<<<<< HEAD
   const [, setStorageVersion] = useState(0);
 
   const refreshAuthCache = () => {
@@ -138,10 +242,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setStorageVersion((value) => value + 1);
     window.dispatchEvent(new Event("ff-auth"));
   };
+=======
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
   const userAvatarInputRef = useRef<HTMLInputElement>(null);
-
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [passwordEdit, setPasswordEdit] = useState({
     current: "",
     next: "",
@@ -160,8 +265,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     newPassword: "",
     confirmPassword: "",
   });
+  const [isHydrated, setIsHydrated] = useState(false);
+  const session = useSyncExternalStore(
+    subscribeSessionSnapshot,
+    getSessionSnapshot,
+    () => emptySessionSnapshot,
+  );
+  const effectiveSession = isHydrated ? session : emptySessionSnapshot;
 
+<<<<<<< HEAD
   const authState = useSyncExternalStore(subscribeAuth, getClientAuthSnapshot, getServerAuthSnapshot);
+=======
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 
   const {
     isUserLoggedIn,
@@ -177,7 +295,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     adminUnit,
     adminAvatar,
     superAdminName,
+<<<<<<< HEAD
   } = authState;
+=======
+  } = effectiveSession;
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 
   // ── Avatar upload handlers ───────────────────────────────────────────────
   const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,7 +313,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     reader.onload = () => {
       const base64 = reader.result as string;
       localStorage.setItem(`adminAvatar_${adminId}`, base64);
+<<<<<<< HEAD
       refreshAuthCache();
+=======
+      announceSessionChange();
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
       toast.success("Profile photo updated!");
     };
     reader.readAsDataURL(file);
@@ -208,7 +334,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     reader.onload = () => {
       const base64 = reader.result as string;
       localStorage.setItem(`userAvatar_${userId}`, base64);
+<<<<<<< HEAD
       refreshAuthCache();
+=======
+      announceSessionChange();
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
       toast.success("Profile photo updated!");
     };
     reader.readAsDataURL(file);
@@ -220,7 +350,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("currentUserId");
     localStorage.removeItem("currentUserName");
     localStorage.removeItem("currentUserEmail");
+<<<<<<< HEAD
     refreshAuthCache();
+=======
+    announceSessionChange();
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
     toast.success("Logged out successfully");
     router.push("/");
   };
@@ -231,7 +365,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("currentAdminName");
     localStorage.removeItem("currentAdminEmail");
     localStorage.removeItem("currentAdminDepartment");
+<<<<<<< HEAD
     refreshAuthCache();
+=======
+    announceSessionChange();
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
     toast.success("Admin logged out successfully");
     router.push("/");
   };
@@ -241,7 +379,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("superAdminToken");
     localStorage.removeItem("superAdminName");
     localStorage.removeItem("superAdminExpiresAt");
+<<<<<<< HEAD
     refreshAuthCache();
+=======
+    announceSessionChange();
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
     toast.success("Superadmin logged out successfully");
     router.push("/login");
   };
@@ -283,6 +425,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         adminProfileEdit.lastName.trim() ||
         currentNameParts.slice(1).join(" ") ||
         "";
+      if (containsEmailLike(lastName)) {
+        toast.error("Last name must not contain an email");
+        return;
+      }
 
       const updatedAdmin = await updateAdminProfile(adminId, {
         firstName,
@@ -294,7 +440,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         firstName: "",
         lastName: "",
       });
+<<<<<<< HEAD
       refreshAuthCache();
+=======
+      announceSessionChange();
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
       toast.success("Admin profile updated!");
     } catch (error) {
       toast.error(
@@ -303,7 +453,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
   const handleDeleteUserAccount = async () => {
     if (!window.confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
     try {
@@ -336,6 +489,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         userProfileEdit.lastName.trim() ||
         currentNameParts.slice(1).join(" ") ||
         "";
+      if (containsEmailLike(lastName)) {
+        toast.error("Last name must not contain an email");
+        return;
+      }
 
       const updatedUser = await updateUserProfile(userId, {
         firstName,
@@ -357,7 +514,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         newPassword: "",
         confirmPassword: "",
       });
+<<<<<<< HEAD
       refreshAuthCache();
+=======
+      announceSessionChange();
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
       toast.success("Profile updated!");
     } catch (error) {
       toast.error(
@@ -369,7 +530,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-white">
+      <header className="sticky top-0 z-50 border-b border-border bg-white">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
@@ -521,6 +682,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Label htmlFor="adm-fname" className="text-xs text-muted-foreground">First Name</Label>
                 <Input
                   id="adm-fname"
+                  name="firstName"
+                  autoComplete="given-name"
                   placeholder="Enter first name"
                   value={adminProfileEdit.firstName}
                   onChange={(e) => setAdminProfileEdit({ ...adminProfileEdit, firstName: e.target.value })}
@@ -530,9 +693,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Label htmlFor="adm-lname" className="text-xs text-muted-foreground">Last Name</Label>
                 <Input
                   id="adm-lname"
+                  name="lastName"
+                  autoComplete="family-name"
                   placeholder="Enter last name"
                   value={adminProfileEdit.lastName}
-                  onChange={(e) => setAdminProfileEdit({ ...adminProfileEdit, lastName: e.target.value })}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (containsEmailLike(next)) {
+                      toast.error("Last name must not contain an email");
+                      return;
+                    }
+                    setAdminProfileEdit({ ...adminProfileEdit, lastName: next });
+                  }}
                 />
               </div>
               <Button className="w-full" variant="outline" onClick={handleAdminProfileSave}>
@@ -577,7 +749,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Button>
             </div>
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
           </div>
         </SheetContent>
       </Sheet>
@@ -634,6 +809,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Label htmlFor="u-fname" className="text-xs text-muted-foreground">First Name</Label>
                 <Input
                   id="u-fname"
+                  name="firstName"
+                  autoComplete="given-name"
                   placeholder="Enter first name"
                   value={userProfileEdit.firstName}
                   onChange={(e) => setUserProfileEdit({ ...userProfileEdit, firstName: e.target.value })}
@@ -643,9 +820,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Label htmlFor="u-lname" className="text-xs text-muted-foreground">Last Name</Label>
                 <Input
                   id="u-lname"
+                  name="lastName"
+                  autoComplete="family-name"
                   placeholder="Enter last name"
                   value={userProfileEdit.lastName}
-                  onChange={(e) => setUserProfileEdit({ ...userProfileEdit, lastName: e.target.value })}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (containsEmailLike(next)) {
+                      toast.error("Last name must not contain an email");
+                      return;
+                    }
+                    setUserProfileEdit({ ...userProfileEdit, lastName: next });
+                  }}
                 />
               </div>
             </div>

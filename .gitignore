@@ -1,0 +1,4 @@
+node_modules
+
+feedback-timing.log
+Backend/.env

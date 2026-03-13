@@ -86,6 +86,7 @@ export default function AdminDashboard() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterName, setFilterName] = useState("asc");
+  const [filterDate, setFilterDate] = useState("recent");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -122,11 +123,16 @@ export default function AdminDashboard() {
       return;
     }
 
+<<<<<<< HEAD
     const admin = {
+=======
+    setCurrentAdmin({
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
       id: localStorage.getItem("currentAdminId") || "",
       name: localStorage.getItem("currentAdminName") || "",
       email: localStorage.getItem("currentAdminEmail") || "",
       unit: localStorage.getItem("currentAdminDepartment") || "",
+<<<<<<< HEAD
     };
     setCurrentAdmin(admin);
     void loadFeedbacks(admin.unit);
@@ -173,6 +179,26 @@ export default function AdminDashboard() {
         }),
     [feedbacks, filterName, filterPriority, filterStatus, filterType, searchQuery],
   );
+=======
+    });
+  }, [router]);
+
+  useEffect(() => {
+    if (!currentAdmin?.unit) return;
+
+    void listFeedbacks({ category: currentAdmin.unit })
+      .then((data) => {
+        startTransition(() => {
+          setFeedbacks(data);
+        });
+      })
+      .catch((error) => {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to load feedbacks.",
+        );
+      });
+  }, [currentAdmin?.unit]);
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 
   const openEditDialog = (feedback: Feedback) => {
     setSelectedFeedback(feedback);
@@ -207,6 +233,7 @@ export default function AdminDashboard() {
       ),
     );
 
+<<<<<<< HEAD
     try {
       const updated = await updateFeedback(selectedFeedback.id, {
         status: nextStatus,
@@ -224,6 +251,25 @@ export default function AdminDashboard() {
       toast.error(error instanceof Error ? error.message : "Failed to update feedback.");
     } finally {
       setIsSavingUpdate(false);
+=======
+    const updatedAdmin = { ...currentAdmin!, unit: newUnit };
+    setCurrentAdmin(updatedAdmin);
+    setNewUnit("");
+    setIsProfileOpen(false);
+    toast.success("Unit updated successfully!");
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20";
+      case "in progress":
+        return "bg-blue-500/10 text-blue-700 border-blue-500/20";
+      case "resolved":
+        return "bg-green-500/10 text-green-700 border-green-500/20";
+      default:
+        return "bg-gray-500/10 text-gray-700 border-gray-500/20";
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
     }
   };
 
@@ -309,6 +355,7 @@ export default function AdminDashboard() {
           </Table>
         </div>
 
+<<<<<<< HEAD
         <div className="space-y-3 md:hidden">
           {filteredFeedbacks.map((feedback) => (
             <Card key={feedback.id} className="ff-surface">
@@ -352,6 +399,51 @@ export default function AdminDashboard() {
       </>
     );
   };
+=======
+  const filteredFeedbacks = feedbacks
+    .filter((feedback) => {
+      const matchesSearch =
+        feedback.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        feedback.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        feedback.id.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesType = filterType === "all" || feedback.type === filterType;
+      // FIX: use regex replace to remove ALL spaces for comparison
+      const matchesStatus =
+        filterStatus === "all" ||
+        feedback.status.toLowerCase().replace(/\s+/g, "") === filterStatus;
+      const matchesPriority =
+        filterPriority === "all" ||
+        feedback.priority?.toLowerCase() === filterPriority;
+      return (
+        matchesSearch &&
+        matchesType &&
+        matchesStatus &&
+        matchesPriority
+      );
+    })
+    .sort((a, b) => {
+      if (filterDate === "recent") {
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      }
+      if (filterDate === "oldest") {
+        return (
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      }
+      if (filterName === "all" || filterName === "") return 0;
+      const nameA = (
+        a.isAnonymous ? "*****" : a.userName || "*****"
+      ).toLowerCase();
+      const nameB = (
+        b.isAnonymous ? "*****" : b.userName || "*****"
+      ).toLowerCase();
+      return filterName === "asc"
+        ? nameA.localeCompare(nameB)
+        : nameB.localeCompare(nameA);
+    });
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 
   return (
     <div className="ff-page-shell">
@@ -442,6 +534,17 @@ export default function AdminDashboard() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="min-w-[140px]">
+                <Select value={filterDate} onValueChange={setFilterDate}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recent">Most Recent</SelectItem>
+                    <SelectItem value="oldest">Oldest</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="min-w-[130px]">
                 <Select value={filterType} onValueChange={setFilterType}>
                   <SelectTrigger>
@@ -496,7 +599,320 @@ export default function AdminDashboard() {
               {currentAdmin?.unit ? ` for ${currentAdmin.unit}` : ""}
             </CardDescription>
           </CardHeader>
+<<<<<<< HEAD
           <CardContent>{renderTableContent()}</CardContent>
+=======
+          <CardContent>
+            {filteredFeedbacks.length === 0 ? (
+              <div className="text-center py-12">
+                <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">
+                  No Feedback Found
+                </h3>
+                <p className="text-muted-foreground">
+                  {feedbacks.length === 0
+                    ? `No feedback submissions yet for ${currentAdmin?.unit}.`
+                    : "Try adjusting your search or filters."}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <Table className="[&_th]:px-3 [&_td]:px-3">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Tracking ID</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="whitespace-nowrap w-[150px]">
+                        Date
+                      </TableHead>
+                      <TableHead className="text-right w-[110px]">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredFeedbacks.map((feedback) => (
+                      <TableRow key={feedback.id}>
+                        <TableCell className="font-mono text-sm">
+                          {feedback.isAnonymous
+                            ? "*****"
+                            : feedback.userName
+                              ? feedback.userName.split(" ")[0]
+                              : "*****"}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {feedback.id}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {feedback.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{feedback.category}</TableCell>
+                        <TableCell>
+                          <Badge
+                            className={getPriorityColor(feedback.priority)}
+                            variant="outline"
+                          >
+                            {feedback.priority}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={getStatusColor(feedback.status)}
+                            variant="outline"
+                          >
+                            {feedback.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {(() => {
+                            const date = new Date(feedback.createdAt);
+                            const datePart = date.toLocaleDateString("en-US", {
+                              timeZone: "Asia/Manila",
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            });
+                            const timePart = date
+                              .toLocaleTimeString("en-US", {
+                                timeZone: "Asia/Manila",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })
+                              .replace(" ", "")
+                              .toLowerCase();
+                            return `${datePart} ${timePart}`;
+                          })()}
+                        </TableCell>
+                        <TableCell className="text-right w-[110px]">
+                          <Dialog
+                            open={
+                              isEditDialogOpen &&
+                              selectedFeedback?.id === feedback.id
+                            }
+                            onOpenChange={(open) => {
+                              if (!open) {
+                                setIsEditDialogOpen(false);
+                                setSelectedFeedback(null);
+                              }
+                            }}
+                          >
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedFeedback(feedback);
+                                  setResponse(feedback.response || "");
+                                  setNewStatus(feedback.status);
+                                  setNewPriority(feedback.priority);
+                                  setIsEditDialogOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                              <DialogHeader>
+                                <DialogTitle>Feedback Details</DialogTitle>
+                                <DialogDescription>
+                                  Tracking ID: {selectedFeedback?.id}
+                                </DialogDescription>
+                              </DialogHeader>
+                              {selectedFeedback && (
+                                <Tabs defaultValue="details" className="w-full">
+                                  <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="details">
+                                      Details
+                                    </TabsTrigger>
+                                    <TabsTrigger value="manage">
+                                      Manage
+                                    </TabsTrigger>
+                                  </TabsList>
+                                  <TabsContent
+                                    value="details"
+                                    className="space-y-4"
+                                  >
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                        <Label className="text-muted-foreground">
+                                          Type
+                                        </Label>
+                                        <p className="font-medium capitalize">
+                                          {selectedFeedback.type}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <Label className="text-muted-foreground">
+                                          Category
+                                        </Label>
+                                        <p className="font-medium">
+                                          {selectedFeedback.category}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <Label className="text-muted-foreground">
+                                          Status
+                                        </Label>
+                                        <Badge
+                                          className={getStatusColor(
+                                            selectedFeedback.status,
+                                          )}
+                                          variant="outline"
+                                        >
+                                          {selectedFeedback.status}
+                                        </Badge>
+                                      </div>
+                                      <div>
+                                        <Label className="text-muted-foreground">
+                                          Submitted
+                                        </Label>
+                                        <p className="font-medium">
+                                          {new Date(
+                                            selectedFeedback.createdAt,
+                                          ).toLocaleString("en-US")}
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <Label className="text-muted-foreground">
+                                          Submitted By
+                                        </Label>
+                                        <p className="font-medium">
+                                          {selectedFeedback.isAnonymous
+                                            ? "*****"
+                                            : selectedFeedback.userName ||
+                                              "*****"}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <Label className="text-muted-foreground">
+                                        Subject
+                                      </Label>
+                                      <p className="font-medium">
+                                        {selectedFeedback.subject}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <Label className="text-muted-foreground">
+                                        Message
+                                      </Label>
+                                      <div className="bg-muted rounded-lg p-4 mt-2">
+                                        <p className="text-sm whitespace-pre-wrap">
+                                          {selectedFeedback.message}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {selectedFeedback.response && (
+                                      <div>
+                                        <Label className="text-muted-foreground">
+                                          Current Response
+                                        </Label>
+                                        <div className="bg-accent/5 border border-accent/20 rounded-lg p-4 mt-2">
+                                          <p className="text-sm whitespace-pre-wrap">
+                                            {selectedFeedback.response}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </TabsContent>
+                                  <TabsContent
+                                    value="manage"
+                                    className="space-y-4"
+                                  >
+                                    <div className="space-y-2">
+                                      <Label htmlFor="status">
+                                        Update Status
+                                      </Label>
+                                      <Select
+                                        value={newStatus}
+                                        onValueChange={setNewStatus}
+                                      >
+                                        <SelectTrigger id="status">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Pending">
+                                            Pending
+                                          </SelectItem>
+                                          <SelectItem value="In Progress">
+                                            In Progress
+                                          </SelectItem>
+                                          <SelectItem value="Resolved">
+                                            Resolved
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label htmlFor="priority">
+                                        Update Priority
+                                      </Label>
+                                      <Select
+                                        value={newPriority}
+                                        onValueChange={setNewPriority}
+                                      >
+                                        <SelectTrigger id="priority">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Low">
+                                            Low
+                                          </SelectItem>
+                                          <SelectItem value="Medium">
+                                            Medium
+                                          </SelectItem>
+                                          <SelectItem value="High">
+                                            High
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label htmlFor="response">
+                                        Add/Update Response
+                                      </Label>
+                                      <Textarea
+                                        id="response"
+                                        placeholder="Enter your response to the user..."
+                                        rows={5}
+                                        value={response}
+                                        onChange={(e) =>
+                                          setResponse(e.target.value)
+                                        }
+                                      />
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                      Marking a submission as Resolved will
+                                      email the user if they registered an
+                                      account.
+                                    </p>
+                                    <Button
+                                      onClick={handleUpdateFeedback}
+                                      className="w-full bg-accent hover:bg-accent/90"
+                                    >
+                                      Update Feedback
+                                    </Button>
+                                  </TabsContent>
+                                </Tabs>
+                              )}
+                            </DialogContent>
+                          </Dialog>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
         </Card>
       </div>
 

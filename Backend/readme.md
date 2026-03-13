@@ -40,18 +40,29 @@ Follow these steps to set up and run the project locally:
     DB_NAME = db_intern
     DB_UNME = fdsap.intern
     DB_PWRD = sh.intern@2025
-    DB_TMEZ = asia/manila 
+    DB_TMEZ = UTC
     DB_SSLM = disable
     PROJ_NAME = INTERN TEMPLATE V1
     PROJ_PORT = 5566
    ```
 
-4. Run the application:
+4. Timezone migration (one-time, recommended):
+   If you already have data stored in local time, run the migration in
+   `Backend/migrations/001_timestamps_utc.sql` once to convert timestamps
+   to UTC and switch columns to `timestamptz`.
+
+5. Run the migration via CLI (optional):
+   ```bash
+   cd Backend
+   go run scripts/migrate.go
+   ```
+
+6. Run the application:
    ```bash
    go run main.go
    ```
 
-5. Access the application in your browser:
+7. Access the application in your browser:
    ```
    http://localhost:5566
    ```

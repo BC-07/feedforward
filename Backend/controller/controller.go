@@ -10,7 +10,10 @@ import (
 	"intern_template_v1/model/errors"
 	"intern_template_v1/model/response"
 	"intern_template_v1/model/status"
+	"log"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -64,6 +67,16 @@ var categoryTableInit sync.Once
 var categoryTableInitErr error
 var adminDisableColumnInit sync.Once
 var adminDisableColumnErr error
+var feedbackEmailColumnInit sync.Once
+var feedbackEmailColumnErr error
+var feedbackTimingLoggerOnce sync.Once
+var feedbackTimingLogger *log.Logger
+var feedbackTimingLoggerErr error
+var feedbackTimingFile *os.File
+var feedbackTimingMu sync.Mutex
+var feedbackTimingEntries int
+
+const feedbackTimingMaxEntries = 3
 
 // // This handler returns all student rows from the database as JSON.
 // // It reads input from the request, talks to the database if needed, and then returns JSON or an error.
@@ -170,10 +183,18 @@ func GetFeedbacks(c *fiber.Ctx) error {
 	// We take the shared database connection that middleware already opened for us.
 	// Think of this as the phone line to Postgres; without it, this handler cannot read or change any data.
 	db := middleware.DBConn
+	if err := ensureFeedbackEmailColumn(); err != nil {
+		return serverError(c, "failed to initialize feedback email storage", err)
+	}
 
+<<<<<<< HEAD
 	// We build the SQL query in pieces so we can optionally filter by category or user.
 	// This single handler can serve both admin views (filter by category) and user views (filter by user id).
 	query := `SELECT id, type, category, subject, message, status, priority, user_id, user_name, is_anonymous, response, created_at, updated_at
+=======
+	// Build the filter dynamically so the same handler supports admin and user views.
+	query := `SELECT id, type, category, subject, message, status, priority, user_id, user_name, user_email, is_anonymous, response, created_at, updated_at
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 		FROM ` + feedbackTable
 	var args []any
 	var conditions []string
@@ -229,9 +250,21 @@ func GetFeedbackByID(c *fiber.Ctx) error {
 // This handler validates a feedback payload, fills in defaults, stores it, and returns the saved row.
 // It reads input from the request, talks to the database if needed, and then returns JSON or an error.
 func CreateFeedback(c *fiber.Ctx) error {
+<<<<<<< HEAD
 	// We take the shared database connection that middleware already opened for us.
 	// Think of this as the phone line to Postgres; without it, this handler cannot read or change any data.
+=======
+	started := time.Now()
+	stepStart := started
+	logPrefix := fmt.Sprintf("CreateFeedback %s", c.IP())
+	logTimingStart(logPrefix, "")
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 	db := middleware.DBConn
+	if err := ensureFeedbackEmailColumn(); err != nil {
+		return serverError(c, "failed to initialize feedback email storage", err)
+	}
+	logTimingf("%s ensureFeedbackEmailColumn=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
 
 	var feedback model.FeedbackModel
 
@@ -246,12 +279,70 @@ func CreateFeedback(c *fiber.Ctx) error {
 		// We return a validation error because CreateFeedback received input that failed required checks (example: missing fields or a value that is not allowed for this endpoint).
 		return invalidRequest(c, err.Error())
 	}
+	logTimingf("%s trackingId=%s", logPrefix, feedback.ID)
+	logTimingf("%s parse+normalize=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
 
+<<<<<<< HEAD
 	// We read the current time once so all timestamps in this operation match exactly.
 	// This prevents tiny differences between created_at and updated_at within the same request.
 	now := time.Now()
 	// If the request did not provide a timestamp, we set one ourselves using the current time.
 	// This ensures the database row always has a valid created_at value.
+=======
+	if feedback.UserID == nil && feedback.UserEmail != nil {
+		user, err := fetchUserByEmail(*feedback.UserEmail)
+		if err != nil {
+			return serverError(c, "failed to validate feedback user email", err)
+		}
+		if user.ID == "" {
+			return invalidRequest(c, "user account not found; please log in again")
+		}
+		feedback.UserID = &user.ID
+		if feedback.UserName == nil || strings.TrimSpace(*feedback.UserName) == "" {
+			name := user.Name
+			feedback.UserName = &name
+		}
+		if feedback.UserEmail == nil || strings.TrimSpace(*feedback.UserEmail) == "" {
+			email := user.Email
+			feedback.UserEmail = &email
+		}
+	}
+	logTimingf("%s resolveUserByEmail=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
+
+	if feedback.UserID != nil && (feedback.UserEmail == nil || strings.TrimSpace(*feedback.UserEmail) == "") {
+		user, err := fetchUserByID(strings.TrimSpace(*feedback.UserID))
+		if err != nil {
+			return serverError(c, "failed to load feedback user", err)
+		}
+		if user.Email != "" {
+			email := user.Email
+			feedback.UserEmail = &email
+		}
+	}
+	if feedback.UserID != nil && strings.TrimSpace(*feedback.UserID) != "" {
+		user, err := fetchUserByID(strings.TrimSpace(*feedback.UserID))
+		if err != nil {
+			return serverError(c, "failed to load feedback user", err)
+		}
+		if user.ID == "" {
+			return invalidRequest(c, "user account not found; please log in again")
+		}
+		if user.Name != "" {
+			name := user.Name
+			feedback.UserName = &name
+		}
+		if user.Email != "" {
+			email := user.Email
+			feedback.UserEmail = &email
+		}
+	}
+	logTimingf("%s resolveUserByID=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
+
+	now := utcNow()
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 	if feedback.CreatedAt.IsZero() {
 		feedback.CreatedAt = now
 	}
@@ -261,8 +352,8 @@ func CreateFeedback(c *fiber.Ctx) error {
 	// We insert the new feedback into the database using placeholders to avoid SQL injection.
 	if err := db.Exec(
 		`INSERT INTO `+feedbackTable+`
-			(id, type, category, subject, message, status, priority, user_id, user_name, is_anonymous, response, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			(id, type, category, subject, message, status, priority, user_id, user_name, user_email, is_anonymous, response, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		feedback.ID,
 		feedback.Type,
 		feedback.Category,
@@ -272,6 +363,7 @@ func CreateFeedback(c *fiber.Ctx) error {
 		feedback.Priority,
 		feedback.UserID,
 		feedback.UserName,
+		feedback.UserEmail,
 		feedback.IsAnonymous,
 		feedback.Response,
 		feedback.CreatedAt,
@@ -280,12 +372,29 @@ func CreateFeedback(c *fiber.Ctx) error {
 		// We return a server error because CreateFeedback hit an internal failure (example: the database query for this handler failed).
 		return serverError(c, "failed to create feedback", err)
 	}
+	logTimingf("%s insertFeedback=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
 
 	created, err := fetchFeedbackByID(feedback.ID)
 	if err != nil {
 		// We return a server error because CreateFeedback hit an internal failure (example: the database query for this handler failed).
 		return serverError(c, "failed to fetch feedback", err)
 	}
+	logTimingf("%s fetchFeedbackByID=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
+
+	queuedAt := time.Now()
+	createdCopy := created
+	go func(feedback model.FeedbackModel, queued time.Time) {
+		emailStart := time.Now()
+		if err := sendTrackingEmailForFeedback(feedback); err != nil {
+			fmt.Printf("email: failed to send tracking notification for %s: %v\n", feedback.ID, err)
+			return
+		}
+		logTimingf("%s sendTrackingEmail async duration=%s queuedDelay=%s", logPrefix, time.Since(emailStart), emailStart.Sub(queued))
+	}(createdCopy, queuedAt)
+	logTimingf("%s sendTrackingEmail queued=%s", logPrefix, time.Since(stepStart))
+	logTimingf("%s total=%s", logPrefix, time.Since(started))
 
 	// We return a success response with the data from CreateFeedback so the client can update its view (example: CreateFeedback returns the requested or updated resource).
 	return success(c, fiber.StatusCreated, created)
@@ -294,9 +403,31 @@ func CreateFeedback(c *fiber.Ctx) error {
 // This handler updates only the feedback fields provided by the client and returns the updated row.
 // It reads input from the request, talks to the database if needed, and then returns JSON or an error.
 func UpdateFeedback(c *fiber.Ctx) error {
+<<<<<<< HEAD
 	// We take the shared database connection that middleware already opened for us.
 	// Think of this as the phone line to Postgres; without it, this handler cannot read or change any data.
+=======
+	started := time.Now()
+	stepStart := started
+	logPrefix := fmt.Sprintf("UpdateFeedback %s", c.IP())
+	logTimingStart(logPrefix, c.Params("id"))
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 	db := middleware.DBConn
+	if err := ensureFeedbackEmailColumn(); err != nil {
+		return serverError(c, "failed to initialize feedback email storage", err)
+	}
+	logTimingf("%s ensureFeedbackEmailColumn=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
+
+	existing, err := fetchFeedbackByID(c.Params("id"))
+	if err != nil {
+		return serverError(c, "failed to fetch feedback", err)
+	}
+	if existing.ID == "" {
+		return notFound(c, "feedback not found", nil)
+	}
+	logTimingf("%s fetchExisting=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
 
 	var payload map[string]any
 	// The HTTP request body arrives as raw bytes; parseBody turns that JSON into the Go value we pass in.
@@ -305,6 +436,8 @@ func UpdateFeedback(c *fiber.Ctx) error {
 		// We return a parse error because UpdateFeedback could not decode the request body into the expected fields (example: invalid JSON or wrong field names/types).
 		return parseError(c, "failed to parse feedback update", err)
 	}
+	logTimingf("%s parsePayload=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
 
 	var sets []string
 	var args []any
@@ -411,8 +544,12 @@ func UpdateFeedback(c *fiber.Ctx) error {
 	// We always record the latest update time so the database knows when this row was last modified.
 	// We add it here so it gets saved in the same UPDATE statement as the other fields.
 	sets = append(sets, "updated_at = ?")
+<<<<<<< HEAD
 	// The last argument is the feedback id, which matches the final "WHERE id = ?" in the SQL below.
 	args = append(args, time.Now(), c.Params("id"))
+=======
+	args = append(args, utcNow(), c.Params("id"))
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 
 	// We build the full UPDATE SQL using the collected SET clauses, then pass all values in args.
 	// Using placeholders keeps the SQL safe and lets the driver handle proper escaping.
@@ -430,12 +567,33 @@ func UpdateFeedback(c *fiber.Ctx) error {
 		// We return not found because UpdateFeedback could not find the requested record (example: no row matches the given id).
 		return notFound(c, "feedback not found", nil)
 	}
+	logTimingf("%s updateFeedback=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
 
 	updated, err := fetchFeedbackByID(c.Params("id"))
 	if err != nil {
 		// We return a server error because UpdateFeedback hit an internal failure (example: the database query for this handler failed).
 		return serverError(c, "failed to fetch feedback", err)
 	}
+	logTimingf("%s fetchUpdated=%s", logPrefix, time.Since(stepStart))
+	stepStart = time.Now()
+
+	if shouldSendResolvedEmail(existing, updated) {
+		queuedAt := time.Now()
+		updatedCopy := updated
+		go func(feedback model.FeedbackModel, queued time.Time) {
+			emailStart := time.Now()
+			if err := sendResolvedEmailForFeedback(feedback); err != nil {
+				fmt.Printf("email: failed to send resolved notification for %s: %v\n", feedback.ID, err)
+				return
+			}
+			logTimingf("%s sendResolvedEmail async duration=%s queuedDelay=%s", logPrefix, time.Since(emailStart), emailStart.Sub(queued))
+		}(updatedCopy, queuedAt)
+		logTimingf("%s sendResolvedEmail queued=%s", logPrefix, time.Since(stepStart))
+		stepStart = time.Now()
+	}
+
+	logTimingf("%s total=%s", logPrefix, time.Since(started))
 
 	// We return a success response with the data from UpdateFeedback so the client can update its view (example: UpdateFeedback returns the requested or updated resource).
 	return success(c, fiber.StatusOK, updated)
@@ -489,10 +647,14 @@ func RegisterUser(c *fiber.Ctx) error {
 	// We generate a simple unique id using the current time in milliseconds.
 	// This keeps ids readable and consistent with the existing format.
 	payload.ID = "USER-" + fmt.Sprintf("%d", time.Now().UnixMilli())
+<<<<<<< HEAD
 	// We read the current time once so all timestamps in this operation match exactly.
 	// This prevents tiny differences between created_at and updated_at within the same request.
 	now := time.Now()
 	// We insert the new user into the database using placeholders for safety.
+=======
+	now := utcNow()
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 	if err := db.Exec(
 		`INSERT INTO `+userTable+` (id, first_name, last_name, email, password, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -566,10 +728,14 @@ func RegisterAdmin(c *fiber.Ctx) error {
 
 	// We generate a new admin id using the current time in milliseconds.
 	payload.ID = "ADMIN-" + fmt.Sprintf("%d", time.Now().UnixMilli())
+<<<<<<< HEAD
 	// We read the current time once so all timestamps in this operation match exactly.
 	// This prevents tiny differences between created_at and updated_at within the same request.
 	now := time.Now()
 	// We insert the new admin into the database using placeholders for safety.
+=======
+	now := utcNow()
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 	if err := db.Exec(
 		`INSERT INTO `+adminTable+` (id, first_name, last_name, email, password, unit, is_disabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -702,9 +868,13 @@ func LoginSuperAdmin(c *fiber.Ctx) error {
 		return unauthorized(c, "invalid superadmin credentials")
 	}
 
+<<<<<<< HEAD
 	// We create a short-lived token so the superadmin can access protected endpoints.
 	expiresAt := time.Now().Add(superAdminTTL)
 	// We return a success response with the data from LoginSuperAdmin so the client can update its view (example: LoginSuperAdmin returns the requested or updated resource).
+=======
+	expiresAt := utcNow().Add(superAdminTTL)
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 	return success(c, fiber.StatusOK, superAdminSession{
 		Token:     issueSuperAdminToken(expiresAt),
 		Username:  superAdminUsername(),
@@ -772,7 +942,7 @@ func CreateCategoryBySuperAdmin(c *fiber.Ctx) error {
 	// We insert the new category row with timestamps.
 	if err := middleware.DBConn.Exec(
 		`INSERT INTO `+categoryTable+` (name, created_at, updated_at) VALUES (?, ?, ?)`,
-		name, time.Now(), time.Now(),
+		name, utcNow(), utcNow(),
 	).Error; err != nil {
 		// We return a server error because CreateCategoryBySuperAdmin hit an internal failure (example: the database query for this handler failed).
 		return serverError(c, "failed to create category", err)
@@ -879,7 +1049,7 @@ func UpdateCategoryBySuperAdmin(c *fiber.Ctx) error {
 	// First we rename the category row itself.
 	if err := tx.Exec(
 		`UPDATE `+categoryTable+` SET name = ?, updated_at = ? WHERE id = ?`,
-		newName, time.Now(), categoryID,
+		newName, utcNow(), categoryID,
 	).Error; err != nil {
 		tx.Rollback()
 		// We return a server error because UpdateCategoryBySuperAdmin hit an internal failure (example: the database query for this handler failed).
@@ -889,7 +1059,7 @@ func UpdateCategoryBySuperAdmin(c *fiber.Ctx) error {
 	// Then we update any admins that reference the old category name.
 	if err := tx.Exec(
 		`UPDATE `+adminTable+` SET unit = ?, updated_at = ? WHERE unit = ?`,
-		newName, time.Now(), existing.Name,
+		newName, utcNow(), existing.Name,
 	).Error; err != nil {
 		tx.Rollback()
 		// We return a server error because UpdateCategoryBySuperAdmin hit an internal failure (example: the database query for this handler failed).
@@ -899,7 +1069,7 @@ func UpdateCategoryBySuperAdmin(c *fiber.Ctx) error {
 	// Finally we update any feedback rows that reference the old category name.
 	if err := tx.Exec(
 		`UPDATE `+feedbackTable+` SET category = ?, updated_at = ? WHERE category = ?`,
-		newName, time.Now(), existing.Name,
+		newName, utcNow(), existing.Name,
 	).Error; err != nil {
 		tx.Rollback()
 		// We return a server error because UpdateCategoryBySuperAdmin hit an internal failure (example: the database query for this handler failed).
@@ -1107,10 +1277,14 @@ func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
 
 	// We generate a new admin id using the current time in milliseconds.
 	payload.ID = "ADMIN-" + fmt.Sprintf("%d", time.Now().UnixMilli())
+<<<<<<< HEAD
 	// We read the current time once so all timestamps in this operation match exactly.
 	// This prevents tiny differences between created_at and updated_at within the same request.
 	now := time.Now()
 	// We insert the new admin into the database with is_disabled set to false.
+=======
+	now := utcNow()
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 	if err := middleware.DBConn.Exec(
 		`INSERT INTO `+adminTable+` (id, first_name, last_name, email, password, unit, is_disabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1229,8 +1403,12 @@ func UpdateAdminBySuperAdmin(c *fiber.Ctx) error {
 
 	// Always update the timestamp so we can see when the record last changed.
 	sets = append(sets, "updated_at = ?")
+<<<<<<< HEAD
 	args = append(args, time.Now())
 	// We execute the update using the shared helper so error handling is consistent.
+=======
+	args = append(args, utcNow())
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 	if err := execUpdateByID(adminTable, c.Params("id"), "failed to update admin", "admin not found", sets, args...); err != nil {
 		return respondDBResult(c, err)
 	}
@@ -1261,7 +1439,7 @@ func DisableAdminBySuperAdmin(c *fiber.Ctx) error {
 	// This preserves history while preventing future logins.
 	result := middleware.DBConn.Exec(
 		`UPDATE `+adminTable+` SET is_disabled = TRUE, updated_at = ? WHERE id = ?`,
-		time.Now(),
+		utcNow(),
 		c.Params("id"),
 	)
 	if result.Error != nil {
@@ -1307,6 +1485,9 @@ func UpdateUserProfile(c *fiber.Ctx) error {
 		// We return a validation error because UpdateUserProfile received input that failed required checks (example: missing fields or a value that is not allowed for this endpoint).
 		return invalidRequest(c, "first name and last name are required")
 	}
+	if containsEmailLike(payload.LastName) {
+		return invalidRequest(c, "last name must not contain an email")
+	}
 
 	// We update the user row by id using the shared helper for consistent error handling.
 	if err := execUpdateByID(
@@ -1315,7 +1496,7 @@ func UpdateUserProfile(c *fiber.Ctx) error {
 		"failed to update user profile",
 		"user not found",
 		[]string{"first_name = ?", "last_name = ?", "updated_at = ?"},
-		payload.FirstName, payload.LastName, time.Now(),
+		payload.FirstName, payload.LastName, utcNow(),
 	); err != nil {
 		return respondDBResult(c, err)
 	}
@@ -1352,6 +1533,9 @@ func UpdateAdminProfile(c *fiber.Ctx) error {
 		// We return a validation error because UpdateAdminProfile received input that failed required checks (example: missing fields or a value that is not allowed for this endpoint).
 		return invalidRequest(c, "first name and last name are required")
 	}
+	if containsEmailLike(payload.LastName) {
+		return invalidRequest(c, "last name must not contain an email")
+	}
 
 	// We update the admin row by id using the shared helper for consistent error handling.
 	if err := execUpdateByID(
@@ -1360,7 +1544,7 @@ func UpdateAdminProfile(c *fiber.Ctx) error {
 		"failed to update admin profile",
 		"admin not found",
 		[]string{"first_name = ?", "last_name = ?", "updated_at = ?"},
-		payload.FirstName, payload.LastName, time.Now(),
+		payload.FirstName, payload.LastName, utcNow(),
 	); err != nil {
 		return respondDBResult(c, err)
 	}
@@ -1400,8 +1584,12 @@ func UpdateAdminPassword(c *fiber.Ctx) error {
 // This handler deletes an admin account by id.
 // It reads input from the request, talks to the database if needed, and then returns JSON or an error.
 func DeleteAdminAccount(c *fiber.Ctx) error {
+<<<<<<< HEAD
 	// We delegate to the shared delete helper so error handling stays consistent.
 	return deleteByID(c, adminTable, "admin", c.Params("id"))
+=======
+	return unauthorized(c, "admin self-deletion is not allowed")
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 }
 
 // This helper checks the current password and writes a new password for a user or admin.
@@ -1435,7 +1623,7 @@ func updatePassword(c *fiber.Ctx, table string, entity string) error {
 	// The WHERE clause includes the current password, so no rows change if it is wrong.
 	result := middleware.DBConn.Exec(
 		fmt.Sprintf("UPDATE %s SET password = ?, updated_at = ? WHERE id = ? AND password = ?", table),
-		payload.NewPassword, time.Now(), c.Params("id"), payload.CurrentPassword,
+		payload.NewPassword, utcNow(), c.Params("id"), payload.CurrentPassword,
 	)
 	if result.Error != nil {
 		// We return a server error because updatePassword hit an internal failure (example: the database query for this handler failed).
@@ -1456,11 +1644,14 @@ func updatePassword(c *fiber.Ctx, table string, entity string) error {
 // This helper reads one feedback row from the database.
 // It is a small reusable piece so we do not repeat the same logic in many handlers.
 func fetchFeedbackByID(id string) (model.FeedbackModel, error) {
+	if err := ensureFeedbackEmailColumn(); err != nil {
+		return model.FeedbackModel{}, err
+	}
 	var feedback model.FeedbackModel
 	// We select only the columns the frontend needs so the API stays stable and predictable.
 	// The id parameter tells us which feedback row to fetch.
 	err := middleware.DBConn.Raw(
-		`SELECT id, type, category, subject, message, status, priority, user_id, user_name, is_anonymous, response, created_at, updated_at
+		`SELECT id, type, category, subject, message, status, priority, user_id, user_name, user_email, is_anonymous, response, created_at, updated_at
 		FROM `+feedbackTable+` WHERE id = ?`,
 		id,
 	).Scan(&feedback).Error
@@ -1481,8 +1672,25 @@ func fetchUserByID(id string) (model.UserModel, error) {
 	return user, err
 }
 
+<<<<<<< HEAD
 // This helper reads one admin row from the database.
 // It is a small reusable piece so we do not repeat the same logic in many handlers.
+=======
+func fetchUserByEmail(email string) (model.UserModel, error) {
+	var user model.UserModel
+	trimmed := strings.TrimSpace(email)
+	if trimmed == "" {
+		return user, nil
+	}
+	err := middleware.DBConn.Raw(
+		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, created_at, updated_at
+		FROM `+userTable+` WHERE LOWER(email) = LOWER(?)`,
+		trimmed,
+	).Scan(&user).Error
+	return user, err
+}
+
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 func fetchAdminByID(id string) (model.AdminModel, error) {
 	if err := ensureAdminDisableColumn(); err != nil {
 		return model.AdminModel{}, err
@@ -1579,8 +1787,19 @@ func normalizeFeedback(feedback *model.FeedbackModel) error {
 			feedback.UserName = &trimmed
 		}
 	}
+<<<<<<< HEAD
 	// Response is optional in the input, but the database requires a non-null value.
 	// We either trim the provided response or set it to an empty string.
+=======
+	if feedback.UserEmail != nil {
+		trimmed := strings.TrimSpace(*feedback.UserEmail)
+		if trimmed == "" {
+			feedback.UserEmail = nil
+		} else {
+			feedback.UserEmail = &trimmed
+		}
+	}
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 	if feedback.Response != nil {
 		trimmed := strings.TrimSpace(*feedback.Response)
 		feedback.Response = &trimmed
@@ -1672,8 +1891,31 @@ func ensureAdminDisableColumn() error {
 	return adminDisableColumnErr
 }
 
+<<<<<<< HEAD
 // This helper returns all categories sorted by name.
 // It is a small reusable piece so we do not repeat the same logic in many handlers.
+=======
+func ensureFeedbackEmailColumn() error {
+	feedbackEmailColumnInit.Do(func() {
+		db := middleware.DBConn
+		if err := db.Exec(
+			`ALTER TABLE ` + feedbackTable + ` ADD COLUMN IF NOT EXISTS user_email VARCHAR(255)`,
+		).Error; err != nil {
+			feedbackEmailColumnErr = err
+			return
+		}
+
+		feedbackEmailColumnErr = db.Exec(
+			`UPDATE `+feedbackTable+` f
+			 SET user_email = u.email
+			 FROM `+userTable+` u
+			 WHERE f.user_id = u.id AND (f.user_email IS NULL OR f.user_email = '')`,
+		).Error
+	})
+	return feedbackEmailColumnErr
+}
+
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 func listCategories() ([]model.CategoryModel, error) {
 	// We make sure the category table exists and is seeded before we try to read from it.
 	if err := ensureCategoryStore(); err != nil {
@@ -1875,8 +2117,24 @@ func emailInUse(email string, excludeUserID string, excludeAdminID string) (bool
 	return userCount+adminCount > 0, nil
 }
 
+<<<<<<< HEAD
 // This helper parses JSON from the request body into a Go value.
 // It is a small reusable piece so we do not repeat the same logic in many handlers.
+=======
+var emailLikePattern = regexp.MustCompile(`(?i)[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}`)
+
+func containsEmailLike(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return false
+	}
+	if strings.Contains(trimmed, "@") {
+		return true
+	}
+	return emailLikePattern.MatchString(trimmed)
+}
+
+>>>>>>> 5dac3556f87e50ad45daf3b4e7705c72bf7d10be
 func parseBody(c *fiber.Ctx, dest any) error {
 	// Fiber's BodyParser reads the request body and tries to decode JSON into dest.
 	// If the JSON is invalid or does not match the expected shape, it returns an error.
@@ -2183,4 +2441,88 @@ func superAdminSecret() string {
 		return value
 	}
 	return defaultSuperAdminSecret
+}
+
+func shouldSendResolvedEmail(previous model.FeedbackModel, updated model.FeedbackModel) bool {
+	if strings.EqualFold(previous.Status, "Resolved") {
+		return false
+	}
+	return strings.EqualFold(updated.Status, "Resolved")
+}
+
+func utcNow() time.Time {
+	return time.Now().UTC()
+}
+
+func logTimingf(format string, args ...any) {
+	logger, err := feedbackTimingLoggerHandle()
+	if err != nil || logger == nil {
+		return
+	}
+	logger.Printf(format, args...)
+}
+
+func feedbackTimingLoggerHandle() (*log.Logger, error) {
+	feedbackTimingLoggerOnce.Do(func() {
+		if err := feedbackTimingOpenLogger(false); err != nil {
+			feedbackTimingLoggerErr = err
+			return
+		}
+	})
+	return feedbackTimingLogger, feedbackTimingLoggerErr
+}
+
+func feedbackTimingLogPath() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "feedback-timing.log"
+	}
+	if strings.EqualFold(filepath.Base(cwd), "Backend") {
+		parent := filepath.Dir(cwd)
+		return filepath.Join(parent, "feedback-timing.log")
+	}
+	return filepath.Join(cwd, "feedback-timing.log")
+}
+
+func logTimingStart(prefix string, id string) {
+	feedbackTimingMu.Lock()
+	defer feedbackTimingMu.Unlock()
+
+	if feedbackTimingEntries >= feedbackTimingMaxEntries {
+		_ = feedbackTimingOpenLogger(true)
+		feedbackTimingEntries = 0
+	}
+	feedbackTimingEntries++
+
+	logger, err := feedbackTimingLoggerHandle()
+	if err != nil || logger == nil {
+		return
+	}
+
+	divider := strings.Repeat("-", 72)
+	meta := prefix
+	if strings.TrimSpace(id) != "" {
+		meta = fmt.Sprintf("%s id=%s", prefix, strings.TrimSpace(id))
+	}
+	logger.Printf("%s", divider)
+	logger.Printf("%s", meta)
+	logger.Printf("%s", divider)
+}
+
+func feedbackTimingOpenLogger(truncate bool) error {
+	path := feedbackTimingLogPath()
+	flags := os.O_CREATE | os.O_APPEND | os.O_WRONLY
+	if truncate {
+		flags = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
+	}
+	file, err := os.OpenFile(path, flags, 0644)
+	if err != nil {
+		return err
+	}
+	if feedbackTimingFile != nil {
+		_ = feedbackTimingFile.Close()
+	}
+	feedbackTimingFile = file
+	feedbackTimingLogger = log.New(file, "", log.LstdFlags)
+	return nil
 }
