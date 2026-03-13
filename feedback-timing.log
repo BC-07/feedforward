@@ -20,3 +20,74 @@
 2026/03/13 10:04:18 CreateFeedback 127.0.0.1 sendTrackingEmail queued=0s
 2026/03/13 10:04:18 CreateFeedback 127.0.0.1 total=29.0354ms
 2026/03/13 10:04:20 CreateFeedback 127.0.0.1 sendTrackingEmail async duration=2.6263708s queuedDelay=0s
+2026/03/13 10:14:06 CreateFeedback 127.0.0.1 start
+2026/03/13 10:14:06 CreateFeedback 127.0.0.1 ensureFeedbackEmailColumn=0s
+2026/03/13 10:14:06 CreateFeedback 127.0.0.1 parse+normalize=4.0994ms
+2026/03/13 10:14:06 CreateFeedback 127.0.0.1 resolveUserByEmail=0s
+2026/03/13 10:14:06 CreateFeedback 127.0.0.1 resolveUserByID=0s
+2026/03/13 10:14:06 CreateFeedback 127.0.0.1 insertFeedback=665µs
+2026/03/13 10:14:06 CreateFeedback 127.0.0.1 fetchFeedbackByID=1.8593ms
+2026/03/13 10:14:06 CreateFeedback 127.0.0.1 sendTrackingEmail queued=0s
+2026/03/13 10:14:06 CreateFeedback 127.0.0.1 total=6.6237ms
+2026/03/13 10:14:09 CreateFeedback 127.0.0.1 sendTrackingEmail async duration=3.4212385s queuedDelay=0s
+2026/03/13 10:19:45 CreateFeedback 127.0.0.1 start
+2026/03/13 10:19:45 CreateFeedback 127.0.0.1 ensureFeedbackEmailColumn=0s
+2026/03/13 10:19:45 CreateFeedback 127.0.0.1 parse+normalize=1.219ms
+2026/03/13 10:19:45 CreateFeedback 127.0.0.1 resolveUserByEmail=0s
+2026/03/13 10:19:45 CreateFeedback 127.0.0.1 resolveUserByID=0s
+2026/03/13 10:19:45 CreateFeedback 127.0.0.1 insertFeedback=15.841ms
+2026/03/13 10:19:45 CreateFeedback 127.0.0.1 fetchFeedbackByID=0s
+2026/03/13 10:19:45 CreateFeedback 127.0.0.1 sendTrackingEmail queued=0s
+2026/03/13 10:19:45 CreateFeedback 127.0.0.1 total=17.06ms
+2026/03/13 10:19:48 CreateFeedback 127.0.0.1 sendTrackingEmail async duration=2.9932363s queuedDelay=0s
+2026/03/13 10:34:05 CreateFeedback 127.0.0.1 start
+2026/03/13 10:34:05 CreateFeedback 127.0.0.1 ensureFeedbackEmailColumn=507.7µs
+2026/03/13 10:34:05 CreateFeedback 127.0.0.1 parse+normalize=1.0246ms
+2026/03/13 10:34:05 CreateFeedback 127.0.0.1 resolveUserByEmail=0s
+2026/03/13 10:34:05 CreateFeedback 127.0.0.1 resolveUserByID=1.0994ms
+2026/03/13 10:34:05 CreateFeedback 127.0.0.1 insertFeedback=3.1774ms
+2026/03/13 10:34:05 CreateFeedback 127.0.0.1 fetchFeedbackByID=659.1µs
+2026/03/13 10:34:05 CreateFeedback 127.0.0.1 sendTrackingEmail queued=0s
+2026/03/13 10:34:05 CreateFeedback 127.0.0.1 total=6.4682ms
+2026/03/13 10:34:08 CreateFeedback 127.0.0.1 sendTrackingEmail async duration=3.0352243s queuedDelay=505.7µs
+2026/03/13 10:37:51 CreateFeedback 127.0.0.1 start
+2026/03/13 10:37:51 CreateFeedback 127.0.0.1 ensureFeedbackEmailColumn=1.1308ms
+2026/03/13 10:37:51 CreateFeedback 127.0.0.1 parse+normalize=1.3464ms
+2026/03/13 10:37:51 CreateFeedback 127.0.0.1 resolveUserByEmail=0s
+2026/03/13 10:37:51 CreateFeedback 127.0.0.1 resolveUserByID=0s
+2026/03/13 10:37:51 CreateFeedback 127.0.0.1 insertFeedback=1.0793ms
+2026/03/13 10:37:51 CreateFeedback 127.0.0.1 fetchFeedbackByID=0s
+2026/03/13 10:37:51 CreateFeedback 127.0.0.1 sendTrackingEmail queued=0s
+2026/03/13 10:37:51 CreateFeedback 127.0.0.1 total=4.2987ms
+2026/03/13 10:37:54 CreateFeedback 127.0.0.1 sendTrackingEmail async duration=3.0879526s queuedDelay=0s
+2026/03/13 10:39:23 CreateFeedback 127.0.0.1 start
+2026/03/13 10:39:23 CreateFeedback 127.0.0.1 ensureFeedbackEmailColumn=0s
+2026/03/13 10:39:23 CreateFeedback 127.0.0.1 parse+normalize=1.8687ms
+2026/03/13 10:39:23 CreateFeedback 127.0.0.1 resolveUserByEmail=0s
+2026/03/13 10:39:23 CreateFeedback 127.0.0.1 resolveUserByID=0s
+2026/03/13 10:39:23 CreateFeedback 127.0.0.1 insertFeedback=21.3359ms
+2026/03/13 10:39:23 CreateFeedback 127.0.0.1 fetchFeedbackByID=593.2µs
+2026/03/13 10:39:23 CreateFeedback 127.0.0.1 sendTrackingEmail queued=0s
+2026/03/13 10:39:23 CreateFeedback 127.0.0.1 total=24.5288ms
+2026/03/13 10:39:26 CreateFeedback 127.0.0.1 sendTrackingEmail async duration=3.0579344s queuedDelay=0s
+2026/03/13 10:39:37 CreateFeedback 127.0.0.1 start
+2026/03/13 10:39:37 CreateFeedback 127.0.0.1 ensureFeedbackEmailColumn=0s
+2026/03/13 10:39:37 CreateFeedback 127.0.0.1 parse+normalize=2.0576ms
+2026/03/13 10:39:37 CreateFeedback 127.0.0.1 resolveUserByEmail=0s
+2026/03/13 10:39:37 CreateFeedback 127.0.0.1 resolveUserByID=0s
+2026/03/13 10:39:37 CreateFeedback 127.0.0.1 insertFeedback=23.416ms
+2026/03/13 10:39:37 CreateFeedback 127.0.0.1 fetchFeedbackByID=0s
+2026/03/13 10:39:37 CreateFeedback 127.0.0.1 sendTrackingEmail queued=0s
+2026/03/13 10:39:37 CreateFeedback 127.0.0.1 total=26.102ms
+2026/03/13 10:39:41 CreateFeedback 127.0.0.1 sendTrackingEmail async duration=3.0593551s queuedDelay=0s
+2026/03/13 10:48:31 ------------------------------------------------------------------------
+2026/03/13 10:48:31 UpdateFeedback 127.0.0.1 id=FF-MMO9JPUD
+2026/03/13 10:48:31 ------------------------------------------------------------------------
+2026/03/13 10:48:31 UpdateFeedback 127.0.0.1 ensureFeedbackEmailColumn=0s
+2026/03/13 10:48:31 UpdateFeedback 127.0.0.1 fetchExisting=1.1021ms
+2026/03/13 10:48:31 UpdateFeedback 127.0.0.1 parsePayload=0s
+2026/03/13 10:48:31 UpdateFeedback 127.0.0.1 updateFeedback=1.0744ms
+2026/03/13 10:48:31 UpdateFeedback 127.0.0.1 fetchUpdated=2.5166ms
+2026/03/13 10:48:31 UpdateFeedback 127.0.0.1 sendResolvedEmail queued=0s
+2026/03/13 10:48:31 UpdateFeedback 127.0.0.1 total=4.6931ms
+2026/03/13 10:48:34 UpdateFeedback 127.0.0.1 sendResolvedEmail async duration=3.1106064s queuedDelay=506.9µs
