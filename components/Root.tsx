@@ -43,6 +43,8 @@ export default function RootLayout({
     localStorage.removeItem("isUserLoggedIn");
     localStorage.removeItem("currentUserId");
     localStorage.removeItem("currentUserName");
+    localStorage.removeItem("currentUserEmail");
+    document.cookie = "ff_user_session=; Path=/; Max-Age=0; SameSite=Lax";
 
     setIsUserLoggedIn(false);
     setUserName("");
@@ -55,6 +57,9 @@ export default function RootLayout({
     localStorage.removeItem("isAdminLoggedIn");
     localStorage.removeItem("currentAdminId");
     localStorage.removeItem("currentAdminName");
+    localStorage.removeItem("currentAdminEmail");
+    localStorage.removeItem("currentAdminDepartment");
+    document.cookie = "ff_admin_session=; Path=/; Max-Age=0; SameSite=Lax";
 
     setIsAdminLoggedIn(false);
     setAdminName("");

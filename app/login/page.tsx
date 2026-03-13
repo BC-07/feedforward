@@ -24,6 +24,17 @@ import { toast } from "sonner";
 import { LogIn, Mail, Lock, KeyRound } from "lucide-react";
 import { loginUser, loginAdmin, superAdminLogin } from "@/frontend/api";
 
+function clearSessionCookies() {
+  document.cookie = "ff_user_session=; Path=/; Max-Age=0; SameSite=Lax";
+  document.cookie = "ff_admin_session=; Path=/; Max-Age=0; SameSite=Lax";
+  document.cookie = "ff_superadmin_session=; Path=/; Max-Age=0; SameSite=Lax";
+}
+
+function setSessionCookie(name: "ff_user_session" | "ff_admin_session" | "ff_superadmin_session", maxAge: number) {
+  clearSessionCookies();
+  document.cookie = `${name}=1; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+}
+
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -62,6 +73,9 @@ export default function Login() {
       localStorage.setItem("superAdminToken", token);
       localStorage.setItem("superAdminName", name);
       localStorage.setItem("superAdminExpiresAt", expiresAt);
+      const expiresMs = new Date(expiresAt).getTime() - Date.now();
+      const maxAge = Math.max(0, Math.floor(expiresMs / 1000));
+      setSessionCookie("ff_superadmin_session", maxAge);
       toast.success(`Welcome, ${name}!`);
       router.push("/superadmin");
     } catch (err: unknown) {
@@ -83,6 +97,7 @@ export default function Login() {
       localStorage.setItem("currentUserId", user.id);
       localStorage.setItem("currentUserName", user.name);
       localStorage.setItem("currentUserEmail", user.email);
+      setSessionCookie("ff_user_session", 60 * 60 * 24 * 7);
       toast.success(`Welcome back, ${user.name}!`);
       router.push("/user");
       return;
@@ -97,6 +112,7 @@ export default function Login() {
       localStorage.setItem("currentAdminName", admin.name);
       localStorage.setItem("currentAdminEmail", admin.email);
       localStorage.setItem("currentAdminDepartment", admin.unit);
+      setSessionCookie("ff_admin_session", 60 * 60 * 24 * 7);
       toast.success(`Welcome back, ${admin.name}!`);
       router.push("/dashboard");
     } catch {

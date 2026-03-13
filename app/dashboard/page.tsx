@@ -135,6 +135,7 @@ export default function AdminDashboard() {
     localStorage.removeItem("currentAdminName");
     localStorage.removeItem("currentAdminEmail");
     localStorage.removeItem("currentAdminDepartment");
+    document.cookie = "ff_admin_session=; Path=/; Max-Age=0; SameSite=Lax";
     toast.success("Logged out successfully");
     router.push("/login");
   };

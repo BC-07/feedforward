@@ -57,6 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isDashboardRoute = pathname.startsWith("/dashboard");
+  const previousPathRef = useRef(pathname);
 
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
@@ -90,6 +91,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
+    const previousPath = previousPathRef.current;
+    const leftSuperAdminRoute =
+      previousPath.startsWith("/superadmin") &&
+      !pathname.startsWith("/superadmin");
+
+    if (leftSuperAdminRoute) {
+      localStorage.removeItem("isSuperAdminLoggedIn");
+      localStorage.removeItem("superAdminToken");
+      localStorage.removeItem("superAdminName");
+      localStorage.removeItem("superAdminExpiresAt");
+      document.cookie = "ff_superadmin_session=; Path=/; Max-Age=0; SameSite=Lax";
+    }
+
     const userLoggedIn = localStorage.getItem("isUserLoggedIn") === "true";
     const adminLoggedIn = localStorage.getItem("isAdminLoggedIn") === "true";
 
@@ -111,6 +125,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setAdminId(aid);
       setAdminAvatar(localStorage.getItem(`adminAvatar_${aid}`) || "");
     }
+
+    previousPathRef.current = pathname;
   }, [pathname]);
 
   // ── Avatar upload handlers ───────────────────────────────────────────────
@@ -153,6 +169,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("isUserLoggedIn");
     localStorage.removeItem("currentUserId");
     localStorage.removeItem("currentUserName");
+    localStorage.removeItem("currentUserEmail");
+    document.cookie = "ff_user_session=; Path=/; Max-Age=0; SameSite=Lax";
     setIsUserLoggedIn(false);
     setUserName("");
     toast.success("Logged out successfully");
@@ -165,6 +183,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("currentAdminName");
     localStorage.removeItem("currentAdminEmail");
     localStorage.removeItem("currentAdminDepartment");
+    document.cookie = "ff_admin_session=; Path=/; Max-Age=0; SameSite=Lax";
     setIsAdminLoggedIn(false);
     setAdminName("");
     toast.success("Admin logged out successfully");

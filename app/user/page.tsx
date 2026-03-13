@@ -19,6 +19,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -51,6 +58,7 @@ export default function UserProfile() {
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [searchTrackingId, setSearchTrackingId] = useState("");
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackData | null>(null);
+  const [isMessageExpanded, setIsMessageExpanded] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -98,6 +106,7 @@ export default function UserProfile() {
     localStorage.removeItem("currentUserId");
     localStorage.removeItem("currentUserName");
     localStorage.removeItem("currentUserEmail");
+    document.cookie = "ff_user_session=; Path=/; Max-Age=0; SameSite=Lax";
     toast.success("Logged out successfully");
     router.push("/login");
   };
@@ -153,9 +162,11 @@ export default function UserProfile() {
     try {
       const res = await getFeedbackById(searchTrackingId.trim());
       setSelectedFeedback(res.data);
+      setIsMessageExpanded(false);
       toast.success("Feedback found!");
     } catch {
       setSelectedFeedback(null);
+      setIsMessageExpanded(false);
       toast.error("Feedback not found. Please check your tracking ID.");
     }
   };
@@ -164,9 +175,11 @@ export default function UserProfile() {
     try {
       const res = await getFeedbackById(feedback.id);
       setSelectedFeedback(res.data);
+      setIsMessageExpanded(false);
       setSearchTrackingId(res.data.id);
     } catch {
       setSelectedFeedback(feedback);
+      setIsMessageExpanded(false);
       setSearchTrackingId(feedback.id);
     }
   };
@@ -244,76 +257,6 @@ export default function UserProfile() {
       completed: index <= currentIndex,
     }));
   };
-
-  if (trackingId) {
-    return (
-      <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
-        <div className="bg-accent text-accent-foreground">
-          <div className="container mx-auto px-4 py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold">User Dashboard</h1>
-                <p className="text-accent-foreground/80 mt-1">
-                  Welcome, {currentUser?.fullName}
-                </p>
-              </div>
-              <Button variant="secondary" onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-        <div className="container mx-auto px-4 py-12">
-          <div className="max-w-lg mx-auto">
-            <Card className="shadow-lg">
-              <CardHeader className="text-center">
-                <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
-                  <ArrowRight className="h-8 w-8 text-accent" />
-                </div>
-                <CardTitle>Feedback Submitted!</CardTitle>
-                <CardDescription>
-                  Your feedback has been received successfully
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="bg-muted rounded-lg p-4 text-center">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Your Tracking ID
-                  </p>
-                  <p className="text-2xl font-bold text-primary">
-                    {trackingId}
-                  </p>
-                </div>
-                <p className="text-sm text-muted-foreground text-center">
-                  Please save this tracking ID to check the status of your
-                  submission.
-                </p>
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => copyToClipboard(trackingId)}
-                  >
-                    Copy ID
-                  </Button>
-                  <Button
-                    className="flex-1 bg-accent hover:bg-accent/90"
-                    onClick={() => {
-                      setTrackingId(null);
-                      setSelectedFeedback(null);
-                    }}
-                  >
-                    Back to Dashboard
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
@@ -636,7 +579,36 @@ export default function UserProfile() {
                       <p className="text-sm font-semibold text-muted-foreground mb-1">
                         Message
                       </p>
-                      <p className="text-sm leading-relaxed">{selectedFeedback.message}</p>
+                      {(() => {
+                        const message = selectedFeedback.message || "";
+                        const isLongMessage = message.length > 220;
+                        return (
+                          <>
+                            <div
+                              className={`mt-1 rounded-md border bg-muted/40 px-3 py-2 ${
+                                isMessageExpanded ? "" : "max-h-24 overflow-hidden"
+                              }`}
+                            >
+                              <p
+                                className="text-sm leading-relaxed whitespace-pre-wrap break-all"
+                                style={{ overflowWrap: "anywhere" }}
+                              >
+                                {message}
+                              </p>
+                            </div>
+                            {isLongMessage && (
+                              <Button
+                                type="button"
+                                variant="link"
+                                className="h-auto p-0 mt-2"
+                                onClick={() => setIsMessageExpanded((prev) => !prev)}
+                              >
+                                {isMessageExpanded ? "See less" : "See more"}
+                              </Button>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-muted-foreground mb-1">
@@ -667,6 +639,56 @@ export default function UserProfile() {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={!!trackingId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTrackingId(null);
+            setSelectedFeedback(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
+              <ArrowRight className="h-8 w-8 text-accent" />
+            </div>
+            <DialogTitle>Feedback Submitted!</DialogTitle>
+            <DialogDescription>
+              Your feedback has been received successfully
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="bg-muted rounded-lg p-4 text-center">
+              <p className="text-sm text-muted-foreground mb-2">Your Tracking ID</p>
+              <p className="text-2xl font-bold text-primary">{trackingId}</p>
+            </div>
+            <p className="text-sm text-muted-foreground text-center">
+              Please save this tracking ID to check the status of your submission.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => trackingId && copyToClipboard(trackingId)}
+              >
+                Copy ID
+              </Button>
+              <Button
+                className="flex-1 bg-accent hover:bg-accent/90"
+                onClick={() => {
+                  setTrackingId(null);
+                  setSelectedFeedback(null);
+                }}
+              >
+                Back to Dashboard
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

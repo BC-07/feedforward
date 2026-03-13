@@ -93,6 +93,7 @@ function clearSuperAdminSession(onRedirect: () => void) {
   localStorage.removeItem("superAdminToken");
   localStorage.removeItem("superAdminName");
   localStorage.removeItem("superAdminExpiresAt");
+  document.cookie = "ff_superadmin_session=; Path=/; Max-Age=0; SameSite=Lax";
   onRedirect();
 }
 
