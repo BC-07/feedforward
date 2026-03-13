@@ -1,5 +1,5 @@
 "use client";
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createFeedback,
@@ -67,6 +67,9 @@ export default function UserProfile() {
     message: "",
   });
   const [categories, setCategories] = useState<string[]>([]);
+  const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
+  const [isLargeScreen, setIsLargeScreen] = useState(false);
+  const leftColumnRef = useRef<HTMLDivElement | null>(null);
 
   async function loadUserFeedbacks(userId: string) {
     try {
@@ -127,6 +130,38 @@ export default function UserProfile() {
         );
       });
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const handleChange = () => setIsLargeScreen(mediaQuery.matches);
+    handleChange();
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    }
+    mediaQuery.addListener(handleChange);
+    return () => mediaQuery.removeListener(handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      setLeftColumnHeight(null);
+      return;
+    }
+    const node = leftColumnRef.current;
+    if (!node) return;
+
+    const updateHeight = () => {
+      setLeftColumnHeight(Math.round(node.getBoundingClientRect().height));
+    };
+
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, [isLargeScreen]);
 
   const handleLogout = () => {
     localStorage.removeItem("isUserLoggedIn");
@@ -373,322 +408,336 @@ export default function UserProfile() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Submit Feedback */}
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Submit Feedback</h2>
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle>Feedback Form</CardTitle>
-                <CardDescription>
-                  All submissions are anonymous and confidential
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      {isAnonymous ? (
-                        <UserX className="h-5 w-5 text-accent" />
-                      ) : (
-                        <User className="h-5 w-5 text-accent" />
-                      )}
-                      <div>
-                        <Label
-                          htmlFor="anonymous"
-                          className="text-base cursor-pointer"
-                        >
-                          Submit Anonymously
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          {isAnonymous
-                            ? "Your identity will be kept confidential"
-                            : "Your name will be visible to administrators"}
-                        </p>
-                      </div>
-                    </div>
-                    <Switch
-                      id="anonymous"
-                      checked={isAnonymous}
-                      onCheckedChange={setIsAnonymous}
-                    />
-                  </div>
+        <div className="grid lg:grid-cols-2 gap-8 items-stretch">
+          <div ref={leftColumnRef} className="flex flex-col gap-6">
+            {/* Track Feedback */}
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Track Your Feedback</h2>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Feedback Type *</Label>
-                    <Select
-                      value={formData.type}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, type: value })
-                      }
-                      required
-                    >
-                      <SelectTrigger id="type">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="suggestion">Suggestion</SelectItem>
-                        <SelectItem value="complaint">Complaint</SelectItem>
-                        <SelectItem value="inquiry">Inquiry</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category *</Label>
-                    <Select
-                      value={formData.category}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, category: value })
-                      }
-                      required
-                    >
-                      <SelectTrigger id="category">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="subject">Subject *</Label>
+              <Card className="shadow-lg mb-6">
+                <CardHeader>
+                  <CardTitle>Enter Tracking ID</CardTitle>
+                  <CardDescription>
+                    Search for your submitted feedback
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSearch} className="flex gap-3">
                     <Input
-                      id="subject"
-                      placeholder="Brief summary of your feedback"
-                      value={formData.subject}
-                      onChange={(e) =>
-                        setFormData({ ...formData, subject: e.target.value })
-                      }
+                      placeholder="e.g., FF-ABC123XYZ"
+                      value={searchTrackingId}
+                      onChange={(e) => setSearchTrackingId(e.target.value)}
                       required
                     />
-                  </div>
+                    <Button
+                      type="submit"
+                      className="bg-accent hover:bg-accent/90"
+                    >
+                      <Search className="mr-2 h-4 w-4" />
+                      Search
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="message">Message *</Label>
-                    <Textarea
-                      id="message"
-                      placeholder="Provide detailed information about your feedback..."
-                      rows={5}
-                      value={formData.message}
-                      onChange={(e) =>
-                        setFormData({ ...formData, message: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
+            </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full bg-accent hover:bg-accent/90"
-                  >
-                    <Send className="mr-2 h-4 w-4" />
-                    Submit Feedback
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+            {/* Submit Feedback */}
+            <div>
+              <h2 className="text-2xl font-bold mb-4">Submit Feedback</h2>
+              <Card className="shadow-lg">
+                <CardHeader>
+                  <CardTitle>Feedback Form</CardTitle>
+                  <CardDescription>
+                    All submissions are anonymous and confidential
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
+                      <div className="flex items-center gap-3">
+                        {isAnonymous ? (
+                          <UserX className="h-5 w-5 text-accent" />
+                        ) : (
+                          <User className="h-5 w-5 text-accent" />
+                        )}
+                        <div>
+                          <Label
+                            htmlFor="anonymous"
+                            className="text-base cursor-pointer"
+                          >
+                            Submit Anonymously
+                          </Label>
+                          <p className="text-xs text-muted-foreground">
+                            {isAnonymous
+                              ? "Your identity will be kept confidential"
+                              : "Your name will be visible to administrators"}
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        id="anonymous"
+                        checked={isAnonymous}
+                        onCheckedChange={setIsAnonymous}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="type">Feedback Type *</Label>
+                      <Select
+                        value={formData.type}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, type: value })
+                        }
+                        required
+                      >
+                        <SelectTrigger id="type">
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="suggestion">Suggestion</SelectItem>
+                          <SelectItem value="complaint">Complaint</SelectItem>
+                          <SelectItem value="inquiry">Inquiry</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category *</Label>
+                      <Select
+                        value={formData.category}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, category: value })
+                        }
+                        required
+                      >
+                        <SelectTrigger id="category">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="subject">Subject *</Label>
+                      <Input
+                        id="subject"
+                        placeholder="Brief summary of your feedback"
+                        value={formData.subject}
+                        onChange={(e) =>
+                          setFormData({ ...formData, subject: e.target.value })
+                        }
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="message">Message *</Label>
+                      <Textarea
+                        id="message"
+                        placeholder="Provide detailed information about your feedback..."
+                        rows={5}
+                        value={formData.message}
+                        onChange={(e) =>
+                          setFormData({ ...formData, message: e.target.value })
+                        }
+                        required
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full bg-accent hover:bg-accent/90"
+                    >
+                      <Send className="mr-2 h-4 w-4" />
+                      Submit Feedback
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
-          {/* Track Feedback */}
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Track Your Feedback</h2>
+          <div
+            className="flex flex-col min-h-0 h-full overflow-hidden"
+            style={leftColumnHeight ? { height: leftColumnHeight } : undefined}
+          >
+            {selectedFeedback ? (
+              <Card className="shadow-lg h-full min-h-0 flex flex-col overflow-hidden">
+                <CardHeader className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle>Feedback Details</CardTitle>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedFeedback(null);
+                        setSearchTrackingId("");
+                      }}
+                    >
+                      <ChevronLeft className="mr-1 h-4 w-4" />
+                      Back to My Submissions
+                    </Button>
+                  </div>
+                  <CardDescription className="font-mono">
+                    {selectedFeedback.id}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6 flex-1 min-h-0 overflow-y-auto">
+                  <Card className="shadow-lg">
+                    <CardContent className="pt-6">
+                      <div className="flex items-start justify-between mb-6">
+                        <h3 className="text-lg font-semibold mb-1">
+                          Status:{" "}
+                          <span className="uppercase">
+                            {selectedFeedback.status}
+                          </span>
+                        </h3>
+                        <Badge
+                          className={getStatusColor(selectedFeedback.status)}
+                          variant="outline"
+                        >
+                          {selectedFeedback.status.toLowerCase()}
+                        </Badge>
+                      </div>
 
-            <Card className="shadow-lg mb-6">
-              <CardHeader>
-                <CardTitle>Enter Tracking ID</CardTitle>
-                <CardDescription>
-                  Search for your submitted feedback
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSearch} className="flex gap-3">
-                  <Input
-                    placeholder="e.g., FF-ABC123XYZ"
-                    value={searchTrackingId}
-                    onChange={(e) => setSearchTrackingId(e.target.value)}
-                    required
-                  />
-                  <Button
-                    type="submit"
-                    className="bg-accent hover:bg-accent/90"
-                  >
-                    <Search className="mr-2 h-4 w-4" />
-                    Search
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
+                      <div className="flex items-start gap-3 mb-8 p-4 bg-muted/50 rounded-lg">
+                        <Clock className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm">
+                          {getStatusMessage(selectedFeedback.status)}
+                        </p>
+                      </div>
 
-            {/* Detail view */}
-            {selectedFeedback && (
-              <div className="space-y-6">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedFeedback(null);
-                    setSearchTrackingId("");
-                  }}
-                >
-                  <ChevronLeft className="mr-1 h-4 w-4" />
-                  Back to My Submissions
-                </Button>
-
-                <Card className="shadow-lg">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between mb-6">
-                      <h3 className="text-lg font-semibold mb-1">
-                        Status:{" "}
-                        <span className="uppercase">
-                          {selectedFeedback.status}
-                        </span>
-                      </h3>
-                      <Badge
-                        className={getStatusColor(selectedFeedback.status)}
-                        variant="outline"
-                      >
-                        {selectedFeedback.status.toLowerCase()}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-start gap-3 mb-8 p-4 bg-muted/50 rounded-lg">
-                      <Clock className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm">
-                        {getStatusMessage(selectedFeedback.status)}
-                      </p>
-                    </div>
-
-                    <div className="space-y-4">
-                      {getStatusSteps(selectedFeedback.status).map(
-                        (step, index) => (
-                          <div key={index} className="flex gap-4">
-                            <div className="flex flex-col items-center">
-                              <div
-                                className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                  step.completed
-                                    ? "bg-green-500/20"
-                                    : "bg-gray-200"
-                                }`}
-                              >
-                                {step.completed ? (
-                                  <CheckCircle className="h-5 w-5 text-green-700" />
-                                ) : (
-                                  <Circle className="h-5 w-5 text-gray-400" />
+                      <div className="space-y-4">
+                        {getStatusSteps(selectedFeedback.status).map(
+                          (step, index) => (
+                            <div key={index} className="flex gap-4">
+                              <div className="flex flex-col items-center">
+                                <div
+                                  className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                                    step.completed
+                                      ? "bg-green-500/20"
+                                      : "bg-gray-200"
+                                  }`}
+                                >
+                                  {step.completed ? (
+                                    <CheckCircle className="h-5 w-5 text-green-700" />
+                                  ) : (
+                                    <Circle className="h-5 w-5 text-gray-400" />
+                                  )}
+                                </div>
+                                {index <
+                                  getStatusSteps(selectedFeedback.status)
+                                    .length -
+                                    1 && (
+                                  <div className="h-12 w-px bg-border"></div>
                                 )}
                               </div>
-                              {index <
-                                getStatusSteps(selectedFeedback.status).length -
-                                  1 && (
-                                <div className="h-12 w-px bg-border"></div>
-                              )}
+                              <div className="pb-4 flex-1">
+                                <p className="font-semibold">{step.name}</p>
+                                {step.name === "Submitted" && (
+                                  <p className="text-sm text-muted-foreground">
+                                    {formatDate(selectedFeedback.createdAt)}
+                                  </p>
+                                )}
+                                {step.description && (
+                                  <p className="text-sm text-muted-foreground">
+                                    {step.description}
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                            <div className="pb-4 flex-1">
-                              <p className="font-semibold">{step.name}</p>
-                              {step.name === "Submitted" && (
-                                <p className="text-sm text-muted-foreground">
-                                  {formatDate(selectedFeedback.createdAt)}
-                                </p>
-                              )}
-                              {step.description && (
-                                <p className="text-sm text-muted-foreground">
-                                  {step.description}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-lg">
-                  <CardHeader>
-                    <CardTitle>Feedback Details</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">
-                        Type
-                      </p>
-                      <p className="capitalize">{selectedFeedback.type}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">
-                        Category
-                      </p>
-                      <p>{selectedFeedback.category}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">
-                        Priority
-                      </p>
-                      <p
-                        className={`capitalize ${getPriorityColor(selectedFeedback.priority)}`}
-                      >
-                        {selectedFeedback.priority}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">
-                        Subject
-                      </p>
-                      <p className="font-semibold">
-                        {selectedFeedback.subject}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">
-                        Message
-                      </p>
-                      <p className="text-sm leading-relaxed">
-                        {selectedFeedback.message}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-muted-foreground mb-1">
-                        Last Updated
-                      </p>
-                      <p className="text-sm">
-                        {formatDate(selectedFeedback.updatedAt)}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {selectedFeedback.response && (
-                  <Card className="shadow-lg bg-blue-50/50 border-blue-200">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-blue-900">
-                        <MessageCircle className="h-5 w-5" />
-                        Updates from Admin
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-blue-900/80 leading-relaxed">
-                        {selectedFeedback.response}
-                      </p>
+                          ),
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
-                )}
-              </div>
-            )}
 
-            {/* Submissions list */}
-            {!selectedFeedback && feedbacks.length > 0 && (
-              <Card className="shadow-lg">
+                  <Card className="shadow-lg">
+                    <CardHeader>
+                      <CardTitle>Feedback Details</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <p className="text-sm font-semibold text-muted-foreground mb-1">
+                          Type
+                        </p>
+                        <p className="capitalize">{selectedFeedback.type}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-muted-foreground mb-1">
+                          Category
+                        </p>
+                        <p>{selectedFeedback.category}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-muted-foreground mb-1">
+                          Priority
+                        </p>
+                        <p
+                          className={`capitalize ${getPriorityColor(selectedFeedback.priority)}`}
+                        >
+                          {selectedFeedback.priority}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-muted-foreground mb-1">
+                          Subject
+                        </p>
+                        <p className="font-semibold">
+                          {selectedFeedback.subject}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-muted-foreground mb-1">
+                          Message
+                        </p>
+                        <p className="text-sm leading-relaxed">
+                          {selectedFeedback.message}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-muted-foreground mb-1">
+                          Last Updated
+                        </p>
+                        <p className="text-sm">
+                          {formatDate(selectedFeedback.updatedAt)}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {selectedFeedback.response && (
+                    <Card className="shadow-lg bg-blue-50/50 border-blue-200">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-blue-900">
+                          <MessageCircle className="h-5 w-5" />
+                          Updates from Admin
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-sm text-blue-900/80 leading-relaxed">
+                          {selectedFeedback.response}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </CardContent>
+              </Card>
+            ) : feedbacks.length > 0 ? (
+              <Card className="shadow-lg h-full min-h-0 flex flex-col overflow-hidden">
                 <CardHeader>
                   <CardTitle>My Submissions</CardTitle>
                   <CardDescription>
                     Your recent feedback submissions
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 max-h-[600px] overflow-y-auto">
+                <CardContent className="space-y-4 flex-1 min-h-0 overflow-y-auto">
                   {feedbacks.map((feedback) => (
                     <div
                       key={feedback.id}
@@ -717,12 +766,10 @@ export default function UserProfile() {
                   ))}
                 </CardContent>
               </Card>
-            )}
-
-            {!selectedFeedback && feedbacks.length === 0 && (
-              <Card className="shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="text-center py-8">
+            ) : (
+              <Card className="shadow-lg h-full flex flex-col">
+                <CardContent className="pt-6 flex-1 flex items-center">
+                  <div className="text-center py-8 w-full">
                     <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-lg font-semibold mb-2">
                       No Submissions Yet
