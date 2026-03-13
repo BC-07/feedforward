@@ -656,17 +656,11 @@ export default function AdminDashboard() {
                                           <SelectItem value="Pending">
                                             Pending
                                           </SelectItem>
-                                          <SelectItem value="Under Review">
-                                            Under Review
-                                          </SelectItem>
                                           <SelectItem value="In Progress">
                                             In Progress
                                           </SelectItem>
                                           <SelectItem value="Resolved">
                                             Resolved
-                                          </SelectItem>
-                                          <SelectItem value="Closed">
-                                            Closed
                                           </SelectItem>
                                         </SelectContent>
                                       </Select>

@@ -44,6 +44,13 @@ Follow these steps to set up and run the project locally:
     DB_SSLM = disable
     PROJ_NAME = INTERN TEMPLATE V1
     PROJ_PORT = 5566
+   SUPERADMIN_KEY = your-superadmin-key
+   APP_BASE_URL = http://localhost:3000
+   MAIL_HOST = smtp.gmail.com
+   MAIL_PORT = 587
+   MAIL_USERNAME = systemfeedforward@gmail.com
+   MAIL_PASSWORD = your-gmail-app-password
+   MAIL_FROM = systemfeedforward@gmail.com
    ```
 
 4. Run the application:

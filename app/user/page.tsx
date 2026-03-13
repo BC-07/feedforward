@@ -39,7 +39,9 @@ import {
   submitFeedback,
   getFeedbackById,
   getFeedbacksByUser,
+  listCategories,
   FeedbackData,
+  type Category,
 } from "@/frontend/api";
 
 export default function UserProfile() {
@@ -57,6 +59,7 @@ export default function UserProfile() {
     subject: "",
     message: "",
   });
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
     const isLoggedIn = localStorage.getItem("isUserLoggedIn");
@@ -75,6 +78,10 @@ export default function UserProfile() {
     };
     setCurrentUser(user);
     loadUserFeedbacks(userId);
+
+    listCategories()
+      .then(setCategories)
+      .catch(() => toast.error("Failed to load categories."));
   }, [router]);
 
   const loadUserFeedbacks = async (userId: string) => {
@@ -402,19 +409,17 @@ export default function UserProfile() {
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="IT Unit">IT Unit</SelectItem>
-                        <SelectItem value="Finance & Registrar Office">
-                          Finance &amp; Registrar Office
-                        </SelectItem>
-                        <SelectItem value="Student Affair Office">
-                          Student Affair Office
-                        </SelectItem>
-                        <SelectItem value="Guidance Office">
-                          Guidance Office
-                        </SelectItem>
-                        <SelectItem value="Faculty Office">
-                          Faculty Office
-                        </SelectItem>
+                        {categories.length === 0 ? (
+                          <SelectItem value="__none" disabled>
+                            No categories available
+                          </SelectItem>
+                        ) : (
+                          categories.map((cat) => (
+                            <SelectItem key={cat.id} value={cat.name}>
+                              {cat.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
