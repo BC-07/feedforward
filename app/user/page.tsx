@@ -326,10 +326,6 @@ export default function UserProfile() {
                 Welcome, {currentUser?.fullName}
               </p>
             </div>
-            <Button variant="secondary" onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
           </div>
         </div>
       </div>

@@ -34,6 +34,14 @@ export default function Login() {
   const [isSuperAdminLoading, setIsSuperAdminLoading] = useState(false);
 
   useEffect(() => {
+    const isUserLoggedIn = localStorage.getItem("isUserLoggedIn") === "true";
+    const currentUserId = localStorage.getItem("currentUserId");
+    if (isUserLoggedIn && currentUserId) {
+      router.replace("/user");
+    }
+  }, [router]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key === "S") {
         e.preventDefault();

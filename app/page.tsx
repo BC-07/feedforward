@@ -1,8 +1,17 @@
 "use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowRight, Shield, MessageSquare, BarChart3, Eye } from "lucide-react";
 
 export default function Home() {
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const loggedIn = localStorage.getItem("isUserLoggedIn") === "true";
+    const userId = localStorage.getItem("currentUserId");
+    setIsUserLoggedIn(loggedIn && !!userId);
+  }, []);
+
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
@@ -27,10 +36,10 @@ export default function Home() {
               </Link>
 
               <Link
-                href="/login"
+                href={isUserLoggedIn ? "/user" : "/login"}
                 className="px-8 py-4 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-lg text-center"
               >
-                Login / Sign Up
+                {isUserLoggedIn ? "Go to Dashboard" : "Login / Sign Up"}
               </Link>
             </div>
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,14 @@ export default function Signup() {
     password: "",
     confirmPassword: "",
   });
+
+  useEffect(() => {
+    const isUserLoggedIn = localStorage.getItem("isUserLoggedIn") === "true";
+    const currentUserId = localStorage.getItem("currentUserId");
+    if (isUserLoggedIn && currentUserId) {
+      router.replace("/user");
+    }
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
