@@ -90,6 +90,7 @@ export default function AdminDashboard() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterName, setFilterName] = useState("asc");
+  const [filterDate, setFilterDate] = useState("recent");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [newUnit, setNewUnit] = useState("");
@@ -265,6 +266,16 @@ export default function AdminDashboard() {
       );
     })
     .sort((a, b) => {
+      if (filterDate === "recent") {
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+      }
+      if (filterDate === "oldest") {
+        return (
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+      }
       if (filterName === "all" || filterName === "") return 0;
       const nameA = (
         a.isAnonymous ? "*****" : a.userName || "*****"
@@ -387,6 +398,17 @@ export default function AdminDashboard() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="min-w-[140px]">
+                <Select value={filterDate} onValueChange={setFilterDate}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Date" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recent">Most Recent</SelectItem>
+                    <SelectItem value="oldest">Oldest</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="min-w-[130px]">
                 <Select value={filterType} onValueChange={setFilterType}>
                   <SelectTrigger>
@@ -461,7 +483,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                <Table>
+                <Table className="[&_th]:px-3 [&_td]:px-3">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
@@ -470,8 +492,12 @@ export default function AdminDashboard() {
                       <TableHead>Category</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="whitespace-nowrap w-[150px]">
+                        Date
+                      </TableHead>
+                      <TableHead className="text-right w-[110px]">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -509,10 +535,27 @@ export default function AdminDashboard() {
                             {feedback.status}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {new Date(feedback.createdAt).toLocaleDateString()}
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {(() => {
+                            const date = new Date(feedback.createdAt);
+                            const datePart = date.toLocaleDateString("en-US", {
+                              timeZone: "Asia/Manila",
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            });
+                            const timePart = date
+                              .toLocaleTimeString("en-US", {
+                                timeZone: "Asia/Manila",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })
+                              .replace(" ", "")
+                              .toLowerCase();
+                            return `${datePart} ${timePart}`;
+                          })()}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right w-[110px]">
                           <Dialog
                             open={
                               isEditDialogOpen &&
@@ -599,7 +642,7 @@ export default function AdminDashboard() {
                                         <p className="font-medium">
                                           {new Date(
                                             selectedFeedback.createdAt,
-                                          ).toLocaleString()}
+                                          ).toLocaleString("en-US")}
                                         </p>
                                       </div>
                                       <div>

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"strings"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -18,10 +19,14 @@ var (
 // establishing the connection, otherwise false.
 func ConnectDB() bool {
 	// Database Confg
+	tz := strings.TrimSpace(GetEnv("DB_TMEZ"))
+	if tz == "" {
+		tz = "UTC"
+	}
 	dns := fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s sslmode=%s TimeZone=%s",
 		GetEnv("DB_HOST"), GetEnv("DB_PORT"), GetEnv("DB_NAME"),
 		GetEnv("DB_USER"), GetEnv("DB_PASS"), GetEnv("DB_SSLM"),
-		GetEnv("DB_TMEZ"))
+		tz)
 
 	DBConn, DBErr = gorm.Open(postgres.Open(dns), &gorm.Config{})
 

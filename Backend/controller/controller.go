@@ -254,7 +254,7 @@ func CreateFeedback(c *fiber.Ctx) error {
 	logTimingf("%s resolveUserByID=%s", logPrefix, time.Since(stepStart))
 	stepStart = time.Now()
 
-	now := time.Now()
+	now := utcNow()
 	if feedback.CreatedAt.IsZero() {
 		feedback.CreatedAt = now
 	}
@@ -401,7 +401,7 @@ func UpdateFeedback(c *fiber.Ctx) error {
 
 	// Always stamp the latest write time on any feedback update.
 	sets = append(sets, "updated_at = ?")
-	args = append(args, time.Now(), c.Params("id"))
+	args = append(args, utcNow(), c.Params("id"))
 
 	result := db.Exec(
 		fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", feedbackTable, strings.Join(sets, ", ")),
@@ -475,7 +475,7 @@ func RegisterUser(c *fiber.Ctx) error {
 	}
 
 	payload.ID = "USER-" + fmt.Sprintf("%d", time.Now().UnixMilli())
-	now := time.Now()
+	now := utcNow()
 	if err := db.Exec(
 		`INSERT INTO `+userTable+` (id, first_name, last_name, email, password, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -531,7 +531,7 @@ func RegisterAdmin(c *fiber.Ctx) error {
 	}
 
 	payload.ID = "ADMIN-" + fmt.Sprintf("%d", time.Now().UnixMilli())
-	now := time.Now()
+	now := utcNow()
 	if err := db.Exec(
 		`INSERT INTO `+adminTable+` (id, first_name, last_name, email, password, unit, is_disabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -624,7 +624,7 @@ func LoginSuperAdmin(c *fiber.Ctx) error {
 		return unauthorized(c, "invalid superadmin credentials")
 	}
 
-	expiresAt := time.Now().Add(superAdminTTL)
+	expiresAt := utcNow().Add(superAdminTTL)
 	return success(c, fiber.StatusOK, superAdminSession{
 		Token:     issueSuperAdminToken(expiresAt),
 		Username:  superAdminUsername(),
@@ -672,7 +672,7 @@ func CreateCategoryBySuperAdmin(c *fiber.Ctx) error {
 
 	if err := middleware.DBConn.Exec(
 		`INSERT INTO `+categoryTable+` (name, created_at, updated_at) VALUES (?, ?, ?)`,
-		name, time.Now(), time.Now(),
+		name, utcNow(), utcNow(),
 	).Error; err != nil {
 		return serverError(c, "failed to create category", err)
 	}
@@ -749,7 +749,7 @@ func UpdateCategoryBySuperAdmin(c *fiber.Ctx) error {
 
 	if err := tx.Exec(
 		`UPDATE `+categoryTable+` SET name = ?, updated_at = ? WHERE id = ?`,
-		newName, time.Now(), categoryID,
+		newName, utcNow(), categoryID,
 	).Error; err != nil {
 		tx.Rollback()
 		return serverError(c, "failed to update category", err)
@@ -757,7 +757,7 @@ func UpdateCategoryBySuperAdmin(c *fiber.Ctx) error {
 
 	if err := tx.Exec(
 		`UPDATE `+adminTable+` SET unit = ?, updated_at = ? WHERE unit = ?`,
-		newName, time.Now(), existing.Name,
+		newName, utcNow(), existing.Name,
 	).Error; err != nil {
 		tx.Rollback()
 		return serverError(c, "failed to sync admin units", err)
@@ -765,7 +765,7 @@ func UpdateCategoryBySuperAdmin(c *fiber.Ctx) error {
 
 	if err := tx.Exec(
 		`UPDATE `+feedbackTable+` SET category = ?, updated_at = ? WHERE category = ?`,
-		newName, time.Now(), existing.Name,
+		newName, utcNow(), existing.Name,
 	).Error; err != nil {
 		tx.Rollback()
 		return serverError(c, "failed to sync feedback categories", err)
@@ -914,7 +914,7 @@ func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
 	}
 
 	payload.ID = "ADMIN-" + fmt.Sprintf("%d", time.Now().UnixMilli())
-	now := time.Now()
+	now := utcNow()
 	if err := middleware.DBConn.Exec(
 		`INSERT INTO `+adminTable+` (id, first_name, last_name, email, password, unit, is_disabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -996,7 +996,7 @@ func UpdateAdminBySuperAdmin(c *fiber.Ctx) error {
 	}
 
 	sets = append(sets, "updated_at = ?")
-	args = append(args, time.Now())
+	args = append(args, utcNow())
 	if err := execUpdateByID(adminTable, c.Params("id"), "failed to update admin", "admin not found", sets, args...); err != nil {
 		return respondDBResult(c, err)
 	}
@@ -1018,7 +1018,7 @@ func DisableAdminBySuperAdmin(c *fiber.Ctx) error {
 
 	result := middleware.DBConn.Exec(
 		`UPDATE `+adminTable+` SET is_disabled = TRUE, updated_at = ? WHERE id = ?`,
-		time.Now(),
+		utcNow(),
 		c.Params("id"),
 	)
 	if result.Error != nil {
@@ -1063,7 +1063,7 @@ func UpdateUserProfile(c *fiber.Ctx) error {
 		"failed to update user profile",
 		"user not found",
 		[]string{"first_name = ?", "last_name = ?", "updated_at = ?"},
-		payload.FirstName, payload.LastName, time.Now(),
+		payload.FirstName, payload.LastName, utcNow(),
 	); err != nil {
 		return respondDBResult(c, err)
 	}
@@ -1102,7 +1102,7 @@ func UpdateAdminProfile(c *fiber.Ctx) error {
 		"failed to update admin profile",
 		"admin not found",
 		[]string{"first_name = ?", "last_name = ?", "updated_at = ?"},
-		payload.FirstName, payload.LastName, time.Now(),
+		payload.FirstName, payload.LastName, utcNow(),
 	); err != nil {
 		return respondDBResult(c, err)
 	}
@@ -1154,7 +1154,7 @@ func updatePassword(c *fiber.Ctx, table string, entity string) error {
 
 	result := middleware.DBConn.Exec(
 		fmt.Sprintf("UPDATE %s SET password = ?, updated_at = ? WHERE id = ? AND password = ?", table),
-		payload.NewPassword, time.Now(), c.Params("id"), payload.CurrentPassword,
+		payload.NewPassword, utcNow(), c.Params("id"), payload.CurrentPassword,
 	)
 	if result.Error != nil {
 		return serverError(c, "failed to update password", result.Error)
@@ -1751,6 +1751,10 @@ func shouldSendResolvedEmail(previous model.FeedbackModel, updated model.Feedbac
 		return false
 	}
 	return strings.EqualFold(updated.Status, "Resolved")
+}
+
+func utcNow() time.Time {
+	return time.Now().UTC()
 }
 
 func logTimingf(format string, args ...any) {

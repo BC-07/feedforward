@@ -809,13 +809,12 @@ export default function UserProfile() {
                           {feedback.status}
                         </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
-                        {feedback.message}
-                      </p>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="font-mono">{feedback.id}</span>
                         <span>
-                          {new Date(feedback.createdAt).toLocaleDateString()}
+                          {new Date(feedback.createdAt).toLocaleDateString(
+                            "en-US",
+                          )}
                         </span>
                       </div>
                     </div>
