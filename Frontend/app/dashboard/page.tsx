@@ -52,6 +52,8 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   MessageSquare,
   TrendingUp,
@@ -292,6 +294,150 @@ export default function AdminDashboard() {
         : nameB.localeCompare(nameA);
     });
 
+  const formatSubmittedAt = (dateValue: string) => {
+    const date = new Date(dateValue);
+    const datePart = date.toLocaleDateString("en-US", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+    const timePart = date
+      .toLocaleTimeString("en-US", {
+        timeZone: "Asia/Manila",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+      .replace(" ", "")
+      .toLowerCase();
+    return `${datePart} ${timePart}`;
+  };
+
+  const exportFeedbacksPdf = () => {
+    const rows = filteredFeedbacks.map((feedback) => ({
+      id: feedback.id,
+      type: feedback.type,
+      status: feedback.status,
+      priority: feedback.priority,
+      submitted: formatSubmittedAt(feedback.createdAt),
+      subject: feedback.subject,
+      message: feedback.message,
+    }));
+
+    const filterParts = [
+      filterType !== "all" ? `Type = ${filterType}` : null,
+      filterStatus !== "all"
+        ? `Status = ${filterStatus === "inprogress" ? "In Progress" : filterStatus}`
+        : null,
+      filterPriority !== "all" ? `Priority = ${filterPriority}` : null,
+      filterDate === "recent" ? "Date = Most Recent" : "Date = Oldest",
+      currentAdmin?.unit ? `Category = ${currentAdmin.unit}` : null,
+      searchQuery ? `Search = "${searchQuery}"` : null,
+    ].filter(Boolean);
+
+    const filterSummary = filterParts.length
+      ? filterParts.join(" | ")
+      : "No filters applied";
+
+    const now = new Date();
+    const nowText = now.toLocaleString("en-US");
+    const pad2 = (value: number) => String(value).padStart(2, "0");
+    const dateStamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(
+      now.getDate(),
+    )}`;
+    const timeStamp = `${pad2(now.getHours())}${pad2(now.getMinutes())}`;
+    const categoryStamp = (currentAdmin?.unit || "All")
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9-_]/g, "");
+    const statusStamp =
+      filterStatus === "all"
+        ? "All"
+        : filterStatus === "inprogress"
+          ? "In-Progress"
+          : filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1);
+    const fileName = `feedback-report_${categoryStamp}_${statusStamp}_${dateStamp}_${timeStamp}.pdf`;
+
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "pt",
+      format: "a4",
+    });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("FeedForward — Feedback Report", 40, 40);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated: ${nowText}`, 40, 58);
+    doc.text(`Filter: ${filterSummary}`, 40, 74);
+
+    if (!rows.length) {
+      doc.setTextColor(120);
+      doc.text(
+        "No feedback submissions match the current filters.",
+        40,
+        110,
+      );
+      doc.save("feedback-report.pdf");
+      return;
+    }
+
+    const body: Array<
+      Array<string> | Array<{ content: string; colSpan: number; styles?: any }>
+    > = [];
+
+    rows.forEach((row) => {
+      body.push([
+        row.id,
+        row.type,
+        row.status,
+        row.priority,
+        row.submitted,
+        row.subject,
+      ]);
+      body.push([
+        {
+          content: `Message: ${row.message}`,
+          colSpan: 6,
+          styles: { fontStyle: "italic", textColor: [55, 65, 81] },
+        },
+      ]);
+      body.push([
+        {
+          content: "",
+          colSpan: 6,
+          styles: { cellPadding: 0, minCellHeight: 4 },
+        },
+      ]);
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const tableWidth = 70 + 70 + 80 + 70 + 110 + 220;
+    const leftMargin = Math.max(40, (pageWidth - tableWidth) / 2);
+
+    autoTable(doc, {
+      startY: 100,
+      head: [["ID", "Type", "Status", "Priority", "Submitted", "Subject"]],
+      body,
+      theme: "grid",
+      margin: { left: leftMargin, right: leftMargin },
+      styles: { fontSize: 9, cellPadding: 6, valign: "top" },
+      headStyles: { fillColor: [243, 244, 246], textColor: [55, 65, 81] },
+      columnStyles: {
+        0: { cellWidth: 70 },
+        1: { cellWidth: 70 },
+        2: { cellWidth: 80 },
+        3: { cellWidth: 70 },
+        4: { cellWidth: 110 },
+        5: { cellWidth: 220 },
+      },
+    });
+
+    doc.save(fileName);
+  };
+
   return (
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
       {/* Header */}
@@ -377,11 +523,18 @@ export default function AdminDashboard() {
 
         {/* Filters */}
         <Card className="mb-6">
-          <CardHeader>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center gap-2">
               <Search className="h-5 w-5" />
               Search &amp; Filter
             </CardTitle>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={exportFeedbacksPdf}
+            >
+              Export PDF
+            </Button>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3 items-end">
