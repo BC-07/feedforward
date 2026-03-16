@@ -24,7 +24,6 @@ export default function Login() {
   const [superAdminUsername, setSuperAdminUsername] = useState("");
   const [superAdminPassword, setSuperAdminPassword] = useState("");
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
-  const [secretTapCount, setSecretTapCount] = useState(0);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -103,26 +102,13 @@ export default function Login() {
     }
   };
 
-  const handleSecretTap = () => {
-    const nextCount = secretTapCount + 1;
-    setSecretTapCount(nextCount);
-    if (nextCount >= 5) {
-      setShowSuperAdmin(true);
-      setSecretTapCount(0);
-    }
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted p-4">
       <Card className="max-w-md w-full shadow-lg">
         <CardHeader className="text-center">
-          <button
-            type="button"
-            onClick={handleSecretTap}
-            className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center"
-          >
+          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
             <LogIn className="h-8 w-8 text-accent" />
-          </button>
+          </div>
           <CardTitle>Login to FeedForward</CardTitle>
           <CardDescription>Sign in with your account credentials</CardDescription>
         </CardHeader>

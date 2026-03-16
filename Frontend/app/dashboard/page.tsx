@@ -95,6 +95,9 @@ export default function AdminDashboard() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [newUnit, setNewUnit] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
+  const applyFeedbackUpdate = (data: Feedback[]) => {
+    setFeedbacks(data);
+  };
 
   async function loadFeedbacks(unit: string) {
     if (!unit.trim()) {
@@ -104,7 +107,7 @@ export default function AdminDashboard() {
 
     try {
       const data = await listFeedbacks({ category: unit });
-      setFeedbacks(data);
+      applyFeedbackUpdate(data);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to load feedbacks.",
@@ -135,7 +138,7 @@ export default function AdminDashboard() {
     void listFeedbacks({ category: currentAdmin.unit })
       .then((data) => {
         startTransition(() => {
-          setFeedbacks(data);
+          applyFeedbackUpdate(data);
         });
       })
       .catch((error) => {
@@ -144,6 +147,7 @@ export default function AdminDashboard() {
         );
       });
   }, [currentAdmin?.unit]);
+
 
   useEffect(() => {
     void listCategories()
@@ -307,6 +311,7 @@ export default function AdminDashboard() {
                 )}
               </p>
             </div>
+            <div className="flex items-center gap-3" />
           </div>
         </div>
       </div>
