@@ -2,6 +2,7 @@ package controller
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
@@ -48,7 +49,19 @@ const (
 	userTable     = "public.users"
 	adminTable    = "public.admins"
 	categoryTable = "public.categories"
+	sessionTable  = "public.sessions"
 	superAdminTTL = 8 * time.Hour
+)
+
+const (
+	sessionCookieName        = "ff_session"
+	userSessionTTL           = 7 * 24 * time.Hour
+	adminSessionTTL          = 8 * time.Hour
+	adminSessionIdleRotation = 5 * time.Minute
+	reauthTTL                = 5 * time.Minute
+	sessionRoleUser          = "user"
+	sessionRoleAdmin         = "admin"
+	sessionRoleSuperAdmin    = "superadmin"
 )
 
 const (
@@ -58,9 +71,20 @@ const (
 )
 
 type superAdminSession struct {
-	Token     string    `json:"token"`
 	Username  string    `json:"username"`
 	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+type sessionRecord struct {
+	ID                 string     `json:"id"`
+	Role               string     `json:"role"`
+	UserID             *string    `json:"userId"`
+	AdminID            *string    `json:"adminId"`
+	SuperAdminUsername *string    `json:"superAdminUsername"`
+	CreatedAt          time.Time  `json:"createdAt"`
+	LastActivityAt     time.Time  `json:"lastActivityAt"`
+	ExpiresAt          time.Time  `json:"expiresAt"`
+	ReauthExpiresAt    *time.Time `json:"reauthExpiresAt"`
 }
 
 var categoryTableInit sync.Once
@@ -69,6 +93,8 @@ var adminDisableColumnInit sync.Once
 var adminDisableColumnErr error
 var feedbackEmailColumnInit sync.Once
 var feedbackEmailColumnErr error
+var sessionTableInit sync.Once
+var sessionTableErr error
 var feedbackTimingLoggerOnce sync.Once
 var feedbackTimingLogger *log.Logger
 var feedbackTimingLoggerErr error
@@ -572,6 +598,12 @@ func LoginUser(c *fiber.Ctx) error {
 		return unauthorized(c, "invalid email or password")
 	}
 
+	session, err := createSession(sessionRoleUser, &user.ID, nil, nil, userSessionTTL)
+	if err != nil {
+		return serverError(c, "failed to create user session", err)
+	}
+	setSessionCookie(c, session)
+
 	return success(c, fiber.StatusOK, user)
 }
 
@@ -607,6 +639,12 @@ func LoginAdmin(c *fiber.Ctx) error {
 		return unauthorized(c, "admin account is disabled")
 	}
 
+	session, err := createSession(sessionRoleAdmin, nil, &admin.ID, nil, adminSessionTTL)
+	if err != nil {
+		return serverError(c, "failed to create admin session", err)
+	}
+	setSessionCookie(c, session)
+
 	return success(c, fiber.StatusOK, admin)
 }
 
@@ -624,11 +662,124 @@ func LoginSuperAdmin(c *fiber.Ctx) error {
 		return unauthorized(c, "invalid superadmin credentials")
 	}
 
-	expiresAt := utcNow().Add(superAdminTTL)
+	username := superAdminUsername()
+	session, err := createSession(sessionRoleSuperAdmin, nil, nil, &username, superAdminTTL)
+	if err != nil {
+		return serverError(c, "failed to create superadmin session", err)
+	}
+	setSessionCookie(c, session)
+
 	return success(c, fiber.StatusOK, superAdminSession{
-		Token:     issueSuperAdminToken(expiresAt),
-		Username:  superAdminUsername(),
-		ExpiresAt: expiresAt,
+		Username:  username,
+		ExpiresAt: session.ExpiresAt,
+	})
+}
+
+func Logout(c *fiber.Ctx) error {
+	sessionID := strings.TrimSpace(c.Cookies(sessionCookieName))
+	if sessionID != "" {
+		deleteSessionByID(sessionID)
+	}
+	clearSessionCookie(c)
+	return success(c, fiber.StatusOK, map[string]string{"message": "logged out"})
+}
+
+func ReverifyAdmin(c *fiber.Ctx) error {
+	session, err := requireAdminSession(c)
+	if err != nil {
+		return err
+	}
+	var payload struct {
+		Password string `json:"password"`
+	}
+	if err := parseBody(c, &payload); err != nil {
+		return parseError(c, "failed to parse reverify request", err)
+	}
+	password := strings.TrimSpace(payload.Password)
+	if password == "" {
+		return invalidRequest(c, "password is required")
+	}
+
+	adminID := ""
+	if session.AdminID != nil {
+		adminID = strings.TrimSpace(*session.AdminID)
+	}
+	var credential struct {
+		Password string `json:"password"`
+	}
+	if err := middleware.DBConn.Raw(
+		`SELECT password FROM `+adminTable+` WHERE id = ?`,
+		adminID,
+	).Scan(&credential).Error; err != nil {
+		return serverError(c, "failed to load admin credentials", err)
+	}
+	if strings.TrimSpace(credential.Password) == "" {
+		return unauthorized(c, "invalid admin session")
+	}
+	if strings.TrimSpace(credential.Password) != password {
+		return unauthorized(c, "invalid credentials")
+	}
+
+	expiresAt := utcNow().Add(reauthTTL)
+	if err := middleware.DBConn.Exec(
+		`UPDATE `+sessionTable+` SET reauth_expires_at = ? WHERE id = ?`,
+		expiresAt, session.ID,
+	).Error; err != nil {
+		return serverError(c, "failed to update reauth session", err)
+	}
+
+	return success(c, fiber.StatusOK, map[string]string{"expiresAt": expiresAt.Format(time.RFC3339)})
+}
+
+func ReverifySuperAdmin(c *fiber.Ctx) error {
+	session, err := requireSuperAdminSession(c)
+	if err != nil {
+		return err
+	}
+	var payload struct {
+		Password string `json:"password"`
+	}
+	if err := parseBody(c, &payload); err != nil {
+		return parseError(c, "failed to parse reverify request", err)
+	}
+	if strings.TrimSpace(payload.Password) != superAdminPassword() {
+		return unauthorized(c, "invalid credentials")
+	}
+
+	expiresAt := utcNow().Add(reauthTTL)
+	if err := middleware.DBConn.Exec(
+		`UPDATE `+sessionTable+` SET reauth_expires_at = ? WHERE id = ?`,
+		expiresAt, session.ID,
+	).Error; err != nil {
+		return serverError(c, "failed to update reauth session", err)
+	}
+
+	return success(c, fiber.StatusOK, map[string]string{"expiresAt": expiresAt.Format(time.RFC3339)})
+}
+
+func Me(c *fiber.Ctx) error {
+	sessionID := strings.TrimSpace(c.Cookies(sessionCookieName))
+	if sessionID == "" {
+		return unauthorized(c, "session is required")
+	}
+
+	session, err := fetchSessionByID(sessionID)
+	if err != nil {
+		return serverError(c, "failed to load session", err)
+	}
+	if session.ID == "" {
+		return unauthorized(c, "invalid session")
+	}
+	if utcNow().After(session.ExpiresAt) {
+		deleteSessionByID(session.ID)
+		clearSessionCookie(c)
+		return unauthorized(c, "session expired")
+	}
+
+	return success(c, fiber.StatusOK, map[string]any{
+		"role":    session.Role,
+		"userId":  session.UserID,
+		"adminId": session.AdminID,
 	})
 }
 
@@ -642,7 +793,7 @@ func ListCategories(c *fiber.Ctx) error {
 }
 
 func CreateCategoryBySuperAdmin(c *fiber.Ctx) error {
-	if err := requireSuperAdmin(c); err != nil {
+	if _, err := requireSuperAdminSession(c); err != nil {
 		return err
 	}
 
@@ -690,7 +841,7 @@ func CreateCategoryBySuperAdmin(c *fiber.Ctx) error {
 }
 
 func UpdateCategoryBySuperAdmin(c *fiber.Ctx) error {
-	if err := requireSuperAdmin(c); err != nil {
+	if _, err := requireSuperAdminSession(c); err != nil {
 		return err
 	}
 
@@ -788,7 +939,7 @@ func UpdateCategoryBySuperAdmin(c *fiber.Ctx) error {
 }
 
 func DeleteCategoryBySuperAdmin(c *fiber.Ctx) error {
-	if err := requireSuperAdmin(c); err != nil {
+	if _, err := requireSuperAdminSession(c); err != nil {
 		return err
 	}
 
@@ -848,7 +999,7 @@ func DeleteCategoryBySuperAdmin(c *fiber.Ctx) error {
 }
 
 func ListAdmins(c *fiber.Ctx) error {
-	if err := requireSuperAdmin(c); err != nil {
+	if _, err := requireSuperAdminSession(c); err != nil {
 		return err
 	}
 	if err := ensureAdminDisableColumn(); err != nil {
@@ -867,7 +1018,7 @@ func ListAdmins(c *fiber.Ctx) error {
 }
 
 func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
-	if err := requireSuperAdmin(c); err != nil {
+	if _, err := requireSuperAdminSession(c); err != nil {
 		return err
 	}
 	if err := ensureAdminDisableColumn(); err != nil {
@@ -931,7 +1082,11 @@ func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
 }
 
 func UpdateAdminBySuperAdmin(c *fiber.Ctx) error {
-	if err := requireSuperAdmin(c); err != nil {
+	session, err := requireSuperAdminSession(c)
+	if err != nil {
+		return err
+	}
+	if err := requireReauth(c, session); err != nil {
 		return err
 	}
 
@@ -1009,7 +1164,11 @@ func UpdateAdminBySuperAdmin(c *fiber.Ctx) error {
 }
 
 func DisableAdminBySuperAdmin(c *fiber.Ctx) error {
-	if err := requireSuperAdmin(c); err != nil {
+	session, err := requireSuperAdminSession(c)
+	if err != nil {
+		return err
+	}
+	if err := requireReauth(c, session); err != nil {
 		return err
 	}
 	if err := ensureAdminDisableColumn(); err != nil {
@@ -1036,7 +1195,42 @@ func DisableAdminBySuperAdmin(c *fiber.Ctx) error {
 	return success(c, fiber.StatusOK, admin)
 }
 
+func EnableAdminBySuperAdmin(c *fiber.Ctx) error {
+	session, err := requireSuperAdminSession(c)
+	if err != nil {
+		return err
+	}
+	if err := requireReauth(c, session); err != nil {
+		return err
+	}
+	if err := ensureAdminDisableColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
+	}
+
+	result := middleware.DBConn.Exec(
+		`UPDATE `+adminTable+` SET is_disabled = FALSE, updated_at = ? WHERE id = ?`,
+		utcNow(),
+		c.Params("id"),
+	)
+	if result.Error != nil {
+		return serverError(c, "failed to enable admin account", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return notFound(c, "admin not found", nil)
+	}
+
+	admin, err := fetchAdminByID(c.Params("id"))
+	if err != nil {
+		return serverError(c, "failed to fetch admin", err)
+	}
+
+	return success(c, fiber.StatusOK, admin)
+}
+
 func UpdateUserProfile(c *fiber.Ctx) error {
+	if err := requireUserSessionForID(c, c.Params("id")); err != nil {
+		return err
+	}
 	//Storage preparation
 	var payload struct {
 		FirstName string `json:"firstName"`
@@ -1076,6 +1270,9 @@ func UpdateUserProfile(c *fiber.Ctx) error {
 }
 
 func UpdateAdminProfile(c *fiber.Ctx) error {
+	if err := requireAdminSessionForID(c, c.Params("id")); err != nil {
+		return err
+	}
 	//Storage preparation
 	var payload struct {
 		FirstName string `json:"firstName"`
@@ -1116,14 +1313,23 @@ func UpdateAdminProfile(c *fiber.Ctx) error {
 }
 
 func UpdateUserPassword(c *fiber.Ctx) error {
+	if err := requireUserSessionForID(c, c.Params("id")); err != nil {
+		return err
+	}
 	return updatePassword(c, userTable, "user")
 }
 
 func DeleteUserAccount(c *fiber.Ctx) error {
+	if err := requireUserSessionForID(c, c.Params("id")); err != nil {
+		return err
+	}
 	return deleteByID(c, userTable, "user", c.Params("id"))
 }
 
 func UpdateAdminPassword(c *fiber.Ctx) error {
+	if err := requireAdminSessionForID(c, c.Params("id")); err != nil {
+		return err
+	}
 	return updatePassword(c, adminTable, "admin")
 }
 
@@ -1370,6 +1576,215 @@ func ensureFeedbackEmailColumn() error {
 		).Error
 	})
 	return feedbackEmailColumnErr
+}
+
+func ensureSessionStore() error {
+	sessionTableInit.Do(func() {
+		db := middleware.DBConn
+		sessionTableErr = db.Exec(
+			`CREATE TABLE IF NOT EXISTS ` + sessionTable + ` (
+				id VARCHAR(64) PRIMARY KEY,
+				role VARCHAR(20) NOT NULL,
+				user_id VARCHAR(64),
+				admin_id VARCHAR(64),
+				superadmin_username VARCHAR(120),
+				created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+				last_activity_at TIMESTAMPTZ NOT NULL,
+				expires_at TIMESTAMPTZ NOT NULL,
+				reauth_expires_at TIMESTAMPTZ
+			)`,
+		).Error
+		if sessionTableErr != nil {
+			return
+		}
+		sessionTableErr = db.Exec(
+			`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON ` + sessionTable + ` (expires_at)`,
+		).Error
+	})
+	return sessionTableErr
+}
+
+func newSessionID() (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(bytes), nil
+}
+
+func createSession(role string, userID *string, adminID *string, superadminUsername *string, ttl time.Duration) (sessionRecord, error) {
+	if err := ensureSessionStore(); err != nil {
+		return sessionRecord{}, err
+	}
+	id, err := newSessionID()
+	if err != nil {
+		return sessionRecord{}, err
+	}
+	now := utcNow()
+	expiresAt := now.Add(ttl)
+	session := sessionRecord{
+		ID:                 id,
+		Role:               role,
+		UserID:             userID,
+		AdminID:            adminID,
+		SuperAdminUsername: superadminUsername,
+		CreatedAt:          now,
+		LastActivityAt:     now,
+		ExpiresAt:          expiresAt,
+	}
+
+	if err := middleware.DBConn.Exec(
+		`INSERT INTO `+sessionTable+` (id, role, user_id, admin_id, superadmin_username, created_at, last_activity_at, expires_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		session.ID,
+		session.Role,
+		session.UserID,
+		session.AdminID,
+		session.SuperAdminUsername,
+		session.CreatedAt,
+		session.LastActivityAt,
+		session.ExpiresAt,
+	).Error; err != nil {
+		return sessionRecord{}, err
+	}
+
+	return session, nil
+}
+
+func fetchSessionByID(id string) (sessionRecord, error) {
+	if err := ensureSessionStore(); err != nil {
+		return sessionRecord{}, err
+	}
+	var session sessionRecord
+	err := middleware.DBConn.Raw(
+		`SELECT id, role, user_id, admin_id, superadmin_username, created_at, last_activity_at, expires_at, reauth_expires_at
+		 FROM `+sessionTable+` WHERE id = ?`,
+		id,
+	).Scan(&session).Error
+	return session, err
+}
+
+func deleteSessionByID(id string) {
+	if strings.TrimSpace(id) == "" {
+		return
+	}
+	_ = middleware.DBConn.Exec(`DELETE FROM `+sessionTable+` WHERE id = ?`, id).Error
+}
+
+func setSessionCookie(c *fiber.Ctx, session sessionRecord) {
+	c.Cookie(&fiber.Cookie{
+		Name:     sessionCookieName,
+		Value:    session.ID,
+		HTTPOnly: true,
+		Secure:   cookieSecure(),
+		SameSite: "Lax",
+		Expires:  session.ExpiresAt,
+		Path:     "/",
+	})
+}
+
+func clearSessionCookie(c *fiber.Ctx) {
+	c.Cookie(&fiber.Cookie{
+		Name:     sessionCookieName,
+		Value:    "",
+		HTTPOnly: true,
+		Secure:   cookieSecure(),
+		SameSite: "Lax",
+		Expires:  time.Unix(0, 0),
+		Path:     "/",
+	})
+}
+
+func cookieSecure() bool {
+	value := strings.ToLower(strings.TrimSpace(middleware.GetEnv("COOKIE_SECURE")))
+	return value == "1" || value == "true" || value == "yes" || value == "on"
+}
+
+func requireSession(c *fiber.Ctx, role string, rotateOnIdle bool) (sessionRecord, error) {
+	sessionID := strings.TrimSpace(c.Cookies(sessionCookieName))
+	if sessionID == "" {
+		return sessionRecord{}, unauthorized(c, "session is required")
+	}
+
+	session, err := fetchSessionByID(sessionID)
+	if err != nil {
+		return sessionRecord{}, serverError(c, "failed to load session", err)
+	}
+	if session.ID == "" || session.Role != role {
+		return sessionRecord{}, unauthorized(c, "invalid session")
+	}
+
+	now := utcNow()
+	if now.After(session.ExpiresAt) {
+		deleteSessionByID(session.ID)
+		clearSessionCookie(c)
+		return sessionRecord{}, unauthorized(c, "session expired")
+	}
+
+	if rotateOnIdle && now.Sub(session.LastActivityAt) >= adminSessionIdleRotation {
+		newSession, err := createSession(session.Role, session.UserID, session.AdminID, session.SuperAdminUsername, time.Until(session.ExpiresAt))
+		if err != nil {
+			return sessionRecord{}, serverError(c, "failed to rotate session", err)
+		}
+		if session.ReauthExpiresAt != nil && now.Before(*session.ReauthExpiresAt) {
+			_ = middleware.DBConn.Exec(
+				`UPDATE `+sessionTable+` SET reauth_expires_at = ? WHERE id = ?`,
+				session.ReauthExpiresAt, newSession.ID,
+			).Error
+			newSession.ReauthExpiresAt = session.ReauthExpiresAt
+		}
+		deleteSessionByID(session.ID)
+		setSessionCookie(c, newSession)
+		return newSession, nil
+	}
+
+	_ = middleware.DBConn.Exec(
+		`UPDATE `+sessionTable+` SET last_activity_at = ? WHERE id = ?`,
+		now, session.ID,
+	).Error
+
+	return session, nil
+}
+
+func requireUserSession(c *fiber.Ctx) (sessionRecord, error) {
+	return requireSession(c, sessionRoleUser, false)
+}
+
+func requireAdminSession(c *fiber.Ctx) (sessionRecord, error) {
+	return requireSession(c, sessionRoleAdmin, true)
+}
+
+func requireSuperAdminSession(c *fiber.Ctx) (sessionRecord, error) {
+	return requireSession(c, sessionRoleSuperAdmin, true)
+}
+
+func requireUserSessionForID(c *fiber.Ctx, userID string) error {
+	session, err := requireUserSession(c)
+	if err != nil {
+		return err
+	}
+	if session.UserID == nil || strings.TrimSpace(*session.UserID) != strings.TrimSpace(userID) {
+		return unauthorized(c, "invalid user session")
+	}
+	return nil
+}
+
+func requireAdminSessionForID(c *fiber.Ctx, adminID string) error {
+	session, err := requireAdminSession(c)
+	if err != nil {
+		return err
+	}
+	if session.AdminID == nil || strings.TrimSpace(*session.AdminID) != strings.TrimSpace(adminID) {
+		return unauthorized(c, "invalid admin session")
+	}
+	return nil
+}
+
+func requireReauth(c *fiber.Ctx, session sessionRecord) error {
+	if session.ReauthExpiresAt == nil || utcNow().After(*session.ReauthExpiresAt) {
+		return unauthorized(c, "reauthentication required")
+	}
+	return nil
 }
 
 func listCategories() ([]model.CategoryModel, error) {

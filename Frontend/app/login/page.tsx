@@ -92,7 +92,6 @@ export default function Login() {
         password: superAdminPassword,
       });
       localStorage.setItem("isSuperAdminLoggedIn", "true");
-      localStorage.setItem("superAdminToken", session.token);
       localStorage.setItem("superAdminName", session.username);
       localStorage.setItem("superAdminExpiresAt", session.expiresAt);
       toast.success("Superadmin access granted");
