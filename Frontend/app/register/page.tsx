@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { registerUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,6 +15,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { UserPlus, Mail, Lock, User } from "lucide-react";
 
@@ -26,10 +35,15 @@ export default function Signup() {
     password: "",
     confirmPassword: "",
   });
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    if (!hasAcceptedTerms) {
+      toast.error("You must accept the Terms and Conditions");
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       toast.error("Passwords do not match");
       return;
@@ -185,6 +199,81 @@ export default function Signup() {
               </div>
             </div>
 
+            <div className="flex items-start gap-3 rounded-md border border-border p-3">
+              <Checkbox
+                id="accept-terms"
+                checked={hasAcceptedTerms}
+                onCheckedChange={(value) => setHasAcceptedTerms(Boolean(value))}
+                className="mt-1"
+              />
+              <div className="space-y-1 text-sm">
+                <Label htmlFor="accept-terms" className="font-normal">
+                  I agree to the{" "}
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-accent font-medium hover:underline"
+                      >
+                        Terms and Conditions
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>FeedForward Terms and Conditions</DialogTitle>
+                        <DialogDescription>
+                          Please read these terms carefully before creating your account.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
+                        <section className="space-y-2">
+                          <h4 className="text-foreground font-semibold">1. Account Use</h4>
+                          <p>
+                            You agree to provide accurate information and to keep your account
+                            credentials secure. You are responsible for all activity that occurs
+                            under your account.
+                          </p>
+                        </section>
+                        <section className="space-y-2">
+                          <h4 className="text-foreground font-semibold">2. Acceptable Use</h4>
+                          <p>
+                            You will use FeedForward only for lawful purposes and will not submit
+                            content that is harmful, abusive, or violates the rights of others.
+                          </p>
+                        </section>
+                        <section className="space-y-2">
+                          <h4 className="text-foreground font-semibold">3. Feedback Content</h4>
+                          <p>
+                            By submitting feedback, you grant the organization permission to review,
+                            store, and act on your submissions for service improvement and support.
+                          </p>
+                        </section>
+                        <section className="space-y-2">
+                          <h4 className="text-foreground font-semibold">4. Privacy</h4>
+                          <p>
+                            We collect and process your data to provide the service. Personal
+                            information is handled according to our internal privacy and data
+                            protection practices.
+                          </p>
+                        </section>
+                        <section className="space-y-2">
+                          <h4 className="text-foreground font-semibold">5. Changes to Terms</h4>
+                          <p>
+                            We may update these terms from time to time. Continued use of the service
+                            after changes means you accept the updated terms.
+                          </p>
+                        </section>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  .
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  You must accept the terms to create an account.
+                </p>
+              </div>
+            </div>
+
             <p className="text-xs text-muted-foreground">
               Password must be at least 6 characters
             </p>
@@ -193,6 +282,7 @@ export default function Signup() {
               type="submit"
               className="w-full bg-accent hover:bg-accent/90"
               size="lg"
+              disabled={!hasAcceptedTerms}
             >
               Create Account
             </Button>

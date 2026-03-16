@@ -495,10 +495,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 )}
             {isSuperAdminRoute && isSuperAdminLoggedIn && (
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <UserCircle2 className="h-4 w-4 text-primary" />
-                  <span className="font-medium">{superAdminName}</span>
-                </div>
                 <Button
                   variant="ghost"
                   size="sm"
