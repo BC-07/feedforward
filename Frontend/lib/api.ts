@@ -311,7 +311,7 @@ export async function getSessionMe(): Promise<{
   userId?: string | null;
   adminId?: string | null;
 }> {
-  return apiFetch("/auth/me");
+  return apiFetch("/auth/session");
 }
 
 export async function updateUserProfile(
