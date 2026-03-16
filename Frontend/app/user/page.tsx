@@ -69,6 +69,7 @@ export default function UserProfile() {
   const [formData, setFormData] = useState({
     type: "",
     category: "",
+    priority: "",
     subject: "",
     message: "",
   });
@@ -247,7 +248,7 @@ export default function UserProfile() {
         subject: formData.subject,
         message: formData.message,
         status: "Pending",
-        priority: "Medium",
+        priority: formData.priority || "Medium",
         isAnonymous,
         userId: currentUser.id,
         userName: currentUser.fullName,
@@ -258,7 +259,13 @@ export default function UserProfile() {
       setTrackingId(newTrackingId);
       await loadUserFeedbacks(currentUser.id);
       toast.success("Feedback submitted successfully!");
-      setFormData({ type: "", category: "", subject: "", message: "" });
+      setFormData({
+        type: "",
+        category: "",
+        priority: "",
+        subject: "",
+        message: "",
+      });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to submit feedback.";
@@ -563,6 +570,26 @@ export default function UserProfile() {
                               {category}
                             </SelectItem>
                           ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="priority">Severity Level *</Label>
+                      <Select
+                        value={formData.priority}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, priority: value })
+                        }
+                        required
+                      >
+                        <SelectTrigger id="priority">
+                          <SelectValue placeholder="Select severity" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Low">Low</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="High">High</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
