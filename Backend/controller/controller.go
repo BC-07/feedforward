@@ -757,7 +757,7 @@ func ReverifySuperAdmin(c *fiber.Ctx) error {
 	return success(c, fiber.StatusOK, map[string]string{"expiresAt": expiresAt.Format(time.RFC3339)})
 }//
 
-func Me(c *fiber.Ctx) error {
+func GetSessionInfo(c *fiber.Ctx) error {
 	sessionID := strings.TrimSpace(c.Cookies(sessionCookieName))
 	if sessionID == "" {
 		return unauthorized(c, "session is required")
