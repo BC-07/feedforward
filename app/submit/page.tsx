@@ -26,6 +26,7 @@ import { submitFeedback, listCategories, type Category } from "@/frontend/api";
 interface FormData {
   type: string;
   category: string;
+  priority: string;
   subject: string;
   message: string;
 }
@@ -34,6 +35,7 @@ export default function Submit() {
   const [formData, setFormData] = useState<FormData>({
     type: "",
     category: "",
+    priority: "Medium",
     subject: "",
     message: "",
   });
@@ -77,6 +79,7 @@ export default function Submit() {
       const res = await submitFeedback({
         type: formData.type,
         category: formData.category,
+        priority: formData.priority,
         subject: formData.subject,
         message: formData.message,
         userId,
@@ -86,7 +89,7 @@ export default function Submit() {
 
       setTrackingId(res.data.id);
       toast.success("Feedback submitted successfully!");
-      setFormData({ type: "", category: "", subject: "", message: "" });
+      setFormData({ type: "", category: "", priority: "Medium", subject: "", message: "" });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to submit feedback");
     } finally {
@@ -203,6 +206,27 @@ export default function Submit() {
                         </SelectItem>
                       ))
                     )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="priority">Severity Level *</Label>
+                <Select
+                  value={formData.priority}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, priority: value })
+                  }
+                  required
+                >
+                  <SelectTrigger id="priority">
+                    <SelectValue placeholder="Select severity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Low">Low</SelectItem>
+                    <SelectItem value="Medium">Medium</SelectItem>
+                    <SelectItem value="High">High</SelectItem>
+                    <SelectItem value="Urgent">Urgent</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

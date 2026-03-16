@@ -17,12 +17,19 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogTrigger,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { LogIn, Mail, Lock, KeyRound } from "lucide-react";
-import { loginUser, loginAdmin, superAdminLogin } from "@/frontend/api";
+import {
+  loginUser,
+  loginAdmin,
+  superAdminLogin,
+  forgotPassword,
+  resetPassword,
+} from "@/frontend/api";
 
 function clearSessionCookies() {
   document.cookie = "ff_user_session=; Path=/; Max-Age=0; SameSite=Lax";
@@ -43,6 +50,12 @@ export default function Login() {
   const [showSuperAdmin, setShowSuperAdmin] = useState(false);
   const [superAdminKey, setSuperAdminKey] = useState("");
   const [isSuperAdminLoading, setIsSuperAdminLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [isForgotLoading, setIsForgotLoading] = useState(false);
+  const [isResetLoading, setIsResetLoading] = useState(false);
 
   useEffect(() => {
     const isUserLoggedIn = localStorage.getItem("isUserLoggedIn") === "true";
@@ -122,6 +135,35 @@ export default function Login() {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsForgotLoading(true);
+    try {
+      await forgotPassword({ email: forgotEmail });
+      toast.success("If your email exists, a reset code was sent.");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to send reset code");
+    } finally {
+      setIsForgotLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsResetLoading(true);
+    try {
+      await resetPassword({ token: resetToken, newPassword });
+      toast.success("Password reset successful. You can now log in.");
+      setForgotOpen(false);
+      setResetToken("");
+      setNewPassword("");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to reset password");
+    } finally {
+      setIsResetLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted p-4">
       <Card className="max-w-md w-full shadow-lg">
@@ -175,6 +217,61 @@ export default function Login() {
             >
               {isLoading ? "Logging in..." : "Log In"}
             </Button>
+            <div className="text-center">
+              <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+                <DialogTrigger asChild>
+                  <button type="button" className="text-sm text-accent hover:underline font-medium">
+                    Forgot Password?
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Reset Password</DialogTitle>
+                    <DialogDescription>
+                      Request a reset code by email, then set your new password.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <form onSubmit={handleForgotPassword} className="space-y-3">
+                    <Label htmlFor="forgot-email">Email Address</Label>
+                    <Input
+                      id="forgot-email"
+                      type="email"
+                      placeholder="Enter your registered email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      required
+                    />
+                    <Button type="submit" variant="outline" className="w-full" disabled={isForgotLoading}>
+                      {isForgotLoading ? "Sending code..." : "Send Reset Code"}
+                    </Button>
+                  </form>
+
+                  <form onSubmit={handleResetPassword} className="space-y-3 pt-2">
+                    <Label htmlFor="reset-token">Reset Code</Label>
+                    <Input
+                      id="reset-token"
+                      placeholder="Paste reset code from email"
+                      value={resetToken}
+                      onChange={(e) => setResetToken(e.target.value)}
+                      required
+                    />
+                    <Label htmlFor="new-password">New Password</Label>
+                    <Input
+                      id="new-password"
+                      type="password"
+                      placeholder="At least 6 characters"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                    />
+                    <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isResetLoading}>
+                      {isResetLoading ? "Resetting..." : "Reset Password"}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
             <p className="text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{" "}
               <Link

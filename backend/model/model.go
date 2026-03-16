@@ -73,11 +73,21 @@ type (
 	FeedbackRequest struct {
 		Type        string `json:"type"`
 		Category    string `json:"category"`
+		Priority    string `json:"priority"`
 		Subject     string `json:"subject"`
 		Message     string `json:"message"`
 		UserID      string `json:"userId"`
 		UserName    string `json:"userName"`
 		IsAnonymous bool   `json:"isAnonymous"`
+	}
+
+	ForgotPasswordRequest struct {
+		Email string `json:"email"`
+	}
+
+	ResetPasswordRequest struct {
+		Token       string `json:"token"`
+		NewPassword string `json:"newPassword"`
 	}
 
 	UpdateFeedbackRequest struct {

@@ -107,6 +107,12 @@ export const registerUser = (data: {
 export const loginUser = (data: { email: string; password: string }) =>
   post<UserData>("/users/login", data);
 
+export const forgotPassword = (data: { email: string }) =>
+  post<{ sent: boolean }>("/users/forgot-password", data);
+
+export const resetPassword = (data: { token: string; newPassword: string }) =>
+  post<{ success: boolean }>("/users/reset-password", data);
+
 // ===================== ADMIN API =====================
 
 export const registerAdmin = (data: {
@@ -129,6 +135,7 @@ export const updateAdminUnit = (adminId: string, unit: string) =>
 export const submitFeedback = (data: {
   type: string;
   category: string;
+  priority: string;
   subject: string;
   message: string;
   userId: string;

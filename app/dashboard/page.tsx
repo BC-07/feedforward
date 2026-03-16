@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,17 +37,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
-  LogOut,
   MessageSquare,
   TrendingUp,
   Clock,
@@ -58,14 +50,15 @@ import {
   Trash2,
   Search,
   UserCircle2,
+  Download,
 } from "lucide-react";
 import {
   getFeedbacksByUnit,
   updateFeedback,
   deleteFeedback,
-  updateAdminUnit,
   FeedbackData,
 } from "@/frontend/api";
+import { exportFeedbackToPdf } from "@/frontend/pdf";
 
 const UNITS = [
   "IT Unit",
@@ -94,8 +87,7 @@ export default function AdminDashboard() {
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterName, setFilterName] = useState("asc");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [newUnit, setNewUnit] = useState("");
+  const knownFeedbackIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -116,28 +108,36 @@ export default function AdminDashboard() {
 
     if (adminUnit) {
       loadFeedbacks(adminUnit);
+
+      const intervalId = window.setInterval(() => {
+        loadFeedbacks(adminUnit, true);
+      }, 30000);
+
+      return () => window.clearInterval(intervalId);
     }
   }, [router]);
 
-  const loadFeedbacks = async (unit: string) => {
+  const loadFeedbacks = async (unit: string, notifyOnNew = false) => {
     try {
       const res = await getFeedbacksByUnit(unit);
-      setFeedbacks(res.data || []);
+      const list = res.data || [];
+
+      if (knownFeedbackIdsRef.current.size === 0) {
+        knownFeedbackIdsRef.current = new Set(list.map((item) => item.id));
+      } else if (notifyOnNew) {
+        const newItems = list.filter((item) => !knownFeedbackIdsRef.current.has(item.id));
+        if (newItems.length > 0) {
+          toast.info(`New feedback received (${newItems.length})`);
+        }
+      }
+
+      knownFeedbackIdsRef.current = new Set(list.map((item) => item.id));
+
+      setFeedbacks(list);
     } catch (err: unknown) {
       console.error("Failed to load feedbacks:", err);
       toast.error("Failed to load feedbacks");
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("isAdminLoggedIn");
-    localStorage.removeItem("currentAdminId");
-    localStorage.removeItem("currentAdminName");
-    localStorage.removeItem("currentAdminEmail");
-    localStorage.removeItem("currentAdminDepartment");
-    document.cookie = "ff_admin_session=; Path=/; Max-Age=0; SameSite=Lax";
-    toast.success("Logged out successfully");
-    router.push("/login");
   };
 
   const handleUpdateFeedback = async () => {
@@ -174,23 +174,6 @@ export default function AdminDashboard() {
       toast.success("Feedback deleted successfully");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to delete feedback");
-    }
-  };
-
-  const handleUnitChange = async () => {
-    if (!newUnit || newUnit === currentAdmin?.unit || !currentAdmin) return;
-
-    try {
-      await updateAdminUnit(currentAdmin.id, newUnit);
-      localStorage.setItem("currentAdminDepartment", newUnit);
-      const updatedAdmin = { ...currentAdmin, unit: newUnit };
-      setCurrentAdmin(updatedAdmin);
-      loadFeedbacks(newUnit);
-      setNewUnit("");
-      setIsProfileOpen(false);
-      toast.success("Unit updated successfully!");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to update unit");
     }
   };
 
@@ -279,12 +262,6 @@ export default function AdminDashboard() {
                   </span>
                 )}
               </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setIsProfileOpen(true)}>
-                <UserCircle2 className="mr-2 h-4 w-4" />
-                Profile
-              </Button>
             </div>
           </div>
         </div>
@@ -664,7 +641,7 @@ export default function AdminDashboard() {
                                     </div>
                                     <div className="space-y-2">
                                       <Label htmlFor="priority">
-                                        Update Priority
+                                        Update Severity Level
                                       </Label>
                                       <Select
                                         value={newPriority}
@@ -709,6 +686,20 @@ export default function AdminDashboard() {
                                     >
                                       Update Feedback
                                     </Button>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full"
+                                      onClick={() =>
+                                        selectedFeedback &&
+                                        exportFeedbackToPdf(
+                                          selectedFeedback,
+                                          currentAdmin?.name || "Admin",
+                                        )
+                                      }
+                                    >
+                                      <Download className="h-4 w-4 mr-2" />
+                                      Export PDF
+                                    </Button>
                                   </TabsContent>
                                 </Tabs>
                               )}
@@ -732,77 +723,6 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Admin Profile Sheet */}
-      <Sheet open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <SheetContent className="w-[360px] sm:w-[400px]">
-          <SheetHeader>
-            <SheetTitle>Admin Profile</SheetTitle>
-            <SheetDescription>Your account information</SheetDescription>
-          </SheetHeader>
-          <div className="mt-8 space-y-6">
-            <div className="flex flex-col items-center gap-3 pb-6 border-b">
-              <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center">
-                <UserCircle2 className="h-12 w-12 text-primary" />
-              </div>
-              <div className="text-center">
-                <p className="text-xl font-bold">{currentAdmin?.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {currentAdmin?.unit}
-                </p>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Full Name
-                </p>
-                <p className="font-medium">{currentAdmin?.name}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Email
-                </p>
-                <p className="font-medium">{currentAdmin?.email}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Current Unit
-                </p>
-                <p className="font-medium">{currentAdmin?.unit}</p>
-              </div>
-            </div>
-            <div className="space-y-3 pt-4 border-t">
-              <div>
-                <p className="text-sm font-semibold mb-1">Change Unit</p>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Each unit can only have one admin. If the selected unit is
-                  already taken, the change will be rejected.
-                </p>
-              </div>
-              <Select value={newUnit} onValueChange={setNewUnit}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNITS.map((unit) => (
-                    <SelectItem key={unit} value={unit}>
-                      {unit}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                className="w-full bg-accent hover:bg-accent/90"
-                onClick={handleUnitChange}
-                disabled={!newUnit || newUnit === currentAdmin?.unit}
-              >
-                Save Unit
-              </Button>
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 

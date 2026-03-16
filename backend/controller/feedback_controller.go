@@ -18,6 +18,36 @@ import (
 	"gorm.io/gorm"
 )
 
+func normalizePriorityLevel(rawPriority string) string {
+	switch strings.ToLower(strings.TrimSpace(rawPriority)) {
+	case "low":
+		return "Low"
+	case "high":
+		return "High"
+	case "urgent":
+		return "Urgent"
+	default:
+		return "Medium"
+	}
+}
+
+func getAdminEmailByUnit(db *gorm.DB, unit string) (string, error) {
+	trimmedUnit := strings.TrimSpace(unit)
+	if trimmedUnit == "" {
+		return "", nil
+	}
+
+	var admin model.Admin
+	if err := db.Table("public.admins").Select("email").Where("LOWER(TRIM(unit)) = LOWER(TRIM(?)) AND is_disabled = FALSE", trimmedUnit).First(&admin).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return "", nil
+		}
+		return "", err
+	}
+
+	return strings.TrimSpace(admin.Email), nil
+}
+
 func getUserEmailByID(db *gorm.DB, userID string) (string, error) {
 	trimmedID := strings.TrimSpace(userID)
 	if trimmedID == "" {
@@ -138,7 +168,7 @@ func SubmitFeedback(c *fiber.Ctx) error {
 		Subject:     req.Subject,
 		Message:     req.Message,
 		Status:      "Pending",
-		Priority:    "Medium",
+		Priority:    normalizePriorityLevel(req.Priority),
 		UserID:      userID,
 		UserName:    req.UserName,
 		IsAnonymous: req.IsAnonymous,
@@ -170,6 +200,24 @@ func SubmitFeedback(c *fiber.Ctx) error {
 		)
 		if mailErr := SendHTMLEmail(recipientEmail, "FeedForward: Submission received", emailBody); mailErr != nil {
 			log.Printf("submit feedback: failed to send email: %v", mailErr)
+		}
+	}
+
+	adminEmail, adminErr := getAdminEmailByUnit(db, feedback.Category)
+	if adminErr != nil {
+		log.Printf("submit feedback: failed to lookup admin email: %v", adminErr)
+	}
+	if adminEmail != "" {
+		adminBody := buildFeedbackEmailHTML(
+			"New feedback submitted",
+			"A new feedback entry needs your review.",
+			feedback,
+			"Open dashboard",
+			fmt.Sprintf("%s/dashboard", getTrackBaseURL()),
+			"",
+		)
+		if mailErr := SendHTMLEmail(adminEmail, "FeedForward: New feedback submitted", adminBody); mailErr != nil {
+			log.Printf("submit feedback: failed to send admin notification: %v", mailErr)
 		}
 	}
 
