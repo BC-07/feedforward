@@ -97,11 +97,14 @@ export default function AdminDashboard() {
   const [categories, setCategories] = useState<string[]>([]);
   const applyFeedbackUpdate = (data: Feedback[]) => {
     setFeedbacks(data);
+    if (typeof window === "undefined") return;
+    if (!currentAdmin?.unit) return;
+    const key = `adminFeedbacksCache:${currentAdmin.unit}`;
+    sessionStorage.setItem(key, JSON.stringify(data));
   };
 
   async function loadFeedbacks(unit: string) {
     if (!unit.trim()) {
-      setFeedbacks([]);
       return;
     }
 
@@ -131,6 +134,22 @@ export default function AdminDashboard() {
       unit: localStorage.getItem("currentAdminDepartment") || "",
     });
   }, [router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!currentAdmin?.unit) return;
+    const key = `adminFeedbacksCache:${currentAdmin.unit}`;
+    const cached = sessionStorage.getItem(key);
+    if (!cached) return;
+    try {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        applyFeedbackUpdate(parsed as Feedback[]);
+      }
+    } catch {
+      // Ignore cache parse errors
+    }
+  }, [currentAdmin?.unit]);
 
   useEffect(() => {
     if (!currentAdmin?.unit) return;
@@ -311,7 +330,6 @@ export default function AdminDashboard() {
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-3" />
           </div>
         </div>
       </div>
