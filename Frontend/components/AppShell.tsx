@@ -5,13 +5,16 @@ import Link from "next/link";
 import {
   deleteUserAccount,
   logout,
+  listFeedbacks,
   updateAdminProfile,
   updateAdminPassword,
   updateUserPassword,
   updateUserProfile,
+  type Feedback,
 } from "@/lib/api";
-import { ArrowRight, LogOut, User, UserCircle2, Camera } from "lucide-react";
+import { ArrowRight, LogOut, User, UserCircle2, Camera, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -22,6 +25,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetDescription,
+  SheetTrigger,
 } from "@/components/ui/sheet";
 
 const SESSION_EVENT = "feedforward:session-change";
@@ -186,6 +190,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isSuperAdminRoute = pathname.startsWith("/superadmin");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
   const userAvatarInputRef = useRef<HTMLInputElement>(null);
   const [passwordEdit, setPasswordEdit] = useState({
@@ -206,6 +211,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     newPassword: "",
     confirmPassword: "",
   });
+  const [adminNotifications, setAdminNotifications] = useState<Feedback[]>([]);
+  const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [isHydrated, setIsHydrated] = useState(false);
   const session = useSyncExternalStore(
     subscribeSessionSnapshot,
@@ -271,6 +281,96 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     adminAvatar,
     superAdminName,
   } = effectiveSession;
+
+  const refreshAdminNotifications = async () => {
+    if (!isAdminLoggedIn || !adminUnit) return;
+    setIsNotificationsLoading(true);
+    try {
+      const data = await listFeedbacks({ category: adminUnit });
+      const now = Date.now();
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      const recent = data
+        .filter(
+          (feedback) => now - new Date(feedback.createdAt).getTime() <= sevenDaysMs,
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
+        .slice(0, 10);
+      setAdminNotifications(recent);
+      if (readNotificationIds.size > 0) {
+        const allowedIds = new Set(recent.map((item) => item.id));
+        const nextRead = new Set(
+          Array.from(readNotificationIds).filter((id) => allowedIds.has(id)),
+        );
+        if (nextRead.size !== readNotificationIds.size) {
+          saveReadNotificationIds(nextRead);
+        }
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load notifications.",
+      );
+    } finally {
+      setIsNotificationsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isAdminLoggedIn || !adminId || !adminUnit) return;
+    const key = `adminNotificationsRead:${adminId}:${adminUnit}`;
+    const stored = localStorage.getItem(key);
+    if (!stored) {
+      setReadNotificationIds(new Set());
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        const ids = parsed.filter((id) => typeof id === "string");
+        setReadNotificationIds(new Set(ids));
+      } else {
+        setReadNotificationIds(new Set());
+      }
+    } catch {
+      setReadNotificationIds(new Set());
+    }
+  }, [isAdminLoggedIn, adminId, adminUnit]);
+
+  useEffect(() => {
+    if (!isAdminLoggedIn || !adminUnit) return;
+    void refreshAdminNotifications();
+  }, [isAdminLoggedIn, adminUnit]);
+
+  const saveReadNotificationIds = (nextSet: Set<string>) => {
+    if (typeof window === "undefined") return;
+    if (!isAdminLoggedIn || !adminId || !adminUnit) return;
+    const key = `adminNotificationsRead:${adminId}:${adminUnit}`;
+    localStorage.setItem(key, JSON.stringify(Array.from(nextSet)));
+    setReadNotificationIds(new Set(nextSet));
+  };
+
+  const toggleNotificationRead = (id: string) => {
+    const next = new Set(readNotificationIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    saveReadNotificationIds(next);
+  };
+
+  const sortedAdminNotifications = [...adminNotifications].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+  const unreadAdminNotifications = sortedAdminNotifications.filter(
+    (feedback) => !readNotificationIds.has(feedback.id),
+  );
+  const adminNotificationCount = unreadAdminNotifications.length;
 
   // ── Avatar upload handlers ───────────────────────────────────────────────
   const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -561,21 +661,131 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )}
 
             {/* Admin nav */}
-{isDashboardRoute && isAdminLoggedIn && (
-  <div className="flex items-center gap-3">
-    <button
-      onClick={() => setIsProfileOpen(true)}
-      className="flex items-center gap-2 text-sm hover:text-accent transition-colors"
-    >
-      <AvatarDisplay src={adminAvatar} fallback={<UserCircle2 />} size="sm" accentColor="primary" />
-      <span className="font-medium">{adminName}</span>
-    </button>
-    <Button variant="ghost" size="sm" onClick={handleAdminLogout} className="text-sm">
-      <LogOut className="h-4 w-4 mr-1" />
-      Logout
-    </Button>
-  </div>
-)}
+            {isDashboardRoute && isAdminLoggedIn && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsProfileOpen(true)}
+                  className="flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+                  aria-label="Open profile settings"
+                >
+                  <AvatarDisplay
+                    src={adminAvatar}
+                    fallback={<UserCircle2 />}
+                    size="sm"
+                    accentColor="primary"
+                  />
+                </button>
+
+                <Sheet
+                  open={isNotificationsOpen}
+                  onOpenChange={(open) => {
+                    setIsNotificationsOpen(open);
+                    if (open) {
+                      void refreshAdminNotifications();
+                    }
+                  }}
+                >
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="relative"
+                      aria-label="Open notifications"
+                    >
+                      <Bell className="h-5 w-5" />
+                      {adminNotificationCount > 0 && (
+                        <span className="absolute -top-1 -right-1 h-5 min-w-[20px] rounded-full bg-destructive text-destructive-foreground text-[11px] font-semibold flex items-center justify-center px-1">
+                          {adminNotificationCount > 99 ? "99+" : adminNotificationCount}
+                        </span>
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent className="w-[360px] sm:w-[400px] overflow-hidden rounded-l-3xl">
+                    <SheetHeader>
+                      <SheetTitle>Notifications</SheetTitle>
+                      <SheetDescription>
+                        New feedback for {adminUnit || "your unit"}.
+                      </SheetDescription>
+                    </SheetHeader>
+                    <div className="mt-2 flex-1 min-h-0 space-y-3 overflow-y-auto px-3 pr-4 pb-3">
+                      {isNotificationsLoading ? (
+                        <div className="text-sm text-muted-foreground">
+                          Loading notifications...
+                        </div>
+                      ) : sortedAdminNotifications.length === 0 ? (
+                        <div className="text-sm text-muted-foreground">
+                          You&apos;re all caught up. No new feedback yet.
+                        </div>
+                      ) : (
+                        sortedAdminNotifications.slice(0, 12).map((feedback) => {
+                          const isRead = readNotificationIds.has(feedback.id);
+                          return (
+                          <div
+                            key={feedback.id}
+                            className="rounded-lg border border-border p-3 hover:bg-muted/50 transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-sm">
+                                  {feedback.subject}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {feedback.category} • {feedback.type}
+                                </p>
+                              </div>
+                              <div className="flex flex-col items-end gap-1">
+                                <Badge
+                                  variant="outline"
+                                  className="capitalize whitespace-nowrap"
+                                >
+                                  {feedback.status}
+                                </Badge>
+                                <Badge
+                                  variant={isRead ? "secondary" : "default"}
+                                  className="whitespace-nowrap"
+                                >
+                                  {isRead ? "Read" : "Unread"}
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                              <span>
+                                {new Date(feedback.createdAt).toLocaleString("en-US")}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => toggleNotificationRead(feedback.id)}
+                              >
+                                {isRead ? "Mark as unread" : "Mark as read"}
+                              </Button>
+                            </div>
+                          </div>
+                          );
+                        })
+                      )}
+                      {sortedAdminNotifications.length > 12 && (
+                        <p className="text-xs text-muted-foreground">
+                          Showing 12 most recent feedback items.
+                        </p>
+                      )}
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleAdminLogout}
+                  className="text-sm"
+                >
+                  <LogOut className="h-4 w-4 mr-1" />
+                  Logout
+                </Button>
+              </div>
+            )}
             {isSuperAdminRoute && isSuperAdminLoggedIn && (
               <div className="flex items-center gap-3">
                 <Button
