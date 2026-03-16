@@ -101,6 +101,7 @@ export const registerUser = (data: {
   lastName: string;
   email: string;
   password: string;
+  termsAccepted: boolean;
 }) => post<UserData>("/users/register", data);
 
 export const loginUser = (data: { email: string; password: string }) =>

@@ -4,8 +4,16 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
@@ -17,6 +25,52 @@ import { toast } from "sonner";
 import { UserPlus, Mail, Lock, User } from "lucide-react";
 import { registerUser } from "@/frontend/api";
 
+function TermsContent() {
+  return (
+    <div className="space-y-5 text-sm leading-6 text-foreground">
+      <section>
+        <h2 className="text-base font-semibold">1. Account Responsibility</h2>
+        <p>
+          You are responsible for maintaining the confidentiality of your login credentials and
+          for activities performed using your account.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="text-base font-semibold">2. Acceptable Use</h2>
+        <p>
+          You agree to use the platform only for lawful and legitimate feedback purposes. Misuse,
+          abuse, or any attempt to disrupt the system is prohibited.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="text-base font-semibold">3. Data and Privacy</h2>
+        <p>
+          Submitted feedback and account details may be stored and processed for service delivery,
+          issue resolution, and system improvement.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="text-base font-semibold">4. Administrative Control</h2>
+        <p>
+          The system administrators may manage account access, including disabling accounts when
+          required for policy compliance or security reasons.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="text-base font-semibold">5. Changes to Terms</h2>
+        <p>
+          These terms may be updated from time to time. Continued use of the platform after
+          updates constitutes acceptance of the revised terms.
+        </p>
+      </section>
+    </div>
+  );
+}
+
 export default function Signup() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -26,6 +80,7 @@ export default function Signup() {
     email: "",
     password: "",
     confirmPassword: "",
+    termsAccepted: false,
   });
 
   useEffect(() => {
@@ -47,6 +102,10 @@ export default function Signup() {
       toast.error("Password must be at least 6 characters");
       return;
     }
+    if (!formData.termsAccepted) {
+      toast.error("Please accept Terms & Conditions");
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -55,6 +114,7 @@ export default function Signup() {
         lastName: formData.lastName,
         email: formData.email,
         password: formData.password,
+        termsAccepted: formData.termsAccepted,
       });
       toast.success("Account created successfully!");
       router.push("/login");
@@ -185,6 +245,38 @@ export default function Signup() {
             <p className="text-xs text-muted-foreground">
               Password must be at least 6 characters
             </p>
+
+            <div className="flex items-start gap-2">
+              <Checkbox
+                id="terms"
+                checked={formData.termsAccepted}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, termsAccepted: checked === true })
+                }
+              />
+              <Label htmlFor="terms" className="text-xs text-muted-foreground leading-5">
+                I agree to the{" "}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-accent font-medium hover:underline"
+                    >
+                      Terms & Conditions
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-2xl">
+                    <DialogTitle>Terms & Conditions</DialogTitle>
+                    <DialogDescription>
+                      By creating and using a FeedForward account, you agree to the following terms.
+                    </DialogDescription>
+                    <div className="max-h-[60vh] overflow-y-auto pr-1">
+                      <TermsContent />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </Label>
+            </div>
 
             <Button
               type="submit"

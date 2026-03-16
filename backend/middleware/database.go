@@ -24,6 +24,14 @@ func ConnectDB() bool {
 		GetEnv("DB_TMEZ"))
 
 	DBConn, DBErr = gorm.Open(postgres.Open(dns), &gorm.Config{})
+	if DBErr != nil {
+		return true
+	}
 
-	return DBErr != nil
+	DBErr = DBConn.Exec(`ALTER TABLE public.admins ADD COLUMN IF NOT EXISTS is_disabled BOOLEAN NOT NULL DEFAULT FALSE;`).Error
+	if DBErr != nil {
+		return true
+	}
+
+	return false
 }

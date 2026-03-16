@@ -18,15 +18,16 @@ type (
 
 	// Admin represents a registered admin account
 	Admin struct {
-		ID        string `json:"id" gorm:"column:id;primaryKey"`
-		FirstName string `json:"firstName" gorm:"column:first_name"`
-		LastName  string `json:"lastName" gorm:"column:last_name"`
-		Name      string `json:"name" gorm:"column:name;<-:false"`
-		Email     string `json:"email" gorm:"column:email"`
-		Password  string `json:"-" gorm:"column:password"`
-		Unit      string `json:"unit" gorm:"column:unit"`
-		CreatedAt string `json:"createdAt" gorm:"column:created_at"`
-		UpdatedAt string `json:"updatedAt" gorm:"column:updated_at"`
+		ID         string `json:"id" gorm:"column:id;primaryKey"`
+		FirstName  string `json:"firstName" gorm:"column:first_name"`
+		LastName   string `json:"lastName" gorm:"column:last_name"`
+		Name       string `json:"name" gorm:"column:name;<-:false"`
+		Email      string `json:"email" gorm:"column:email"`
+		Password   string `json:"-" gorm:"column:password"`
+		Unit       string `json:"unit" gorm:"column:unit"`
+		IsDisabled bool   `json:"isDisabled" gorm:"column:is_disabled"`
+		CreatedAt  string `json:"createdAt" gorm:"column:created_at"`
+		UpdatedAt  string `json:"updatedAt" gorm:"column:updated_at"`
 	}
 
 	// Feedback represents a submitted feedback entry
@@ -48,10 +49,11 @@ type (
 
 	// Request models
 	RegisterUserRequest struct {
-		FirstName string `json:"firstName"`
-		LastName  string `json:"lastName"`
-		Email     string `json:"email"`
-		Password  string `json:"password"`
+		FirstName     string `json:"firstName"`
+		LastName      string `json:"lastName"`
+		Email         string `json:"email"`
+		Password      string `json:"password"`
+		TermsAccepted bool   `json:"termsAccepted"`
 	}
 
 	RegisterAdminRequest struct {

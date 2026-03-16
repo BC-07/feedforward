@@ -37,6 +37,7 @@ func AppRoutes(app *fiber.App) {
 	api.Post("/superadmin/admins", controller.SuperAdminCreateAdmin)
 	api.Put("/superadmin/admins/:id", controller.SuperAdminUpdateAdmin)
 	api.Delete("/superadmin/admins/:id", controller.SuperAdminDeleteAdmin)
+	api.Patch("/superadmin/admins/:id/disable", controller.SuperAdminDisableAdmin)
 
 	// Category routes
 	api.Get("/superadmin/categories", controller.SuperAdminListCategories)

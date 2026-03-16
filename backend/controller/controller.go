@@ -41,6 +41,14 @@ func RegisterUser(c *fiber.Ctx) error {
 		})
 	}
 
+	if !req.TermsAccepted {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: "Terms and Conditions must be accepted",
+			Data:    errors.ErrorModel{Message: "Please accept Terms and Conditions to continue", IsSuccess: false},
+		})
+	}
+
 	var existing model.User
 	if result := db.Table("public.users").Where("email = ?", req.Email).First(&existing); result.Error == nil {
 		return c.Status(409).JSON(response.ResponseModel{
@@ -236,6 +244,14 @@ func LoginAdmin(c *fiber.Ctx) error {
 			RetCode: "401",
 			Message: "Invalid email or password",
 			Data:    errors.ErrorModel{Message: "Incorrect password", IsSuccess: false},
+		})
+	}
+
+	if admin.IsDisabled {
+		return c.Status(403).JSON(response.ResponseModel{
+			RetCode: "403",
+			Message: "Admin account is disabled",
+			Data:    errors.ErrorModel{Message: "Contact superadmin to restore access", IsSuccess: false},
 		})
 	}
 
@@ -881,6 +897,56 @@ func SuperAdminDeleteAdmin(c *fiber.Ctx) error {
 	})
 }
 
+func SuperAdminDisableAdmin(c *fiber.Ctx) error {
+	if !superAdminAuth(c) {
+		return c.Status(401).JSON(response.ResponseModel{
+			RetCode: "401",
+			Message: "Unauthorized superadmin access",
+			Data:    errors.ErrorModel{Message: "Invalid or missing superadmin token", IsSuccess: false},
+		})
+	}
+
+	db := middleware.DBConn
+	id := c.Params("id")
+
+	updates := map[string]any{
+		"is_disabled": true,
+		"updated_at":  time.Now().Format(time.RFC3339),
+	}
+
+	result := db.Table("public.admins").Where("id = ?", id).Updates(updates)
+	if result.Error != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to disable admin", IsSuccess: false, Error: result.Error},
+		})
+	}
+
+	if result.RowsAffected == 0 {
+		return c.Status(404).JSON(response.ResponseModel{
+			RetCode: "404",
+			Message: "Admin not found",
+			Data:    errors.ErrorModel{Message: "No admin found with id: " + id, IsSuccess: false},
+		})
+	}
+
+	var admin model.Admin
+	if err := db.Table("public.admins").Where("id = ?", id).First(&admin).Error; err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to load admin after disable", IsSuccess: false, Error: err},
+		})
+	}
+
+	return c.Status(200).JSON(response.ResponseModel{
+		RetCode: "200",
+		Message: "Admin disabled successfully",
+		Data:    admin,
+	})
+}
+
 // ===================== CATEGORY MANAGEMENT =====================
 
 func listAllCategories(db *gorm.DB) ([]model.Category, error) {
@@ -1006,6 +1072,42 @@ func SuperAdminDeleteCategory(c *fiber.Ctx) error {
 	}
 	db := middleware.DBConn
 	id := c.Params("id")
+
+	var category model.Category
+	if err := db.Table("public.categories").Where("id = ?", id).First(&category).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(404).JSON(response.ResponseModel{
+				RetCode: "404",
+				Message: "Category not found",
+				Data:    errors.ErrorModel{Message: "No category found with id: " + id, IsSuccess: false},
+			})
+		}
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to load category", IsSuccess: false, Error: err},
+		})
+	}
+
+	var activeAdminCount int64
+	if err := db.Table("public.admins").Where("LOWER(TRIM(unit)) = LOWER(TRIM(?)) AND is_disabled = FALSE", category.Name).Count(&activeAdminCount).Error; err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to validate category usage", IsSuccess: false, Error: err},
+		})
+	}
+
+	if activeAdminCount > 0 {
+		return c.Status(409).JSON(response.ResponseModel{
+			RetCode: "409",
+			Message: "Category cannot be deleted",
+			Data: errors.ErrorModel{
+				Message:   "Disable or reassign active admin accounts for this category before deleting it",
+				IsSuccess: false,
+			},
+		})
+	}
 
 	if err := db.Table("public.categories").Where("id = ?", id).Delete(&model.Category{}).Error; err != nil {
 		return c.Status(500).JSON(response.ResponseModel{
