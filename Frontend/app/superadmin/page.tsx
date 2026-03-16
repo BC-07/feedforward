@@ -6,9 +6,12 @@ import {
   createCategoryBySuperAdmin,
   createAdminBySuperAdmin,
   disableAdminBySuperAdmin,
+  enableAdminBySuperAdmin,
   deleteCategoryBySuperAdmin,
+  getSessionMe,
   listAdmins,
   listCategories,
+  reverifySuperAdmin,
   updateCategoryBySuperAdmin,
   updateAdminBySuperAdmin,
   type Admin,
@@ -67,12 +70,11 @@ const emptyEditForm = {
 };
 
 async function fetchAdmins(
-  sessionToken: string,
   onSuccess: (admins: Admin[]) => void,
   onAuthFailure: () => void,
 ) {
   try {
-    const data = await listAdmins(sessionToken);
+    const data = await listAdmins();
     startTransition(() => {
       onSuccess(data);
     });
@@ -90,7 +92,6 @@ async function fetchAdmins(
 
 function clearSuperAdminSession(onRedirect: () => void) {
   localStorage.removeItem("isSuperAdminLoggedIn");
-  localStorage.removeItem("superAdminToken");
   localStorage.removeItem("superAdminName");
   localStorage.removeItem("superAdminExpiresAt");
   onRedirect();
@@ -98,11 +99,6 @@ function clearSuperAdminSession(onRedirect: () => void) {
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
-  const [token] = useState(() =>
-    typeof window === "undefined"
-      ? ""
-      : localStorage.getItem("superAdminToken") || "",
-  );
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [createForm, setCreateForm] = useState(emptyCreateForm);
@@ -113,7 +109,19 @@ export default function SuperAdminDashboard() {
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingCategoryOriginalName, setEditingCategoryOriginalName] = useState("");
+  const [adminFilter, setAdminFilter] = useState<"active" | "disabled">(
+    "active",
+  );
+  const [reauthOpen, setReauthOpen] = useState(false);
+  const [reauthPassword, setReauthPassword] = useState("");
+  const [reauthAction, setReauthAction] = useState<
+    "disable" | "enable" | "edit" | null
+  >(
+    null,
+  );
+  const [reauthTarget, setReauthTarget] = useState<Admin | null>(null);
 
+  /*
   const stats = {
     total: admins.length,
     occupiedUnits: new Set(admins.map((admin) => admin.unit)).size,
@@ -122,6 +130,7 @@ export default function SuperAdminDashboard() {
         .map((admin) => new Date(admin.updatedAt).getTime())
         .sort((a, b) => b - a)[0] ?? null,
   };
+  */
 
   const getUnitClass = (unit: string) => {
     const normalized = unit.trim().toLowerCase();
@@ -148,27 +157,48 @@ export default function SuperAdminDashboard() {
       ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
       : "bg-blue-500/10 text-blue-700 border-blue-500/30";
 
+  const visibleAdmins = admins.filter((admin) => {
+    if (adminFilter === "disabled") {
+      return Boolean(admin.isDisabled);
+    }
+    return !admin.isDisabled;
+  });
+
+  const availableCategories = categories.filter((category) => {
+    const name = category.name.trim().toLowerCase();
+    return !admins.some(
+      (admin) =>
+        !admin.isDisabled && admin.unit.trim().toLowerCase() === name,
+    );
+  });
+
+  const editAvailableCategories = categories.filter((category) => {
+    const name = category.name.trim().toLowerCase();
+    const currentUnit = editForm.unit.trim().toLowerCase();
+    if (name === currentUnit) {
+      return true;
+    }
+    return !admins.some(
+      (admin) =>
+        !admin.isDisabled && admin.unit.trim().toLowerCase() === name,
+    );
+  });
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-
-    const isLoggedIn = localStorage.getItem("isSuperAdminLoggedIn") === "true";
-    const sessionToken = localStorage.getItem("superAdminToken") || "";
-    const expiresAt = localStorage.getItem("superAdminExpiresAt") || "";
-
-    if (!isLoggedIn || !sessionToken) {
-      router.push("/login");
-      return;
-    }
-
-    if (expiresAt && new Date(expiresAt).getTime() < Date.now()) {
-      clearSuperAdminSession(() => router.push("/login"));
-      toast.error("Superadmin session expired.");
-      return;
-    }
-
-    void fetchAdmins(sessionToken, setAdmins, () =>
-      clearSuperAdminSession(() => router.push("/login")),
-    );
+    void getSessionMe()
+      .then((session) => {
+        if (session.role !== "superadmin") {
+          clearSuperAdminSession(() => router.push("/login"));
+          return;
+        }
+        void fetchAdmins(setAdmins, () =>
+          clearSuperAdminSession(() => router.push("/login")),
+        );
+      })
+      .catch(() => {
+        clearSuperAdminSession(() => router.push("/login"));
+      });
     void listCategories()
       .then((data) => {
         setCategories(data);
@@ -182,12 +212,11 @@ export default function SuperAdminDashboard() {
 
   const handleCreateAdmin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!token) return;
 
     try {
-      await createAdminBySuperAdmin(token, createForm);
+      await createAdminBySuperAdmin(createForm);
       setCreateForm(emptyCreateForm);
-      await fetchAdmins(token, setAdmins, () =>
+      await fetchAdmins(setAdmins, () =>
         clearSuperAdminSession(() => router.push("/login")),
       );
       toast.success("Admin created successfully");
@@ -199,6 +228,10 @@ export default function SuperAdminDashboard() {
   };
 
   const handleOpenEdit = (admin: Admin) => {
+    if (admin.isDisabled) {
+      toast.error("Disabled admins cannot be edited.");
+      return;
+    }
     setSelectedAdmin(admin);
     setEditForm({
       firstName: admin.firstName,
@@ -211,47 +244,73 @@ export default function SuperAdminDashboard() {
   };
 
   const handleUpdateAdmin = async () => {
-    if (!token || !selectedAdmin) return;
-
-    try {
-      await updateAdminBySuperAdmin(token, selectedAdmin.id, editForm);
-      setIsEditOpen(false);
-      setSelectedAdmin(null);
-      setEditForm(emptyEditForm);
-      await fetchAdmins(token, setAdmins, () =>
-        clearSuperAdminSession(() => router.push("/login")),
-      );
-      toast.success("Admin updated successfully");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update admin.",
-      );
-    }
+    if (!selectedAdmin) return;
+    setReauthAction("edit");
+    setReauthTarget(selectedAdmin);
+    setReauthPassword("");
+    setReauthOpen(true);
   };
 
   const handleDisableAdmin = async (admin: Admin) => {
-    if (!token) return;
     if (!window.confirm(`Disable admin access for ${admin.name}?`)) return;
+    setReauthAction("disable");
+    setReauthTarget(admin);
+    setReauthPassword("");
+    setReauthOpen(true);
+  };
+
+  const handleEnableAdmin = async (admin: Admin) => {
+    if (!window.confirm(`Enable admin access for ${admin.name}?`)) return;
+    setReauthAction("enable");
+    setReauthTarget(admin);
+    setReauthPassword("");
+    setReauthOpen(true);
+  };
+
+  const handleReauthConfirm = async () => {
+    if (!reauthAction) return;
+    if (!reauthPassword.trim()) {
+      toast.error("Password is required.");
+      return;
+    }
 
     try {
-      await disableAdminBySuperAdmin(token, admin.id);
-      await fetchAdmins(token, setAdmins, () =>
+      await reverifySuperAdmin(reauthPassword);
+      if (reauthAction === "edit") {
+        if (!selectedAdmin) return;
+        await updateAdminBySuperAdmin(selectedAdmin.id, editForm);
+        setIsEditOpen(false);
+        setSelectedAdmin(null);
+        setEditForm(emptyEditForm);
+        toast.success("Admin updated successfully");
+      } else if (reauthAction === "disable") {
+        if (!reauthTarget) return;
+        await disableAdminBySuperAdmin(reauthTarget.id);
+        toast.success("Admin account disabled");
+      } else if (reauthAction === "enable") {
+        if (!reauthTarget) return;
+        await enableAdminBySuperAdmin(reauthTarget.id);
+        toast.success("Admin account enabled");
+      }
+      await fetchAdmins(setAdmins, () =>
         clearSuperAdminSession(() => router.push("/login")),
       );
-      toast.success("Admin account disabled");
+      setReauthOpen(false);
+      setReauthAction(null);
+      setReauthTarget(null);
+      setReauthPassword("");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to disable admin.",
+        error instanceof Error ? error.message : "Re-authentication failed.",
       );
     }
   };
 
   const handleCreateCategory = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!token) return;
 
     try {
-      const updated = await createCategoryBySuperAdmin(token, {
+      const updated = await createCategoryBySuperAdmin({
         name: newCategoryName,
       });
       setCategories(updated);
@@ -271,14 +330,14 @@ export default function SuperAdminDashboard() {
   };
 
   const handleSaveCategoryEdit = async () => {
-    if (!token || editingCategoryId === null) return;
+    if (editingCategoryId === null) return;
 
     try {
-      const updated = await updateCategoryBySuperAdmin(token, editingCategoryId, {
+      const updated = await updateCategoryBySuperAdmin(editingCategoryId, {
         name: editingCategoryName,
       });
       setCategories(updated);
-      await fetchAdmins(token, setAdmins, () =>
+      await fetchAdmins(setAdmins, () =>
         clearSuperAdminSession(() => router.push("/login")),
       );
       setCreateForm((current) => ({
@@ -307,13 +366,12 @@ export default function SuperAdminDashboard() {
   };
 
   const handleDeleteCategory = async (category: Category) => {
-    if (!token) return;
     if (!window.confirm(`Delete category "${category.name}"?`)) return;
 
     try {
-      const updated = await deleteCategoryBySuperAdmin(token, category.id);
+      const updated = await deleteCategoryBySuperAdmin(category.id);
       setCategories(updated);
-      await fetchAdmins(token, setAdmins, () =>
+      await fetchAdmins(setAdmins, () =>
         clearSuperAdminSession(() => router.push("/login")),
       );
       setCreateForm((current) => ({
@@ -360,6 +418,7 @@ export default function SuperAdminDashboard() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        {/*
         <div className="mb-8 grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="pb-3">
@@ -393,7 +452,7 @@ export default function SuperAdminDashboard() {
             </CardContent>
           </Card>
         </div>
-
+        */}
         <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
           <div className="space-y-6">
             <Card className="h-fit">
@@ -478,7 +537,7 @@ export default function SuperAdminDashboard() {
                         <SelectValue placeholder="Select a unit" />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((category) => (
+                        {availableCategories.map((category) => (
                           <SelectItem key={category.id} value={category.name}>
                             {category.name}
                           </SelectItem>
@@ -578,13 +637,37 @@ export default function SuperAdminDashboard() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserCog className="h-5 w-5" />
-                Admin Control
-              </CardTitle>
-              <CardDescription>
-                Review, modify, and remove admin accounts in the system.
-              </CardDescription>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserCog className="h-5 w-5" />
+                    Admin Control
+                  </CardTitle>
+                  <CardDescription>
+                    Review, modify, and remove admin accounts in the system.
+                  </CardDescription>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-2 py-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={adminFilter === "active" ? "default" : "ghost"}
+                    onClick={() => setAdminFilter("active")}
+                    className="h-8 rounded-full px-3"
+                  >
+                    Active
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={adminFilter === "disabled" ? "default" : "ghost"}
+                    onClick={() => setAdminFilter("disabled")}
+                    className="h-8 rounded-full px-3"
+                  >
+                    Disabled
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border">
@@ -600,17 +683,19 @@ export default function SuperAdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {admins.length === 0 ? (
+                    {visibleAdmins.length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={6}
                           className="py-10 text-center text-muted-foreground"
                         >
-                          No admin accounts found.
+                          {adminFilter === "disabled"
+                            ? "No disabled admin accounts found."
+                            : "No active admin accounts found."}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      admins.map((admin) => (
+                      visibleAdmins.map((admin) => (
                         <TableRow key={admin.id}>
                           <TableCell>
                             <div>
@@ -648,21 +733,33 @@ export default function SuperAdminDashboard() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleOpenEdit(admin)}
+                                disabled={Boolean(admin.isDisabled)}
                                 className="border-transparent bg-transparent text-black hover:bg-amber-600 hover:text-black"
                               >
                                 <Pencil className="mr-2 h-4 w-4" />
                                 Edit
                               </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDisableAdmin(admin)}
-                                disabled={Boolean(admin.isDisabled)}
-                                className="border-transparent bg-transparent text-black hover:bg-red-600 hover:text-black disabled:opacity-60"
-                              >
-                                <Ban className="mr-2 h-4 w-4" />
-                                {admin.isDisabled ? "Disabled" : "Disable"}
-                              </Button>
+                              {admin.isDisabled ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEnableAdmin(admin)}
+                                  className="border-transparent bg-transparent text-black hover:bg-emerald-600 hover:text-black"
+                                >
+                                  <Ban className="mr-2 h-4 w-4 rotate-180" />
+                                  Enable
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDisableAdmin(admin)}
+                                  className="border-transparent bg-transparent text-black hover:bg-red-600 hover:text-black"
+                                >
+                                  <Ban className="mr-2 h-4 w-4" />
+                                  Disable
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -751,19 +848,58 @@ export default function SuperAdminDashboard() {
               >
                 <SelectTrigger>
                   <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.name}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {editAvailableCategories.map((category) => (
+                      <SelectItem key={category.id} value={category.name}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
             <Button onClick={handleUpdateAdmin} className="w-full">
               Save Admin Changes
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reauthOpen} onOpenChange={setReauthOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Re-authenticate</DialogTitle>
+            <DialogDescription>
+              Please confirm your superadmin password to continue.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reauth-password">Password</Label>
+              <Input
+                id="reauth-password"
+                type="password"
+                value={reauthPassword}
+                onChange={(event) => setReauthPassword(event.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setReauthOpen(false);
+                  setReauthAction(null);
+                  setReauthTarget(null);
+                  setReauthPassword("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleReauthConfirm}>
+                Confirm
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

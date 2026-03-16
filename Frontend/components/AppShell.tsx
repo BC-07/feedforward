@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   deleteUserAccount,
+  logout,
   updateAdminProfile,
   updateAdminPassword,
   updateUserPassword,
@@ -214,6 +215,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const effectiveSession = isHydrated ? session : emptySessionSnapshot;
 
   useEffect(() => {
+    const apiBase =
+      process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+      "http://localhost:5566";
+
+    const sendLogoutBeacon = () => {
+      if (
+        !effectiveSession.isAdminLoggedIn &&
+        !effectiveSession.isSuperAdminLoggedIn
+      ) {
+        return;
+      }
+      if (typeof navigator === "undefined" || !navigator.sendBeacon) {
+        return;
+      }
+      const url = `${apiBase}/auth/logout`;
+      const body = new Blob([], { type: "application/json" });
+      navigator.sendBeacon(url, body);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        sendLogoutBeacon();
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      sendLogoutBeacon();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [effectiveSession.isAdminLoggedIn, effectiveSession.isSuperAdminLoggedIn]);
+
+  useEffect(() => {
     setIsHydrated(true);
   }, []);
 
@@ -269,7 +308,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   // ── Auth / profile handlers ──────────────────────────────────────────────
-  const handleUserLogout = () => {
+  const handleUserLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      // Best-effort logout
+    }
     localStorage.removeItem("isUserLoggedIn");
     localStorage.removeItem("currentUserId");
     localStorage.removeItem("currentUserName");
@@ -279,7 +323,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push("/");
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      // Best-effort logout
+    }
     localStorage.removeItem("isAdminLoggedIn");
     localStorage.removeItem("currentAdminId");
     localStorage.removeItem("currentAdminName");
@@ -290,14 +339,44 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     router.push("/");
   };
 
-  const handleSuperAdminLogout = () => {
+  const handleSuperAdminLogout = async () => {
+    try {
+      await logout();
+    } catch {
+      // Best-effort logout
+    }
     localStorage.removeItem("isSuperAdminLoggedIn");
-    localStorage.removeItem("superAdminToken");
     localStorage.removeItem("superAdminName");
     localStorage.removeItem("superAdminExpiresAt");
     announceSessionChange();
     toast.success("Superadmin logged out successfully");
     router.push("/login");
+  };
+
+  const handleLogoClick = async (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!effectiveSession.isAdminLoggedIn && !effectiveSession.isSuperAdminLoggedIn) {
+      return;
+    }
+    event.preventDefault();
+    try {
+      await logout();
+    } catch {
+      // Best-effort logout
+    }
+    if (effectiveSession.isAdminLoggedIn) {
+      localStorage.removeItem("isAdminLoggedIn");
+      localStorage.removeItem("currentAdminId");
+      localStorage.removeItem("currentAdminName");
+      localStorage.removeItem("currentAdminEmail");
+      localStorage.removeItem("currentAdminDepartment");
+    }
+    if (effectiveSession.isSuperAdminLoggedIn) {
+      localStorage.removeItem("isSuperAdminLoggedIn");
+      localStorage.removeItem("superAdminName");
+      localStorage.removeItem("superAdminExpiresAt");
+    }
+    announceSessionChange();
+    router.push("/");
   };
 
   const handlePasswordChange = async () => {
@@ -433,7 +512,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-50 border-b border-border bg-white">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
+            <Link
+              href="/"
+              className="flex items-center gap-2"
+              onClick={handleLogoClick}
+            >
               <ArrowRight className="h-8 w-8 text-accent" />
               <div>
                 <h1 className="text-xl font-bold text-primary tracking-tight">FEED FORWARD</h1>

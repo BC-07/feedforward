@@ -38,7 +38,6 @@ export interface Admin {
 }
 
 export interface SuperAdminSession {
-  token: string;
   username: string;
   expiresAt: string;
 }
@@ -67,6 +66,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
       "Content-Type": "application/json",
       ...(initHeaders || {}),
     },
+    credentials: "include",
     ...restInit,
   });
 
@@ -196,10 +196,8 @@ export async function loginSuperAdmin(payload: {
   });
 }
 
-export async function listAdmins(token: string): Promise<Admin[]> {
-  const data = await apiFetch<Admin[] | null>("/superadmin/admins", {
-    headers: withAuthToken(token),
-  });
+export async function listAdmins(): Promise<Admin[]> {
+  const data = await apiFetch<Admin[] | null>("/superadmin/admins");
   return Array.isArray(data) ? data : [];
 }
 
@@ -209,40 +207,33 @@ export async function listCategories(): Promise<Category[]> {
 }
 
 export async function createCategoryBySuperAdmin(
-  token: string,
   payload: { name: string },
 ): Promise<Category[]> {
   return apiFetch<Category[]>("/superadmin/categories", {
     method: "POST",
-    headers: withAuthToken(token),
     body: JSON.stringify(payload),
   });
 }
 
 export async function updateCategoryBySuperAdmin(
-  token: string,
   id: number,
   payload: { name: string },
 ): Promise<Category[]> {
   return apiFetch<Category[]>(`/superadmin/categories/${id}`, {
     method: "PUT",
-    headers: withAuthToken(token),
     body: JSON.stringify(payload),
   });
 }
 
 export async function deleteCategoryBySuperAdmin(
-  token: string,
   id: number,
 ): Promise<Category[]> {
   return apiFetch<Category[]>(`/superadmin/categories/${id}`, {
     method: "DELETE",
-    headers: withAuthToken(token),
   });
 }
 
 export async function createAdminBySuperAdmin(
-  token: string,
   payload: {
     firstName: string;
     lastName: string;
@@ -253,13 +244,11 @@ export async function createAdminBySuperAdmin(
 ): Promise<Admin> {
   return apiFetch<Admin>("/superadmin/admins", {
     method: "POST",
-    headers: withAuthToken(token),
     body: JSON.stringify(payload),
   });
 }
 
 export async function updateAdminBySuperAdmin(
-  token: string,
   id: string,
   payload: Partial<{
     firstName: string;
@@ -271,29 +260,58 @@ export async function updateAdminBySuperAdmin(
 ): Promise<Admin> {
   return apiFetch<Admin>(`/superadmin/admins/${encodeURIComponent(id)}`, {
     method: "PUT",
-    headers: withAuthToken(token),
     body: JSON.stringify(payload),
   });
 }
 
 export async function deleteAdminBySuperAdmin(
-  token: string,
   id: string,
 ): Promise<void> {
   await apiFetch(`/superadmin/admins/${encodeURIComponent(id)}`, {
     method: "DELETE",
-    headers: withAuthToken(token),
   });
 }
 
 export async function disableAdminBySuperAdmin(
-  token: string,
   id: string,
 ): Promise<Admin> {
   return apiFetch<Admin>(`/superadmin/admins/${encodeURIComponent(id)}/disable`, {
     method: "PUT",
-    headers: withAuthToken(token),
   });
+}
+
+export async function enableAdminBySuperAdmin(
+  id: string,
+): Promise<Admin> {
+  return apiFetch<Admin>(`/superadmin/admins/${encodeURIComponent(id)}/enable`, {
+    method: "PUT",
+  });
+}
+
+export async function reverifyAdmin(password: string): Promise<void> {
+  await apiFetch("/auth/admins/reverify", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+}
+
+export async function reverifySuperAdmin(password: string): Promise<void> {
+  await apiFetch("/auth/superadmin/reverify", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+  });
+}
+
+export async function logout(): Promise<void> {
+  await apiFetch("/auth/logout", { method: "POST" });
+}
+
+export async function getSessionMe(): Promise<{
+  role: string;
+  userId?: string | null;
+  adminId?: string | null;
+}> {
+  return apiFetch("/auth/me");
 }
 
 export async function updateUserProfile(
