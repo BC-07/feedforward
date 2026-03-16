@@ -32,7 +32,6 @@ import { toast } from "sonner";
 import {
   ArrowRight,
   Send,
-  LogOut,
   Search,
   Clock,
   CheckCircle,
@@ -64,6 +63,7 @@ export default function UserProfile() {
   const [formData, setFormData] = useState({
     type: "",
     category: "",
+    priority: "Medium",
     subject: "",
     message: "",
   });
@@ -138,6 +138,7 @@ export default function UserProfile() {
       const res = await submitFeedback({
         type: formData.type,
         category: formData.category.trim(),
+        priority: formData.priority,
         subject: formData.subject,
         message: formData.message,
         userId: currentUser.id,
@@ -149,7 +150,7 @@ export default function UserProfile() {
       setTrackingId(newId);
       await loadUserFeedbacks(currentUser.id);
       toast.success("Feedback submitted successfully!");
-      setFormData({ type: "", category: "", subject: "", message: "" });
+      setFormData({ type: "", category: "", priority: "Medium", subject: "", message: "" });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to submit feedback");
     } finally {
@@ -364,6 +365,27 @@ export default function UserProfile() {
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor="priority">Severity Level *</Label>
+                    <Select
+                      value={formData.priority}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, priority: value })
+                      }
+                      required
+                    >
+                      <SelectTrigger id="priority">
+                        <SelectValue placeholder="Select severity" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Low">Low</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="High">High</SelectItem>
+                        <SelectItem value="Urgent">Urgent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="subject">Subject *</Label>
                     <Input
                       id="subject"
@@ -452,9 +474,14 @@ export default function UserProfile() {
                           <p className="font-mono text-xs text-muted-foreground">{fb.id}</p>
                           <p className="font-medium text-sm truncate">{fb.subject}</p>
                         </div>
-                        <Badge className={getStatusColor(fb.status)} variant="outline">
-                          {fb.status}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getPriorityColor(fb.priority)} variant="outline">
+                            {fb.priority}
+                          </Badge>
+                          <Badge className={getStatusColor(fb.status)} variant="outline">
+                            {fb.status}
+                          </Badge>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -465,16 +492,18 @@ export default function UserProfile() {
             {/* Detail view */}
             {selectedFeedback && (
               <div className="space-y-6">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedFeedback(null);
-                    setSearchTrackingId("");
-                  }}
-                >
-                  <ChevronLeft className="mr-1 h-4 w-4" />
-                  Back to My Submissions
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedFeedback(null);
+                      setSearchTrackingId("");
+                    }}
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Back to My Submissions
+                  </Button>
+                </div>
 
                 <Card className="shadow-lg">
                   <CardContent className="pt-6">
@@ -563,7 +592,7 @@ export default function UserProfile() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-muted-foreground mb-1">
-                        Priority
+                        Severity Level
                       </p>
                       <p className={`capitalize ${getPriorityColor(selectedFeedback.priority)}`}>
                         {selectedFeedback.priority}
