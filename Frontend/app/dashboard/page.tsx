@@ -54,6 +54,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import ExcelJS from "exceljs";
 import {
   MessageSquare,
   TrendingUp,
@@ -313,6 +314,25 @@ export default function AdminDashboard() {
     return `${datePart} ${timePart}`;
   };
 
+  const buildFileNameBase = () => {
+    const now = new Date();
+    const pad2 = (value: number) => String(value).padStart(2, "0");
+    const dateStamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(
+      now.getDate(),
+    )}`;
+    const timeStamp = `${pad2(now.getHours())}${pad2(now.getMinutes())}`;
+    const categoryStamp = (currentAdmin?.unit || "All")
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9-_]/g, "");
+    const statusStamp =
+      filterStatus === "all"
+        ? "All"
+        : filterStatus === "inprogress"
+          ? "In-Progress"
+          : filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1);
+    return `feedback-report_${categoryStamp}_${statusStamp}_${dateStamp}_${timeStamp}`;
+  };
+
   const exportFeedbacksPdf = () => {
     const rows = filteredFeedbacks.map((feedback) => ({
       id: feedback.id,
@@ -339,23 +359,8 @@ export default function AdminDashboard() {
       ? filterParts.join(" | ")
       : "No filters applied";
 
-    const now = new Date();
-    const nowText = now.toLocaleString("en-US");
-    const pad2 = (value: number) => String(value).padStart(2, "0");
-    const dateStamp = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(
-      now.getDate(),
-    )}`;
-    const timeStamp = `${pad2(now.getHours())}${pad2(now.getMinutes())}`;
-    const categoryStamp = (currentAdmin?.unit || "All")
-      .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9-_]/g, "");
-    const statusStamp =
-      filterStatus === "all"
-        ? "All"
-        : filterStatus === "inprogress"
-          ? "In-Progress"
-          : filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1);
-    const fileName = `feedback-report_${categoryStamp}_${statusStamp}_${dateStamp}_${timeStamp}.pdf`;
+    const nowText = new Date().toLocaleString("en-US");
+    const fileName = `${buildFileNameBase()}.pdf`;
 
     const doc = new jsPDF({
       orientation: "landscape",
@@ -380,7 +385,7 @@ export default function AdminDashboard() {
         40,
         110,
       );
-      doc.save("feedback-report.pdf");
+      doc.save(fileName);
       return;
     }
 
@@ -436,6 +441,50 @@ export default function AdminDashboard() {
     });
 
     doc.save(fileName);
+  };
+
+  const exportFeedbacksXlsx = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Feedback");
+
+    worksheet.columns = [
+      { header: "ID", key: "id", width: 14 },
+      { header: "Type", key: "type", width: 12 },
+      { header: "Status", key: "status", width: 14 },
+      { header: "Priority", key: "priority", width: 10 },
+      { header: "Submitted", key: "submitted", width: 20 },
+      { header: "Subject", key: "subject", width: 30 },
+      { header: "Message", key: "message", width: 60 },
+    ];
+
+    worksheet.getRow(1).font = { bold: true };
+
+    filteredFeedbacks.forEach((feedback) => {
+      worksheet.addRow({
+        id: feedback.id,
+        type: feedback.type,
+        status: feedback.status,
+        priority: feedback.priority,
+        submitted: formatSubmittedAt(feedback.createdAt),
+        subject: feedback.subject,
+        message: feedback.message,
+      });
+    });
+
+    worksheet.columns.forEach((column) => {
+      column.alignment = { vertical: "top", wrapText: true };
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${buildFileNameBase()}.xlsx`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -528,13 +577,18 @@ export default function AdminDashboard() {
               <Search className="h-5 w-5" />
               Search &amp; Filter
             </CardTitle>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={exportFeedbacksPdf}
-            >
-              Export PDF
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={exportFeedbacksPdf}
+              >
+                Export PDF
+              </Button>
+              <Button type="button" variant="outline" onClick={exportFeedbacksXlsx}>
+                Export XLSX
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3 items-end">
