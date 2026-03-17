@@ -247,11 +247,14 @@ func ListAdmins(c *fiber.Ctx) error {
 	if err := ensureAdminDisableColumn(); err != nil {
 		return serverError(c, "failed to initialize admin access state", err)
 	}
+	if err := ensureAdminSuperAdminColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
+	}
 
 	var admins []model.AdminModel
 	if err := middleware.DBConn.Raw(
-		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, created_at, updated_at
-		FROM ` + adminTable + ` ORDER BY unit ASC, first_name ASC, last_name ASC`,
+		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, COALESCE(is_superadmin, FALSE) AS is_superadmin, created_at, updated_at
+		FROM ` + adminTable + ` WHERE COALESCE(is_superadmin, FALSE) = FALSE ORDER BY unit ASC, first_name ASC, last_name ASC`,
 	).Scan(&admins).Error; err != nil {
 		return serverError(c, "failed to fetch admins", err)
 	}

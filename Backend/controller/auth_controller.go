@@ -59,6 +59,9 @@ func RegisterAdmin(c *fiber.Ctx) error {
 	if err := ensureAdminDisableColumn(); err != nil {
 		return serverError(c, "failed to initialize admin access state", err)
 	}
+	if err := ensureAdminSuperAdminColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
+	}
 
 	//Storage preparation
 	var payload model.AdminModel
@@ -151,6 +154,9 @@ func LoginAdmin(c *fiber.Ctx) error {
 	if err := ensureAdminDisableColumn(); err != nil {
 		return serverError(c, "failed to initialize admin access state", err)
 	}
+	if err := ensureAdminSuperAdminColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
+	}
 
 	//Storage preparation
 	var payload struct {
@@ -165,7 +171,7 @@ func LoginAdmin(c *fiber.Ctx) error {
 
 	var admin model.AdminModel
 	if err := middleware.DBConn.Raw(
-		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, created_at, updated_at
+		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, COALESCE(is_superadmin, FALSE) AS is_superadmin, created_at, updated_at
 		FROM `+adminTable+` WHERE email = ? AND password = ?`,
 		strings.TrimSpace(payload.Email),
 		strings.TrimSpace(payload.Password),
@@ -176,7 +182,26 @@ func LoginAdmin(c *fiber.Ctx) error {
 		return unauthorized(c, "invalid email or password")
 	}
 	if admin.IsDisabled {
+		if admin.IsSuperAdmin {
+			return unauthorized(c, "superadmin account is disabled")
+		}
 		return unauthorized(c, "admin account is disabled")
+	}
+
+	if admin.IsSuperAdmin {
+		displayName := strings.TrimSpace(admin.Name)
+		if displayName == "" {
+			displayName = strings.TrimSpace(admin.Email)
+		}
+		if displayName == "" {
+			displayName = "superadmin"
+		}
+		session, err := createSession(sessionRoleSuperAdmin, nil, &admin.ID, &displayName, superAdminTTL)
+		if err != nil {
+			return serverError(c, "failed to create superadmin session", err)
+		}
+		setSessionCookie(c, session)
+		return success(c, fiber.StatusOK, admin)
 	}
 
 	session, err := createSession(sessionRoleAdmin, nil, &admin.ID, nil, adminSessionTTL)
@@ -190,6 +215,7 @@ func LoginAdmin(c *fiber.Ctx) error {
 
 func LoginSuperAdmin(c *fiber.Ctx) error {
 	var payload struct {
+		Email    string `json:"email"`
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
@@ -198,12 +224,47 @@ func LoginSuperAdmin(c *fiber.Ctx) error {
 		return parseError(c, "failed to parse superadmin login", err)
 	}
 
-	if strings.TrimSpace(payload.Username) != superAdminUsername() || strings.TrimSpace(payload.Password) != superAdminPassword() {
-		return unauthorized(c, "invalid superadmin credentials")
+	if err := ensureAdminSuperAdminColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
+	}
+	if err := ensureAdminDisableColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
 	}
 
-	username := superAdminUsername()
-	session, err := createSession(sessionRoleSuperAdmin, nil, nil, &username, superAdminTTL)
+	identifier := strings.TrimSpace(payload.Email)
+	if identifier == "" {
+		identifier = strings.TrimSpace(payload.Username)
+	}
+	password := strings.TrimSpace(payload.Password)
+	if identifier == "" || password == "" {
+		return invalidRequest(c, "email and password are required")
+	}
+
+	var admin model.AdminModel
+	if err := middleware.DBConn.Raw(
+		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, COALESCE(is_superadmin, FALSE) AS is_superadmin, created_at, updated_at
+		FROM `+adminTable+` WHERE LOWER(email) = LOWER(?) AND password = ? AND COALESCE(is_superadmin, FALSE) = TRUE`,
+		identifier,
+		password,
+	).Scan(&admin).Error; err != nil {
+		return serverError(c, "failed to login superadmin", err)
+	}
+
+	if admin.ID == "" || !admin.IsSuperAdmin {
+		return unauthorized(c, "invalid superadmin credentials")
+	}
+	if admin.IsDisabled {
+		return unauthorized(c, "superadmin account is disabled")
+	}
+
+	username := strings.TrimSpace(admin.Name)
+	if username == "" {
+		username = strings.TrimSpace(admin.Email)
+	}
+	if username == "" {
+		username = superAdminUsername()
+	}
+	session, err := createSession(sessionRoleSuperAdmin, nil, &admin.ID, &username, superAdminTTL)
 	if err != nil {
 		return serverError(c, "failed to create superadmin session", err)
 	}
@@ -276,13 +337,41 @@ func ReverifySuperAdmin(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	if err := ensureAdminSuperAdminColumn(); err != nil {
+		return serverError(c, "failed to initialize admin access state", err)
+	}
 	var payload struct {
 		Password string `json:"password"`
 	}
 	if err := parseBody(c, &payload); err != nil {
 		return parseError(c, "failed to parse reverify request", err)
 	}
-	if strings.TrimSpace(payload.Password) != superAdminPassword() {
+	password := strings.TrimSpace(payload.Password)
+	if password == "" {
+		return invalidRequest(c, "password is required")
+	}
+
+	adminID := ""
+	if session.AdminID != nil {
+		adminID = strings.TrimSpace(*session.AdminID)
+	}
+	if adminID != "" {
+		var credential struct {
+			Password string `json:"password"`
+		}
+		if err := middleware.DBConn.Raw(
+			`SELECT password FROM `+adminTable+` WHERE id = ? AND COALESCE(is_superadmin, FALSE) = TRUE`,
+			adminID,
+		).Scan(&credential).Error; err != nil {
+			return serverError(c, "failed to load superadmin credentials", err)
+		}
+		if strings.TrimSpace(credential.Password) == "" {
+			return unauthorized(c, "invalid superadmin session")
+		}
+		if strings.TrimSpace(credential.Password) != password {
+			return unauthorized(c, "invalid credentials")
+		}
+	} else if password != superAdminPassword() {
 		return unauthorized(c, "invalid credentials")
 	}
 

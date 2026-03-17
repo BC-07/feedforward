@@ -33,6 +33,7 @@ export interface Admin {
   email: string;
   unit: string;
   isDisabled?: boolean;
+  isSuperAdmin?: boolean;
   createdAt: string;
   updatedAt: string;
 }
