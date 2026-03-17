@@ -44,6 +44,7 @@ type (
 		Password   string    `json:"password,omitempty" gorm:"column:password"`
 		Unit       string    `json:"unit" gorm:"column:unit"`
 		IsDisabled bool      `json:"isDisabled" gorm:"column:is_disabled"`
+		IsSuperAdmin bool    `json:"isSuperAdmin" gorm:"column:is_superadmin"`
 		CreatedAt  time.Time `json:"createdAt" gorm:"column:created_at"`
 		UpdatedAt  time.Time `json:"updatedAt" gorm:"column:updated_at"`
 	}

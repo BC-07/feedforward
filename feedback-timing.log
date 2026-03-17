@@ -68,3 +68,29 @@
 2026/03/16 11:32:57 CreateFeedback 127.0.0.1 sendTrackingEmail queued=0s
 2026/03/16 11:32:57 CreateFeedback 127.0.0.1 total=3.795ms
 2026/03/16 11:33:00 CreateFeedback 127.0.0.1 sendTrackingEmail async duration=3.6125125s queuedDelay=0s
+2026/03/16 14:47:27 ------------------------------------------------------------------------
+2026/03/16 14:47:27 CreateFeedback 127.0.0.1
+2026/03/16 14:47:27 ------------------------------------------------------------------------
+2026/03/16 14:47:27 CreateFeedback 127.0.0.1 ensureFeedbackEmailColumn=1.0674ms
+2026/03/16 14:47:27 CreateFeedback 127.0.0.1 trackingId=FF-MMSTMT7O
+2026/03/16 14:47:27 CreateFeedback 127.0.0.1 parse+normalize=3.805ms
+2026/03/16 14:47:27 CreateFeedback 127.0.0.1 resolveUserByEmail=0s
+2026/03/16 14:47:27 CreateFeedback 127.0.0.1 resolveUserByID=1.4828ms
+2026/03/16 14:47:27 CreateFeedback 127.0.0.1 insertFeedback=2.3216ms
+2026/03/16 14:47:27 CreateFeedback 127.0.0.1 fetchFeedbackByID=1.1138ms
+2026/03/16 14:47:27 CreateFeedback 127.0.0.1 sendTrackingEmail queued=0s
+2026/03/16 14:47:27 CreateFeedback 127.0.0.1 total=10.5117ms
+2026/03/16 14:47:32 CreateFeedback 127.0.0.1 sendTrackingEmail async duration=4.4894896s queuedDelay=0s
+2026/03/16 14:48:17 ------------------------------------------------------------------------
+2026/03/16 14:48:17 CreateFeedback 127.0.0.1
+2026/03/16 14:48:17 ------------------------------------------------------------------------
+2026/03/16 14:48:17 CreateFeedback 127.0.0.1 ensureFeedbackEmailColumn=0s
+2026/03/16 14:48:17 CreateFeedback 127.0.0.1 trackingId=FF-MMSTNVHX
+2026/03/16 14:48:17 CreateFeedback 127.0.0.1 parse+normalize=2.0457ms
+2026/03/16 14:48:17 CreateFeedback 127.0.0.1 resolveUserByEmail=0s
+2026/03/16 14:48:17 CreateFeedback 127.0.0.1 resolveUserByID=765.8µs
+2026/03/16 14:48:17 CreateFeedback 127.0.0.1 insertFeedback=1.7177ms
+2026/03/16 14:48:17 CreateFeedback 127.0.0.1 fetchFeedbackByID=512.3µs
+2026/03/16 14:48:17 CreateFeedback 127.0.0.1 sendTrackingEmail queued=0s
+2026/03/16 14:48:17 CreateFeedback 127.0.0.1 total=5.0415ms
+2026/03/16 14:48:20 CreateFeedback 127.0.0.1 sendTrackingEmail async duration=3.721208s queuedDelay=0s

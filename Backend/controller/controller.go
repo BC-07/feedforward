@@ -91,6 +91,8 @@ var categoryTableInit sync.Once
 var categoryTableInitErr error
 var adminDisableColumnInit sync.Once
 var adminDisableColumnErr error
+var adminSuperAdminColumnInit sync.Once
+var adminSuperAdminColumnErr error
 var feedbackEmailColumnInit sync.Once
 var feedbackEmailColumnErr error
 var sessionTableInit sync.Once
@@ -147,11 +149,14 @@ func fetchAdminByID(id string) (model.AdminModel, error) {
 	if err := ensureAdminDisableColumn(); err != nil {
 		return model.AdminModel{}, err
 	}
+	if err := ensureAdminSuperAdminColumn(); err != nil {
+		return model.AdminModel{}, err
+	}
 
 	var admin model.AdminModel
 	// Compose the display name in SQL because the table stores first and last names separately.
 	err := middleware.DBConn.Raw(
-		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, created_at, updated_at
+		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, COALESCE(is_superadmin, FALSE) AS is_superadmin, created_at, updated_at
 		FROM `+adminTable+` WHERE id = ?`,
 		id,
 	).Scan(&admin).Error
@@ -235,6 +240,10 @@ func normalizeFeedback(feedback *model.FeedbackModel) error {
 func ensureCategoryStore() error {
 	categoryTableInit.Do(func() {
 		db := middleware.DBConn
+		if err := ensureAdminSuperAdminColumn(); err != nil {
+			categoryTableInitErr = err
+			return
+		}
 
 		categoryTableInitErr = db.Exec(
 			`CREATE TABLE IF NOT EXISTS ` + categoryTable + ` (
@@ -261,7 +270,7 @@ func ensureCategoryStore() error {
 		if err := db.Exec(
 			`INSERT INTO ` + categoryTable + ` (name)
 			 SELECT DISTINCT TRIM(unit) FROM ` + adminTable + `
-			 WHERE unit IS NOT NULL AND TRIM(unit) <> ''
+			 WHERE unit IS NOT NULL AND TRIM(unit) <> '' AND COALESCE(is_superadmin, FALSE) = FALSE
 			 ON CONFLICT (name) DO NOTHING`,
 		).Error; err != nil {
 			categoryTableInitErr = err
@@ -288,6 +297,15 @@ func ensureAdminDisableColumn() error {
 		).Error
 	})
 	return adminDisableColumnErr
+}
+
+func ensureAdminSuperAdminColumn() error {
+	adminSuperAdminColumnInit.Do(func() {
+		adminSuperAdminColumnErr = middleware.DBConn.Exec(
+			`ALTER TABLE ` + adminTable + ` ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN NOT NULL DEFAULT FALSE`,
+		).Error
+	})
+	return adminSuperAdminColumnErr
 }
 
 func ensureFeedbackEmailColumn() error {
@@ -807,8 +825,11 @@ func deleteByID(c *fiber.Ctx, table string, entity string, id string) error {
 
 // Enforce one admin per unit in application logic because the live schema does not.
 func adminUnitTaken(unit string, excludeID string) (bool, error) {
+	if err := ensureAdminSuperAdminColumn(); err != nil {
+		return false, err
+	}
 	var count int64
-	query := `SELECT COUNT(*) FROM ` + adminTable + ` WHERE unit = ?`
+	query := `SELECT COUNT(*) FROM ` + adminTable + ` WHERE unit = ? AND COALESCE(is_superadmin, FALSE) = FALSE`
 	args := []any{unit}
 	if excludeID != "" {
 		query += ` AND id <> ?`

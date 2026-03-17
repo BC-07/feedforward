@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { loginAdmin, loginSuperAdmin, loginUser } from "@/lib/api";
+import { loginAdmin, loginUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,21 +21,6 @@ export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [superAdminUsername, setSuperAdminUsername] = useState("");
-  const [superAdminPassword, setSuperAdminPassword] = useState("");
-  const [showSuperAdmin, setShowSuperAdmin] = useState(false);
-
-  useEffect(() => {
-    const handleShortcut = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        setShowSuperAdmin(true);
-      }
-    };
-
-    window.addEventListener("keydown", handleShortcut);
-    return () => window.removeEventListener("keydown", handleShortcut);
-  }, []);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -53,6 +38,9 @@ export default function Login() {
       localStorage.removeItem("currentAdminName");
       localStorage.removeItem("currentAdminEmail");
       localStorage.removeItem("currentAdminDepartment");
+      localStorage.removeItem("isSuperAdminLoggedIn");
+      localStorage.removeItem("superAdminName");
+      localStorage.removeItem("superAdminExpiresAt");
       toast.success(`Welcome back, ${user.name}!`);
       router.push("/user");
       return;
@@ -65,6 +53,24 @@ export default function Login() {
         email,
         password,
       });
+      if (admin.isSuperAdmin) {
+        const superName = admin.name || admin.email || "Superadmin";
+        localStorage.setItem("isSuperAdminLoggedIn", "true");
+        localStorage.setItem("superAdminName", superName);
+        localStorage.removeItem("superAdminExpiresAt");
+        localStorage.removeItem("isAdminLoggedIn");
+        localStorage.removeItem("currentAdminId");
+        localStorage.removeItem("currentAdminName");
+        localStorage.removeItem("currentAdminEmail");
+        localStorage.removeItem("currentAdminDepartment");
+        localStorage.removeItem("isUserLoggedIn");
+        localStorage.removeItem("currentUserId");
+        localStorage.removeItem("currentUserName");
+        localStorage.removeItem("currentUserEmail");
+        toast.success(`Welcome back, ${superName}!`);
+        router.push("/superadmin");
+        return;
+      }
       localStorage.setItem("isAdminLoggedIn", "true");
       localStorage.setItem("currentAdminId", admin.id);
       localStorage.setItem("currentAdminName", admin.name);
@@ -74,30 +80,14 @@ export default function Login() {
       localStorage.removeItem("currentUserId");
       localStorage.removeItem("currentUserName");
       localStorage.removeItem("currentUserEmail");
+      localStorage.removeItem("isSuperAdminLoggedIn");
+      localStorage.removeItem("superAdminName");
+      localStorage.removeItem("superAdminExpiresAt");
       toast.success(`Welcome back, ${admin.name}!`);
       router.push("/dashboard");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Invalid email or password",
-      );
-    }
-  };
-
-  const handleSuperAdminLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    try {
-      const session = await loginSuperAdmin({
-        username: superAdminUsername,
-        password: superAdminPassword,
-      });
-      localStorage.setItem("isSuperAdminLoggedIn", "true");
-      localStorage.setItem("superAdminName", session.username);
-      localStorage.setItem("superAdminExpiresAt", session.expiresAt);
-      toast.success("Superadmin access granted");
-      router.push("/superadmin");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Invalid superadmin credentials",
       );
     }
   };
@@ -160,46 +150,6 @@ export default function Login() {
             </p>
           </form>
 
-          {showSuperAdmin && (
-            <div className="mt-6 border-t pt-6">
-              <div className="mb-4 text-center">
-                <p className="text-sm font-semibold text-primary">
-                  Restricted Console
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Hidden access for system-level administration
-                </p>
-              </div>
-              <form onSubmit={handleSuperAdminLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="superadmin-username">Username</Label>
-                  <Input
-                    id="superadmin-username"
-                    value={superAdminUsername}
-                    onChange={(e) => setSuperAdminUsername(e.target.value)}
-                    placeholder="Enter superadmin username"
-                    autoComplete="username"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="superadmin-password">Password</Label>
-                  <Input
-                    id="superadmin-password"
-                    type="password"
-                    value={superAdminPassword}
-                    onChange={(e) => setSuperAdminPassword(e.target.value)}
-                    placeholder="Enter superadmin password"
-                    autoComplete="current-password"
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" variant="secondary">
-                  Open Superadmin Dashboard
-                </Button>
-              </form>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>
