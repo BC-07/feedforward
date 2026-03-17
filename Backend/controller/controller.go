@@ -11,9 +11,6 @@ import (
 	"intern_template_v1/model/errors"
 	"intern_template_v1/model/response"
 	"intern_template_v1/model/status"
-	"log"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -99,14 +96,6 @@ var feedbackEmailColumnInit sync.Once
 var feedbackEmailColumnErr error
 var sessionTableInit sync.Once
 var sessionTableErr error
-var feedbackTimingLoggerOnce sync.Once
-var feedbackTimingLogger *log.Logger
-var feedbackTimingLoggerErr error
-var feedbackTimingFile *os.File
-var feedbackTimingMu sync.Mutex
-var feedbackTimingEntries int
-
-const feedbackTimingMaxEntries = 3
 
 func fetchFeedbackByID(id string) (model.FeedbackModel, error) {
 	if err := ensureFeedbackEmailColumn(); err != nil {
@@ -942,78 +931,5 @@ func shouldSendResolvedEmail(previous model.FeedbackModel, updated model.Feedbac
 
 func utcNow() time.Time {
 	return time.Now().UTC()
-}
-
-func logTimingf(format string, args ...any) {
-	logger, err := feedbackTimingLoggerHandle()
-	if err != nil || logger == nil {
-		return
-	}
-	logger.Printf(format, args...)
-}
-
-func feedbackTimingLoggerHandle() (*log.Logger, error) {
-	feedbackTimingLoggerOnce.Do(func() {
-		if err := feedbackTimingOpenLogger(false); err != nil {
-			feedbackTimingLoggerErr = err
-			return
-		}
-	})
-	return feedbackTimingLogger, feedbackTimingLoggerErr
-}
-
-func feedbackTimingLogPath() string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "feedback-timing.log"
-	}
-	if strings.EqualFold(filepath.Base(cwd), "Backend") {
-		parent := filepath.Dir(cwd)
-		return filepath.Join(parent, "feedback-timing.log")
-	}
-	return filepath.Join(cwd, "feedback-timing.log")
-}
-
-func logTimingStart(prefix string, id string) {
-	feedbackTimingMu.Lock()
-	defer feedbackTimingMu.Unlock()
-
-	if feedbackTimingEntries >= feedbackTimingMaxEntries {
-		_ = feedbackTimingOpenLogger(true)
-		feedbackTimingEntries = 0
-	}
-	feedbackTimingEntries++
-
-	logger, err := feedbackTimingLoggerHandle()
-	if err != nil || logger == nil {
-		return
-	}
-
-	divider := strings.Repeat("-", 72)
-	meta := prefix
-	if strings.TrimSpace(id) != "" {
-		meta = fmt.Sprintf("%s id=%s", prefix, strings.TrimSpace(id))
-	}
-	logger.Printf("%s", divider)
-	logger.Printf("%s", meta)
-	logger.Printf("%s", divider)
-}
-
-func feedbackTimingOpenLogger(truncate bool) error {
-	path := feedbackTimingLogPath()
-	flags := os.O_CREATE | os.O_APPEND | os.O_WRONLY
-	if truncate {
-		flags = os.O_CREATE | os.O_TRUNC | os.O_WRONLY
-	}
-	file, err := os.OpenFile(path, flags, 0644)
-	if err != nil {
-		return err
-	}
-	if feedbackTimingFile != nil {
-		_ = feedbackTimingFile.Close()
-	}
-	feedbackTimingFile = file
-	feedbackTimingLogger = log.New(file, "", log.LstdFlags)
-	return nil
 }
 

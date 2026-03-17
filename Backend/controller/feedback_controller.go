@@ -5,7 +5,6 @@ import (
 	"intern_template_v1/middleware"
 	"intern_template_v1/model"
 	"strings"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -112,16 +111,10 @@ func GetFeedbackByID(c *fiber.Ctx) error {
 }
 
 func CreateFeedback(c *fiber.Ctx) error {
-	started := time.Now()
-	stepStart := started
-	logPrefix := fmt.Sprintf("CreateFeedback %s", c.IP())
-	logTimingStart(logPrefix, "")
 	db := middleware.DBConn
 	if err := ensureFeedbackEmailColumn(); err != nil {
 		return serverError(c, "failed to initialize feedback email storage", err)
 	}
-	logTimingf("%s ensureFeedbackEmailColumn=%s", logPrefix, time.Since(stepStart))
-	stepStart = time.Now()
 
 	//Storage preparation
 	var feedback model.FeedbackModel
@@ -135,9 +128,6 @@ func CreateFeedback(c *fiber.Ctx) error {
 		return invalidRequest(c, err.Error())
 	}
 	feedback.IsAnonymous = false
-	logTimingf("%s trackingId=%s", logPrefix, feedback.ID)
-	logTimingf("%s parse+normalize=%s", logPrefix, time.Since(stepStart))
-	stepStart = time.Now()
 
 	if feedback.UserID == nil && feedback.UserEmail != nil {
 		user, err := fetchUserByEmail(*feedback.UserEmail)
@@ -157,8 +147,6 @@ func CreateFeedback(c *fiber.Ctx) error {
 			feedback.UserEmail = &email
 		}
 	}
-	logTimingf("%s resolveUserByEmail=%s", logPrefix, time.Since(stepStart))
-	stepStart = time.Now()
 
 	if feedback.UserID != nil && (feedback.UserEmail == nil || strings.TrimSpace(*feedback.UserEmail) == "") {
 		user, err := fetchUserByID(strings.TrimSpace(*feedback.UserID))
@@ -187,8 +175,6 @@ func CreateFeedback(c *fiber.Ctx) error {
 			feedback.UserEmail = &email
 		}
 	}
-	logTimingf("%s resolveUserByID=%s", logPrefix, time.Since(stepStart))
-	stepStart = time.Now()
 
 	now := utcNow()
 	if feedback.CreatedAt.IsZero() {
@@ -217,43 +203,28 @@ func CreateFeedback(c *fiber.Ctx) error {
 	).Error; err != nil {
 		return serverError(c, "failed to create feedback", err)
 	}
-	logTimingf("%s insertFeedback=%s", logPrefix, time.Since(stepStart))
-	stepStart = time.Now()
 
 	created, err := fetchFeedbackByID(feedback.ID)
 	if err != nil {
 		return serverError(c, "failed to fetch feedback", err)
 	}
-	logTimingf("%s fetchFeedbackByID=%s", logPrefix, time.Since(stepStart))
-	stepStart = time.Now()
 
-	queuedAt := time.Now()
 	createdCopy := created
-	go func(feedback model.FeedbackModel, queued time.Time) {
-		emailStart := time.Now()
+	go func(feedback model.FeedbackModel) {
 		if err := sendTrackingEmailForFeedback(feedback); err != nil {
 			fmt.Printf("email: failed to send tracking notification for %s: %v\n", feedback.ID, err)
 			return
 		}
-		logTimingf("%s sendTrackingEmail async duration=%s queuedDelay=%s", logPrefix, time.Since(emailStart), emailStart.Sub(queued))
-	}(createdCopy, queuedAt)
-	logTimingf("%s sendTrackingEmail queued=%s", logPrefix, time.Since(stepStart))
-	logTimingf("%s total=%s", logPrefix, time.Since(started))
+	}(createdCopy)
 
 	return success(c, fiber.StatusCreated, created)
 }
 
 func UpdateFeedback(c *fiber.Ctx) error {
-	started := time.Now()
-	stepStart := started
-	logPrefix := fmt.Sprintf("UpdateFeedback %s", c.IP())
-	logTimingStart(logPrefix, c.Params("id"))
 	db := middleware.DBConn
 	if err := ensureFeedbackEmailColumn(); err != nil {
 		return serverError(c, "failed to initialize feedback email storage", err)
 	}
-	logTimingf("%s ensureFeedbackEmailColumn=%s", logPrefix, time.Since(stepStart))
-	stepStart = time.Now()
 
 	existing, err := fetchFeedbackByID(c.Params("id"))
 	if err != nil {
@@ -262,15 +233,11 @@ func UpdateFeedback(c *fiber.Ctx) error {
 	if existing.ID == "" {
 		return notFound(c, "feedback not found", nil)
 	}
-	logTimingf("%s fetchExisting=%s", logPrefix, time.Since(stepStart))
-	stepStart = time.Now()
 
 	var payload map[string]any
 	if err := parseBody(c, &payload); err != nil {
 		return parseError(c, "failed to parse feedback update", err)
 	}
-	logTimingf("%s parsePayload=%s", logPrefix, time.Since(stepStart))
-	stepStart = time.Now()
 
 	// Only update fields that were actually sent by the client.
 	var sets []string
@@ -347,32 +314,21 @@ func UpdateFeedback(c *fiber.Ctx) error {
 	if result.RowsAffected == 0 {
 		return notFound(c, "feedback not found", nil)
 	}
-	logTimingf("%s updateFeedback=%s", logPrefix, time.Since(stepStart))
-	stepStart = time.Now()
 
 	updated, err := fetchFeedbackByID(c.Params("id"))
 	if err != nil {
 		return serverError(c, "failed to fetch feedback", err)
 	}
-	logTimingf("%s fetchUpdated=%s", logPrefix, time.Since(stepStart))
-	stepStart = time.Now()
 
 	if shouldSendResolvedEmail(existing, updated) {
-		queuedAt := time.Now()
 		updatedCopy := updated
-		go func(feedback model.FeedbackModel, queued time.Time) {
-			emailStart := time.Now()
+		go func(feedback model.FeedbackModel) {
 			if err := sendResolvedEmailForFeedback(feedback); err != nil {
 				fmt.Printf("email: failed to send resolved notification for %s: %v\n", feedback.ID, err)
 				return
 			}
-			logTimingf("%s sendResolvedEmail async duration=%s queuedDelay=%s", logPrefix, time.Since(emailStart), emailStart.Sub(queued))
-		}(updatedCopy, queuedAt)
-		logTimingf("%s sendResolvedEmail queued=%s", logPrefix, time.Since(stepStart))
-		stepStart = time.Now()
+		}(updatedCopy)
 	}
-
-	logTimingf("%s total=%s", logPrefix, time.Since(started))
 
 	return success(c, fiber.StatusOK, updated)
 }
