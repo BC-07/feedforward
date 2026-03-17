@@ -33,7 +33,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
   ArrowRight,
@@ -44,8 +50,6 @@ import {
   CheckCircle,
   Circle,
   MessageCircle,
-  User,
-  UserX,
   ChevronLeft,
 } from "lucide-react";
 
@@ -65,7 +69,6 @@ export default function UserProfile() {
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
-  const [isAnonymous, setIsAnonymous] = useState(true);
   const [formData, setFormData] = useState({
     type: "",
     category: "",
@@ -73,6 +76,8 @@ export default function UserProfile() {
     subject: "",
     message: "",
   });
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [confirmData, setConfirmData] = useState(formData);
   const [categories, setCategories] = useState<string[]>([]);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
@@ -238,22 +243,30 @@ export default function UserProfile() {
     document.body.removeChild(textArea);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
 
-    const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
+    setConfirmData({
+      ...formData,
+      category: formData.category.trim(),
+    });
+    setIsConfirmOpen(true);
+  };
 
+  const handleConfirmSubmit = async () => {
+    if (!currentUser) return;
+    const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
     try {
       await createFeedback({
         id: newTrackingId,
-        type: formData.type,
-        category: formData.category.trim(),
-        subject: formData.subject,
-        message: formData.message,
+        type: confirmData.type,
+        category: confirmData.category.trim(),
+        subject: confirmData.subject,
+        message: confirmData.message,
         status: "Pending",
-        priority: formData.priority || "Medium",
-        isAnonymous,
+        priority: confirmData.priority || "Medium",
+        isAnonymous: false,
         userId: currentUser.id,
         userName: currentUser.fullName,
         userEmail: currentUser.email,
@@ -270,6 +283,7 @@ export default function UserProfile() {
         subject: "",
         message: "",
       });
+      setIsConfirmOpen(false);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to submit feedback.";
@@ -277,9 +291,7 @@ export default function UserProfile() {
         handleLogout();
         return;
       }
-      toast.error(
-        message,
-      );
+      toast.error(message);
     }
   };
 
@@ -389,12 +401,21 @@ export default function UserProfile() {
     }));
   };
 
+  const formatMessagePreview = (value: string) => {
+    if (!value) return value;
+    let result = value.replace(/(^\s*[a-z])/, (match) => match.toUpperCase());
+    result = result.replace(/([.!?]\s+)([a-z])/g, (_, spacer, letter) => {
+      return spacer + String(letter).toUpperCase();
+    });
+    return result;
+  };
+
   return (
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
       {trackingId && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-8">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-8 animate-in fade-in-0">
           <div className="w-full max-w-lg">
-            <Card className="shadow-lg">
+            <Card className="shadow-lg animate-in zoom-in-95 fade-in-0">
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
                   <ArrowRight className="h-8 w-8 text-accent" />
@@ -503,39 +524,11 @@ export default function UserProfile() {
                 <CardHeader>
                   <CardTitle>Feedback Form</CardTitle>
                   <CardDescription>
-                    All submissions are anonymous and confidential
+                    Review your feedback before submitting
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
-                      <div className="flex items-center gap-3">
-                        {isAnonymous ? (
-                          <UserX className="h-5 w-5 text-accent" />
-                        ) : (
-                          <User className="h-5 w-5 text-accent" />
-                        )}
-                        <div>
-                          <Label
-                            htmlFor="anonymous"
-                            className="text-base cursor-pointer"
-                          >
-                            Submit Anonymously
-                          </Label>
-                          <p className="text-xs text-muted-foreground">
-                            {isAnonymous
-                              ? "Your identity will be kept confidential"
-                              : "Your name will be visible to administrators"}
-                          </p>
-                        </div>
-                      </div>
-                      <Switch
-                        id="anonymous"
-                        checked={isAnonymous}
-                        onCheckedChange={setIsAnonymous}
-                      />
-                    </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="type">Feedback Type *</Label>
                       <Select
@@ -763,7 +756,7 @@ export default function UserProfile() {
                         <p className="text-sm font-semibold text-muted-foreground mb-1">
                           Subject
                         </p>
-                        <p className="font-semibold">
+                        <p className="font-semibold break-words">
                           {selectedFeedback.subject}
                         </p>
                       </div>
@@ -771,7 +764,7 @@ export default function UserProfile() {
                         <p className="text-sm font-semibold text-muted-foreground mb-1">
                           Message
                         </p>
-                        <p className="text-sm leading-relaxed">
+                        <p className="text-sm leading-relaxed break-all">
                           {selectedFeedback.message}
                         </p>
                       </div>
@@ -870,6 +863,57 @@ export default function UserProfile() {
           </div>
         </div>
       </div>
+
+      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <DialogContent className="animate-in fade-in-0 zoom-in-95">
+          <DialogHeader>
+            <DialogTitle>Confirm Your Feedback</DialogTitle>
+            <DialogDescription>
+              Please review the details before submitting.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="min-h-[64px] min-w-0 rounded-lg border border-l-4 border-l-orange-400 bg-muted/40 px-3 py-2">
+                  <p className="text-[11px] uppercase text-muted-foreground">Type</p>
+                  <p className="capitalize font-semibold">{confirmData.type}</p>
+                </div>
+                <div className="min-h-[64px] min-w-0 rounded-lg border border-l-4 border-l-orange-400 bg-muted/40 px-3 py-2">
+                  <p className="text-[11px] uppercase text-muted-foreground">Category</p>
+                  <p className="font-semibold break-words">{confirmData.category}</p>
+                </div>
+                <div className="min-h-[64px] min-w-0 rounded-lg border border-l-4 border-l-orange-400 bg-muted/40 px-3 py-2">
+                  <p className="text-[11px] uppercase text-muted-foreground">Severity</p>
+                  <p className="font-semibold capitalize">{confirmData.priority}</p>
+                </div>
+              </div>
+              <div className="min-h-[64px] min-w-0 rounded-lg border border-l-4 border-l-orange-400 bg-muted/30 px-3 py-2">
+                <p className="text-[11px] uppercase text-muted-foreground">Subject</p>
+                <p className="break-all text-sm font-semibold text-foreground">
+                  {formatMessagePreview(confirmData.subject)}
+                </p>
+              </div>
+              <div className="min-h-[120px] min-w-0 rounded-lg border border-l-4 border-l-orange-400 bg-muted/30 px-3 py-2">
+                <p className="text-[11px] uppercase text-muted-foreground">Message</p>
+                <p className="whitespace-pre-wrap break-all text-sm text-foreground">
+                  {formatMessagePreview(confirmData.message)}
+                </p>
+              </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmSubmit}
+              className="bg-accent hover:bg-accent/90"
+            >
+              Confirm & Submit
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
