@@ -532,7 +532,7 @@ export default function AdminDashboard() {
       <div className="container mx-auto px-4 py-8">
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card>
+          <Card className="shadow-lg">
             <CardHeader className="pb-3">
               <CardDescription>Total Feedback</CardDescription>
               <CardTitle className="text-3xl">{stats.total}</CardTitle>
@@ -544,7 +544,7 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-lg">
             <CardHeader className="pb-3">
               <CardDescription>Pending</CardDescription>
               <CardTitle className="text-3xl text-yellow-600">
@@ -558,7 +558,7 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-lg">
             <CardHeader className="pb-3">
               <CardDescription>In Progress</CardDescription>
               <CardTitle className="text-3xl text-blue-600">
@@ -572,7 +572,7 @@ export default function AdminDashboard() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-lg">
             <CardHeader className="pb-3">
               <CardDescription>Resolved</CardDescription>
               <CardTitle className="text-3xl text-green-600">

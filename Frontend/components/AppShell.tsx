@@ -12,7 +12,7 @@ import {
   updateUserProfile,
   type Feedback,
 } from "@/lib/api";
-import { ArrowRight, LogOut, User, UserCircle2, Camera, Bell } from "lucide-react";
+import { ArrowRight, LogOut, User, UserCircle2, Camera, Bell, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,12 @@ import {
   SheetDescription,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const SESSION_EVENT = "feedforward:session-change";
 const emailLikePattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
@@ -317,6 +323,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     } finally {
       setIsNotificationsLoading(false);
     }
+  };
+
+  const handleNotificationsClearAll = () => {
+    if (!window.confirm("Mark all notifications as read?")) return;
+    const next = new Set(sortedAdminNotifications.map((item) => item.id));
+    saveReadNotificationIds(next);
   };
 
   useEffect(() => {
@@ -697,18 +709,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       )}
                     </Button>
                   </SheetTrigger>
-                  <SheetContent className="w-[360px] sm:w-[400px] overflow-hidden rounded-l-3xl">
-                    <SheetHeader>
-                      <SheetTitle>Notifications</SheetTitle>
-                      <SheetDescription>
-                        New feedback for {adminUnit || "your unit"}.
-                      </SheetDescription>
-                    </SheetHeader>
-                    <div className="mt-2 flex-1 min-h-0 space-y-3 overflow-y-auto px-3 pr-4 pb-3">
-                      {isNotificationsLoading ? (
-                        <div className="text-sm text-muted-foreground">
-                          Loading notifications...
-                        </div>
+                <SheetContent className="w-[360px] sm:w-[400px] overflow-hidden rounded-l-3xl">
+                  <SheetHeader className="pb-0 px-3">
+                    <div className="w-full rounded-lg bg-white px-4 py-1.5 shadow-sm">
+                      <SheetTitle className="text-center text-lg font-semibold">
+                        Notifications
+                      </SheetTitle>
+                    </div>
+                  </SheetHeader>
+                  <div className="mt-0.5 flex items-center justify-end px-3">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleNotificationsClearAll}
+                      disabled={sortedAdminNotifications.length === 0}
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex-1 min-h-0 space-y-3 overflow-y-auto px-3 pr-4 pb-3">
+                    {isNotificationsLoading ? (
+                      <div className="text-sm text-muted-foreground">
+                        Loading notifications...
+                      </div>
                       ) : sortedAdminNotifications.length === 0 ? (
                         <div className="text-sm text-muted-foreground">
                           You&apos;re all caught up. No new feedback yet.
@@ -719,45 +743,78 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           return (
                           <div
                             key={feedback.id}
-                            className="rounded-lg border border-border p-3 hover:bg-muted/50 transition-colors"
+                            className={`rounded-lg border border-border/40 border-l-4 bg-white/80 p-3 shadow-sm hover:bg-muted/50 transition-colors ${
+                              feedback.priority?.toLowerCase() === "high"
+                                ? "border-l-orange-400"
+                                : feedback.priority?.toLowerCase() === "medium"
+                                  ? "border-l-amber-400"
+                                  : feedback.priority?.toLowerCase() === "low"
+                                    ? "border-l-slate-300"
+                                    : "border-l-muted-foreground/40"
+                            }`}
                           >
                             <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="font-semibold text-sm">
-                                  {feedback.subject}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {feedback.category} • {feedback.type}
-                                </p>
-                              </div>
-                              <div className="flex flex-col items-end gap-1">
-                                <Badge
-                                  variant="outline"
-                                  className="capitalize whitespace-nowrap"
-                                >
-                                  {feedback.status}
-                                </Badge>
+                              <p className="font-semibold text-sm">
+                                {feedback.subject}
+                              </p>
+                              <div className="flex items-center gap-2">
                                 <Badge
                                   variant={isRead ? "secondary" : "default"}
                                   className="whitespace-nowrap"
                                 >
                                   {isRead ? "Read" : "Unread"}
                                 </Badge>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      aria-label="Notification actions"
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={() => toggleNotificationRead(feedback.id)}
+                                    >
+                                      {isRead ? "Mark as unread" : "Mark as read"}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </div>
-                            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                              <span>
-                                {new Date(feedback.createdAt).toLocaleString("en-US")}
-                              </span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 px-2 text-xs"
-                                onClick={() => toggleNotificationRead(feedback.id)}
-                              >
-                                {isRead ? "Mark as unread" : "Mark as read"}
-                              </Button>
+                            <div className="mt-0.5 flex items-center justify-between gap-3">
+                              <p className="text-xs text-muted-foreground">
+                                {feedback.category} • {feedback.type}
+                              </p>
+                              <div className="flex items-center justify-end gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className="h-6 px-2 text-xs capitalize whitespace-nowrap"
+                                >
+                                  {feedback.status}
+                                </Badge>
+                                {feedback.priority && (
+                                  <Badge
+                                    variant="outline"
+                                    className={`h-6 px-2 text-xs whitespace-nowrap border ${
+                                      feedback.priority.toLowerCase() === "high"
+                                        ? "bg-orange-50 text-orange-700 border-orange-200"
+                                        : feedback.priority.toLowerCase() === "medium"
+                                          ? "bg-amber-50 text-amber-700 border-amber-200"
+                                          : "bg-slate-50 text-slate-700 border-slate-200"
+                                    }`}
+                                  >
+                                    {feedback.priority} Priority
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-2 text-xs text-muted-foreground">
+                              {new Date(feedback.createdAt).toLocaleString("en-US")}
                             </div>
                           </div>
                           );
