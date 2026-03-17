@@ -16,6 +16,10 @@ export default function TrackFeedback() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [notFound, setNotFound] = useState(false);
 
+  const normalizeTrackingId = (value: string) => value.trim().toUpperCase();
+  const isValidTrackingId = (value: string) =>
+    /^FF-[A-Z0-9]+$/.test(value) && value.length >= 6;
+
   const searchFeedback = async (id: string) => {
     try {
       const found = await getFeedback(id.trim());
@@ -24,20 +28,45 @@ export default function TrackFeedback() {
     } catch {
       setFeedback(null);
       setNotFound(true);
-      toast.error("Feedback not found. Please check your tracking ID.");
+      toast.error(
+        "Tracking ID not found. Please use the ID provided by the system.",
+      );
     }
   };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    await searchFeedback(trackingId);
+    const normalized = normalizeTrackingId(trackingId);
+    if (!normalized) {
+      toast.error("Please enter your tracking ID.");
+      return;
+    }
+    if (!isValidTrackingId(normalized)) {
+      setFeedback(null);
+      setNotFound(false);
+      toast.error(
+        "Tracking ID not found. Please use the ID provided by the system.",
+      );
+      return;
+    }
+    setTrackingId(normalized);
+    await searchFeedback(normalized);
   };
 
   useEffect(() => {
     const param = searchParams.get("trackingId");
     if (!param) return;
-    setTrackingId(param);
-    void searchFeedback(param);
+    const normalized = normalizeTrackingId(param);
+    setTrackingId(normalized);
+    if (!isValidTrackingId(normalized)) {
+      setFeedback(null);
+      setNotFound(false);
+      toast.error(
+        "Tracking ID not found. Please use the ID provided by the system.",
+      );
+      return;
+    }
+    void searchFeedback(normalized);
   }, [searchParams]);
 
   const getStatusColor = (status: string) => {
@@ -154,7 +183,7 @@ export default function TrackFeedback() {
                   No feedback was found with tracking ID: <strong>{trackingId}</strong>
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Please check your tracking ID and try again.
+                  Please use the tracking ID provided by the system.
                 </p>
               </div>
             </CardContent>

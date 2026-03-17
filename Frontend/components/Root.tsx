@@ -85,13 +85,6 @@ export default function RootLayout({
               {!isAdminRoute && (
                 <nav className="flex items-center gap-6">
                   <Link
-                    href="/submit"
-                    className="text-sm hover:text-accent transition-colors"
-                  >
-                    Submit Feedback
-                  </Link>
-
-                  <Link
                     href="/track"
                     className="text-sm hover:text-accent transition-colors"
                   >

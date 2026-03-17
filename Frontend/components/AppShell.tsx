@@ -655,9 +655,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 ) : (
                   <>
-                    <Link href="/submit" className="text-sm hover:text-accent transition-colors">
-                      Submit Feedback
-                    </Link>
                     <Link href="/track" className="text-sm hover:text-accent transition-colors">
                       Track Submission
                     </Link>

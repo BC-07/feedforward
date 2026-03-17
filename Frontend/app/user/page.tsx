@@ -9,6 +9,7 @@ import {
 import { useRouter } from "next/navigation";
 import {
   createFeedback,
+  deleteFeedback,
   getFeedback,
   listCategories,
   listFeedbacks,
@@ -32,7 +33,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +40,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   ArrowRight,
@@ -69,6 +71,7 @@ export default function UserProfile() {
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
+  const [isAnonymous, setIsAnonymous] = useState(true);
   const [formData, setFormData] = useState({
     type: "",
     category: "",
@@ -76,8 +79,6 @@ export default function UserProfile() {
     subject: "",
     message: "",
   });
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [confirmData, setConfirmData] = useState(formData);
   const [categories, setCategories] = useState<string[]>([]);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
@@ -117,6 +118,33 @@ export default function UserProfile() {
       department: localStorage.getItem("currentUserDepartment") || "",
     });
   }, [router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(draftKey);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as Partial<typeof formData>;
+      setFormData((current) => ({
+        ...current,
+        ...parsed,
+      }));
+    } catch {
+      // Ignore corrupted drafts
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasContent = Object.values(formData).some(
+      (value) => value.trim() !== "",
+    );
+    if (hasContent) {
+      window.localStorage.setItem(draftKey, JSON.stringify(formData));
+    } else {
+      window.localStorage.removeItem(draftKey);
+    }
+  }, [formData]);
 
   useEffect(() => {
     if (!currentUser?.id) return;
@@ -265,8 +293,8 @@ export default function UserProfile() {
         subject: confirmData.subject,
         message: confirmData.message,
         status: "Pending",
-        priority: confirmData.priority || "Medium",
-        isAnonymous: false,
+        priority: formData.priority || "Medium",
+        isAnonymous,
         userId: currentUser.id,
         userName: currentUser.fullName,
         userEmail: currentUser.email,
@@ -283,7 +311,6 @@ export default function UserProfile() {
         subject: "",
         message: "",
       });
-      setIsConfirmOpen(false);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to submit feedback.";
@@ -331,6 +358,26 @@ export default function UserProfile() {
     } catch {
       setSelectedFeedback(feedback);
       setSearchTrackingId(feedback.id);
+    }
+  };
+
+  const handleDeleteFeedback = async (feedback: Feedback) => {
+    if (!currentUser) return;
+    if (feedback.status.toLowerCase() !== "pending") {
+      toast.error("Only pending submissions can be deleted.");
+      return;
+    }
+    try {
+      await deleteFeedback(feedback.id);
+      await loadUserFeedbacks(currentUser.id);
+      if (selectedFeedback?.id === feedback.id) {
+        setSelectedFeedback(null);
+      }
+      toast.success("Submission deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete submission.",
+      );
     }
   };
 
@@ -411,7 +458,8 @@ export default function UserProfile() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
+    <>
+      <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
       {trackingId && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-8 animate-in fade-in-0">
           <div className="w-full max-w-lg">
@@ -524,7 +572,7 @@ export default function UserProfile() {
                 <CardHeader>
                   <CardTitle>Feedback Form</CardTitle>
                   <CardDescription>
-                    Review your feedback before submitting
+                    All submissions are anonymous and confidential
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -539,14 +587,16 @@ export default function UserProfile() {
                         required
                       >
                         <SelectTrigger id="type">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="suggestion">Suggestion</SelectItem>
-                          <SelectItem value="complaint">Complaint</SelectItem>
-                          <SelectItem value="inquiry">Inquiry</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="suggestion">Suggestion</SelectItem>
+                        <SelectItem value="complaint">Complaint</SelectItem>
+                        <SelectItem value="inquiry">Inquiry</SelectItem>
+                        <SelectItem value="request">Request</SelectItem>
+                        <SelectItem value="compliment">Compliment</SelectItem>
+                      </SelectContent>
+                    </Select>
                     </div>
 
                     <div className="space-y-2">
@@ -826,12 +876,29 @@ export default function UserProfile() {
                     >
                       <div className="flex items-start justify-between mb-2">
                         <p className="font-semibold">{feedback.subject}</p>
-                        <Badge
-                          className={getStatusColor(feedback.status)}
-                          variant="outline"
-                        >
-                          {feedback.status}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            className={getStatusColor(feedback.status)}
+                            variant="outline"
+                          >
+                            {feedback.status}
+                          </Badge>
+                          {feedback.status.toLowerCase() === "pending" && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2 text-xs border-destructive text-destructive hover:bg-destructive/10"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setDeleteTarget(feedback);
+                                setIsDeleteOpen(true);
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="font-mono">{feedback.id}</span>
@@ -863,57 +930,6 @@ export default function UserProfile() {
           </div>
         </div>
       </div>
-
-      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <DialogContent className="animate-in fade-in-0 zoom-in-95">
-          <DialogHeader>
-            <DialogTitle>Confirm Your Feedback</DialogTitle>
-            <DialogDescription>
-              Please review the details before submitting.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 text-sm">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="min-h-[64px] min-w-0 rounded-lg border border-l-4 border-l-orange-400 bg-muted/40 px-3 py-2">
-                  <p className="text-[11px] uppercase text-muted-foreground">Type</p>
-                  <p className="capitalize font-semibold">{confirmData.type}</p>
-                </div>
-                <div className="min-h-[64px] min-w-0 rounded-lg border border-l-4 border-l-orange-400 bg-muted/40 px-3 py-2">
-                  <p className="text-[11px] uppercase text-muted-foreground">Category</p>
-                  <p className="font-semibold break-words">{confirmData.category}</p>
-                </div>
-                <div className="min-h-[64px] min-w-0 rounded-lg border border-l-4 border-l-orange-400 bg-muted/40 px-3 py-2">
-                  <p className="text-[11px] uppercase text-muted-foreground">Severity</p>
-                  <p className="font-semibold capitalize">{confirmData.priority}</p>
-                </div>
-              </div>
-              <div className="min-h-[64px] min-w-0 rounded-lg border border-l-4 border-l-orange-400 bg-muted/30 px-3 py-2">
-                <p className="text-[11px] uppercase text-muted-foreground">Subject</p>
-                <p className="break-all text-sm font-semibold text-foreground">
-                  {formatMessagePreview(confirmData.subject)}
-                </p>
-              </div>
-              <div className="min-h-[120px] min-w-0 rounded-lg border border-l-4 border-l-orange-400 bg-muted/30 px-3 py-2">
-                <p className="text-[11px] uppercase text-muted-foreground">Message</p>
-                <p className="whitespace-pre-wrap break-all text-sm text-foreground">
-                  {formatMessagePreview(confirmData.message)}
-                </p>
-              </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setIsConfirmOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleConfirmSubmit}
-              className="bg-accent hover:bg-accent/90"
-            >
-              Confirm & Submit
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

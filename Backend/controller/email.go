@@ -385,6 +385,10 @@ func feedbackTypeLabel(feedbackType string) string {
 		return "Suggestion"
 	case "inquiry":
 		return "Inquiry"
+	case "request":
+		return "Request"
+	case "compliment":
+		return "Compliment"
 	default:
 		return "Feedback"
 	}

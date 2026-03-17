@@ -104,6 +104,9 @@ func GetFeedbackByID(c *fiber.Ctx) error {
 	if err != nil {
 		return notFound(c, "feedback not found", err)
 	}
+	if feedback.ID == "" {
+		return notFound(c, "feedback not found", nil)
+	}
 
 	return success(c, fiber.StatusOK, feedback)
 }
@@ -131,6 +134,7 @@ func CreateFeedback(c *fiber.Ctx) error {
 	if err := normalizeFeedback(&feedback); err != nil {
 		return invalidRequest(c, err.Error())
 	}
+	feedback.IsAnonymous = false
 	logTimingf("%s trackingId=%s", logPrefix, feedback.ID)
 	logTimingf("%s parse+normalize=%s", logPrefix, time.Since(stepStart))
 	stepStart = time.Now()
@@ -325,11 +329,6 @@ func UpdateFeedback(c *fiber.Ctx) error {
 			args = append(args, trimmed)
 		}
 	}
-	if raw, ok := payload["isAnonymous"].(bool); ok {
-		sets = append(sets, "is_anonymous = ?")
-		args = append(args, raw)
-	}
-
 	if len(sets) == 0 {
 		return invalidRequest(c, "no fields provided for update")
 	}
@@ -379,5 +378,27 @@ func UpdateFeedback(c *fiber.Ctx) error {
 }
 
 func DeleteFeedback(c *fiber.Ctx) error {
+	session, err := requireUserSession(c)
+	if err != nil {
+		return err
+	}
+
+	feedback, err := fetchFeedbackByID(c.Params("id"))
+	if err != nil {
+		return notFound(c, "feedback not found", err)
+	}
+	if feedback.ID == "" {
+		return notFound(c, "feedback not found", nil)
+	}
+	if feedback.UserID == nil || strings.TrimSpace(*feedback.UserID) == "" {
+		return unauthorized(c, "feedback ownership is required")
+	}
+	if session.UserID == nil || strings.TrimSpace(*session.UserID) != strings.TrimSpace(*feedback.UserID) {
+		return unauthorized(c, "you can only delete your own feedback")
+	}
+	if !strings.EqualFold(strings.TrimSpace(feedback.Status), "Pending") {
+		return invalidRequest(c, "only pending feedback can be deleted")
+	}
+
 	return deleteByID(c, feedbackTable, "feedback", c.Params("id"))
 }

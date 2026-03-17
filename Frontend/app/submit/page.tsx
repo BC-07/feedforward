@@ -39,6 +39,7 @@ export default function Submit() {
     subject: "",
     message: "",
   });
+  const draftKey = "ff:submitDraft";
   const userEmail =
     typeof window !== "undefined"
       ? localStorage.getItem("currentUserEmail") || ""
@@ -61,6 +62,33 @@ export default function Submit() {
         );
       });
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(draftKey);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as Partial<FormData>;
+      setFormData((current) => ({
+        ...current,
+        ...parsed,
+      }));
+    } catch {
+      // Ignore corrupted drafts
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasContent = Object.values(formData).some(
+      (value) => value.trim() !== "",
+    );
+    if (hasContent) {
+      window.localStorage.setItem(draftKey, JSON.stringify(formData));
+    } else {
+      window.localStorage.removeItem(draftKey);
+    }
+  }, [formData]);
 
   const copyToClipboard = (text: string) => {
     const textArea = document.createElement("textarea");
@@ -92,8 +120,8 @@ export default function Submit() {
           : null;
       const userName =
         typeof window !== "undefined"
-          ? localStorage.getItem("currentUserName") || "Anonymous"
-          : "Anonymous";
+          ? localStorage.getItem("currentUserName") || "Guest"
+          : "Guest";
 
       await createFeedback({
         id: newTrackingId,
@@ -101,7 +129,6 @@ export default function Submit() {
         userId,
         userName,
         userEmail: userEmail || undefined,
-        isAnonymous: !userId,
         status: "Pending",
         priority: "Medium",
         response: "",
@@ -110,6 +137,9 @@ export default function Submit() {
       setTrackingId(newTrackingId);
       toast.success("Feedback submitted successfully!");
       setFormData({ type: "", category: "", subject: "", message: "" });
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(draftKey);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to submit feedback.";
@@ -197,8 +227,8 @@ export default function Submit() {
           <CardHeader>
             <CardTitle>Feedback Form</CardTitle>
             <CardDescription>
-              All submissions are anonymous and confidential. If you are signed
-              in, we will email your tracking ID and resolution updates.
+              If you are signed in, we will email your tracking ID and resolution
+              updates.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -213,14 +243,16 @@ export default function Submit() {
                   required
                 >
                   <SelectTrigger id="type">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="suggestion">Suggestion</SelectItem>
-                    <SelectItem value="complaint">Complaint</SelectItem>
-                    <SelectItem value="inquiry">Inquiry</SelectItem>
-                  </SelectContent>
-                </Select>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="suggestion">Suggestion</SelectItem>
+                      <SelectItem value="complaint">Complaint</SelectItem>
+                      <SelectItem value="inquiry">Inquiry</SelectItem>
+                      <SelectItem value="request">Request</SelectItem>
+                      <SelectItem value="compliment">Compliment</SelectItem>
+                    </SelectContent>
+                  </Select>
               </div>
 
               <div className="space-y-2">
