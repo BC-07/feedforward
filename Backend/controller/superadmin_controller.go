@@ -313,11 +313,15 @@ func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
 	}
 
 	payload.ID = "ADMIN-" + fmt.Sprintf("%d", time.Now().UnixMilli())
+	hashedPassword, err := hashPassword(payload.Password)
+	if err != nil {
+		return serverError(c, "failed to secure admin password", err)
+	}
 	now := utcNow()
 	if err := middleware.DBConn.Exec(
 		`INSERT INTO `+adminTable+` (id, first_name, last_name, email, password, unit, is_disabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		payload.ID, payload.FirstName, payload.LastName, payload.Email, payload.Password, payload.Unit, false, now, now,
+		payload.ID, payload.FirstName, payload.LastName, payload.Email, hashedPassword, payload.Unit, false, now, now,
 	).Error; err != nil {
 		return serverError(c, "failed to create admin", err)
 	}
@@ -393,8 +397,12 @@ func UpdateAdminBySuperAdmin(c *fiber.Ctx) error {
 		args = append(args, value)
 	}
 	if value := strings.TrimSpace(payload.Password); value != "" {
+		hashedPassword, err := hashPassword(value)
+		if err != nil {
+			return serverError(c, "failed to secure admin password", err)
+		}
 		sets = append(sets, "password = ?")
-		args = append(args, value)
+		args = append(args, hashedPassword)
 	}
 
 	if len(sets) == 0 {

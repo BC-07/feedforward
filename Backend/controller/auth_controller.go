@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func RegisterUser(c *fiber.Ctx) error {
@@ -38,11 +39,15 @@ func RegisterUser(c *fiber.Ctx) error {
 	}
 
 	payload.ID = "USER-" + fmt.Sprintf("%d", time.Now().UnixMilli())
+	hashedPassword, err := hashPassword(payload.Password)
+	if err != nil {
+		return serverError(c, "failed to secure user password", err)
+	}
 	now := utcNow()
 	if err := db.Exec(
 		`INSERT INTO `+userTable+` (id, first_name, last_name, email, password, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		payload.ID, payload.FirstName, payload.LastName, payload.Email, payload.Password, now, now,
+		payload.ID, payload.FirstName, payload.LastName, payload.Email, hashedPassword, now, now,
 	).Error; err != nil {
 		return serverError(c, "failed to register user", err)
 	}
@@ -100,11 +105,15 @@ func RegisterAdmin(c *fiber.Ctx) error {
 	}
 
 	payload.ID = "ADMIN-" + fmt.Sprintf("%d", time.Now().UnixMilli())
+	hashedPassword, err := hashPassword(payload.Password)
+	if err != nil {
+		return serverError(c, "failed to secure admin password", err)
+	}
 	now := utcNow()
 	if err := db.Exec(
 		`INSERT INTO `+adminTable+` (id, first_name, last_name, email, password, unit, is_disabled, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		payload.ID, payload.FirstName, payload.LastName, payload.Email, payload.Password, payload.Unit, false, now, now,
+		payload.ID, payload.FirstName, payload.LastName, payload.Email, hashedPassword, payload.Unit, false, now, now,
 	).Error; err != nil {
 		return serverError(c, "failed to register admin", err)
 	}
@@ -128,17 +137,39 @@ func LoginUser(c *fiber.Ctx) error {
 		return parseError(c, "failed to parse login", err)
 	}
 
-	var user model.UserModel
+	email := strings.TrimSpace(payload.Email)
+	password := strings.TrimSpace(payload.Password)
+	if email == "" || password == "" {
+		return invalidRequest(c, "email and password are required")
+	}
+
+	var credential struct {
+		ID       string `json:"id"`
+		Password string `json:"password"`
+	}
 	if err := middleware.DBConn.Raw(
-		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, created_at, updated_at
-		FROM `+userTable+` WHERE email = ? AND password = ?`,
-		strings.TrimSpace(payload.Email),
-		strings.TrimSpace(payload.Password),
-	).Scan(&user).Error; err != nil {
+		`SELECT id, password FROM `+userTable+` WHERE email = ?`,
+		email,
+	).Scan(&credential).Error; err != nil {
 		return serverError(c, "failed to login user", err)
 	}
-	if user.ID == "" {
+	if credential.ID == "" {
 		return unauthorized(c, "invalid email or password")
+	}
+
+	matched, needsUpgrade := verifyPassword(credential.Password, password)
+	if !matched {
+		return unauthorized(c, "invalid email or password")
+	}
+	if needsUpgrade {
+		if err := upgradePasswordHash(userTable, credential.ID, password); err != nil {
+			return serverError(c, "failed to secure user password", err)
+		}
+	}
+
+	user, err := fetchUserByID(credential.ID)
+	if err != nil {
+		return serverError(c, "failed to load user profile", err)
 	}
 
 	session, err := createSession(sessionRoleUser, &user.ID, nil, nil, userSessionTTL)
@@ -169,12 +200,41 @@ func LoginAdmin(c *fiber.Ctx) error {
 		return parseError(c, "failed to parse login", err)
 	}
 
+	email := strings.TrimSpace(payload.Email)
+	password := strings.TrimSpace(payload.Password)
+	if email == "" || password == "" {
+		return invalidRequest(c, "email and password are required")
+	}
+
+	var credential struct {
+		ID       string `json:"id"`
+		Password string `json:"password"`
+	}
+	if err := middleware.DBConn.Raw(
+		`SELECT id, password FROM `+adminTable+` WHERE email = ?`,
+		email,
+	).Scan(&credential).Error; err != nil {
+		return serverError(c, "failed to load admin credentials", err)
+	}
+	if credential.ID == "" {
+		return unauthorized(c, "invalid email or password")
+	}
+
+	matched, needsUpgrade := verifyPassword(credential.Password, password)
+	if !matched {
+		return unauthorized(c, "invalid email or password")
+	}
+	if needsUpgrade {
+		if err := upgradePasswordHash(adminTable, credential.ID, password); err != nil {
+			return serverError(c, "failed to secure admin password", err)
+		}
+	}
+
 	var admin model.AdminModel
 	if err := middleware.DBConn.Raw(
 		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, COALESCE(is_superadmin, FALSE) AS is_superadmin, created_at, updated_at
-		FROM `+adminTable+` WHERE email = ? AND password = ?`,
-		strings.TrimSpace(payload.Email),
-		strings.TrimSpace(payload.Password),
+		FROM `+adminTable+` WHERE id = ?`,
+		credential.ID,
 	).Scan(&admin).Error; err != nil {
 		return serverError(c, "failed to login admin", err)
 	}
@@ -240,12 +300,35 @@ func LoginSuperAdmin(c *fiber.Ctx) error {
 		return invalidRequest(c, "email and password are required")
 	}
 
+	var credential struct {
+		ID       string `json:"id"`
+		Password string `json:"password"`
+	}
+	if err := middleware.DBConn.Raw(
+		`SELECT id, password FROM `+adminTable+` WHERE LOWER(email) = LOWER(?) AND COALESCE(is_superadmin, FALSE) = TRUE`,
+		identifier,
+	).Scan(&credential).Error; err != nil {
+		return serverError(c, "failed to load superadmin credentials", err)
+	}
+	if credential.ID == "" {
+		return unauthorized(c, "invalid superadmin credentials")
+	}
+
+	matched, needsUpgrade := verifyPassword(credential.Password, password)
+	if !matched {
+		return unauthorized(c, "invalid superadmin credentials")
+	}
+	if needsUpgrade {
+		if err := upgradePasswordHash(adminTable, credential.ID, password); err != nil {
+			return serverError(c, "failed to secure superadmin password", err)
+		}
+	}
+
 	var admin model.AdminModel
 	if err := middleware.DBConn.Raw(
 		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, COALESCE(is_superadmin, FALSE) AS is_superadmin, created_at, updated_at
-		FROM `+adminTable+` WHERE LOWER(email) = LOWER(?) AND password = ? AND COALESCE(is_superadmin, FALSE) = TRUE`,
-		identifier,
-		password,
+		FROM `+adminTable+` WHERE id = ?`,
+		credential.ID,
 	).Scan(&admin).Error; err != nil {
 		return serverError(c, "failed to login superadmin", err)
 	}
@@ -317,8 +400,14 @@ func ReverifyAdmin(c *fiber.Ctx) error {
 	if strings.TrimSpace(credential.Password) == "" {
 		return unauthorized(c, "invalid admin session")
 	}
-	if strings.TrimSpace(credential.Password) != password {
+	matched, needsUpgrade := verifyPassword(credential.Password, password)
+	if !matched {
 		return unauthorized(c, "invalid credentials")
+	}
+	if needsUpgrade {
+		if err := upgradePasswordHash(adminTable, adminID, password); err != nil {
+			return serverError(c, "failed to secure admin password", err)
+		}
 	}
 
 	expiresAt := utcNow().Add(reauthTTL)
@@ -368,8 +457,14 @@ func ReverifySuperAdmin(c *fiber.Ctx) error {
 		if strings.TrimSpace(credential.Password) == "" {
 			return unauthorized(c, "invalid superadmin session")
 		}
-		if strings.TrimSpace(credential.Password) != password {
+		matched, needsUpgrade := verifyPassword(credential.Password, password)
+		if !matched {
 			return unauthorized(c, "invalid credentials")
+		}
+		if needsUpgrade {
+			if err := upgradePasswordHash(adminTable, adminID, password); err != nil {
+				return serverError(c, "failed to secure superadmin password", err)
+			}
 		}
 	} else if password != superAdminPassword() {
 		return unauthorized(c, "invalid credentials")
@@ -410,4 +505,36 @@ func GetSessionInfo(c *fiber.Ctx) error {
 		"userId":  session.UserID,
 		"adminId": session.AdminID,
 	})
+}
+
+func hashPassword(password string) (string, error) {
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hashed), nil
+}
+
+func verifyPassword(storedPassword string, plainPassword string) (matched bool, needsUpgrade bool) {
+	stored := strings.TrimSpace(storedPassword)
+	if stored == "" {
+		return false, false
+	}
+	if strings.HasPrefix(stored, "$2a$") || strings.HasPrefix(stored, "$2b$") || strings.HasPrefix(stored, "$2y$") {
+		return bcrypt.CompareHashAndPassword([]byte(stored), []byte(plainPassword)) == nil, false
+	}
+	return stored == plainPassword, stored == plainPassword
+}
+
+func upgradePasswordHash(table string, id string, plainPassword string) error {
+	hashedPassword, err := hashPassword(plainPassword)
+	if err != nil {
+		return err
+	}
+	return middleware.DBConn.Exec(
+		`UPDATE `+table+` SET password = ?, updated_at = ? WHERE id = ?`,
+		hashedPassword,
+		utcNow(),
+		id,
+	).Error
 }
