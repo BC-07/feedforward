@@ -57,6 +57,14 @@ import {
 
 export default function UserProfile() {
   const router = useRouter();
+  const draftKey = "userFeedbackDraft";
+  const emptyForm = {
+    type: "",
+    category: "",
+    priority: "",
+    subject: "",
+    message: "",
+  };
   const [currentUser, setCurrentUser] = useState<{
     id: string;
     fullName: string;
@@ -72,13 +80,11 @@ export default function UserProfile() {
     null,
   );
   const [isAnonymous, setIsAnonymous] = useState(true);
-  const [formData, setFormData] = useState({
-    type: "",
-    category: "",
-    priority: "",
-    subject: "",
-    message: "",
-  });
+  const [formData, setFormData] = useState(emptyForm);
+  const [confirmData, setConfirmData] = useState(emptyForm);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
@@ -304,13 +310,9 @@ export default function UserProfile() {
       setTrackingId(newTrackingId);
       await loadUserFeedbacks(currentUser.id);
       toast.success("Feedback submitted successfully!");
-      setFormData({
-        type: "",
-        category: "",
-        priority: "",
-        subject: "",
-        message: "",
-      });
+      setFormData(emptyForm);
+      setConfirmData(emptyForm);
+      setIsConfirmOpen(false);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to submit feedback.";
@@ -517,6 +519,125 @@ export default function UserProfile() {
           </div>
         </div>
       )}
+      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <DialogContent className="w-full max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirm Your Feedback</DialogTitle>
+            <DialogDescription>
+              Please review the details before submitting.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  TYPE
+                </p>
+                <p className="mt-1 font-semibold capitalize">
+                  {confirmData.type || "—"}
+                </p>
+              </div>
+              <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  CATEGORY
+                </p>
+                <p className="mt-1 font-semibold break-words break-all">
+                  {confirmData.category || "—"}
+                </p>
+              </div>
+              <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  SEVERITY
+                </p>
+                <p className="mt-1 font-semibold capitalize">
+                  {confirmData.priority || "—"}
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-4">
+              <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  SUBJECT
+                </p>
+                <p className="mt-1 font-semibold break-words break-all">
+                  {formatMessagePreview(confirmData.subject) || "—"}
+                </p>
+              </div>
+              <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
+                <p className="text-xs font-semibold text-muted-foreground">
+                  MESSAGE
+                </p>
+                <p className="mt-1 text-sm leading-relaxed break-all">
+                  {formatMessagePreview(confirmData.message) || "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-accent hover:bg-accent/90"
+              onClick={handleConfirmSubmit}
+            >
+              Confirm & Submit
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={isDeleteOpen}
+        onOpenChange={(open) => {
+          setIsDeleteOpen(open);
+          if (!open) {
+            setDeleteTarget(null);
+          }
+        }}
+      >
+        <DialogContent className="w-full max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Submission?</DialogTitle>
+            <DialogDescription>
+              This will permanently remove your pending feedback.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteTarget && (
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              <p className="font-semibold">{deleteTarget.subject}</p>
+              <p className="mt-1 text-xs text-muted-foreground font-mono">
+                {deleteTarget.id}
+              </p>
+            </div>
+          )}
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteOpen(false);
+                setDeleteTarget(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (deleteTarget) {
+                  await handleDeleteFeedback(deleteTarget);
+                }
+                setIsDeleteOpen(false);
+                setDeleteTarget(null);
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className="bg-accent text-accent-foreground">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
@@ -874,9 +995,11 @@ export default function UserProfile() {
                       className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                       onClick={() => handleViewFeedback(feedback)}
                     >
-                      <div className="flex items-start justify-between mb-2">
-                        <p className="font-semibold">{feedback.subject}</p>
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <p className="min-w-0 flex-1 font-semibold break-words break-all">
+                          {feedback.subject}
+                        </p>
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           <Badge
                             className={getStatusColor(feedback.status)}
                             variant="outline"
@@ -931,5 +1054,6 @@ export default function UserProfile() {
         </div>
       </div>
     </div>
+  </>
   );
 }
