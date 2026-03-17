@@ -213,14 +213,16 @@ export default function Submit() {
                   required
                 >
                   <SelectTrigger id="type">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="suggestion">Suggestion</SelectItem>
-                    <SelectItem value="complaint">Complaint</SelectItem>
-                    <SelectItem value="inquiry">Inquiry</SelectItem>
-                  </SelectContent>
-                </Select>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="suggestion">Suggestion</SelectItem>
+                      <SelectItem value="complaint">Complaint</SelectItem>
+                      <SelectItem value="inquiry">Inquiry</SelectItem>
+                      <SelectItem value="request">Request</SelectItem>
+                      <SelectItem value="compliment">Compliment</SelectItem>
+                    </SelectContent>
+                  </Select>
               </div>
 
               <div className="space-y-2">
