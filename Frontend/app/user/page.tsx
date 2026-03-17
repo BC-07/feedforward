@@ -79,6 +79,7 @@ export default function UserProfile() {
     subject: "",
     message: "",
   });
+  const draftKey = "ff:userSubmitDraft";
   const [categories, setCategories] = useState<string[]>([]);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
@@ -118,6 +119,33 @@ export default function UserProfile() {
       department: localStorage.getItem("currentUserDepartment") || "",
     });
   }, [router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(draftKey);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as Partial<typeof formData>;
+      setFormData((current) => ({
+        ...current,
+        ...parsed,
+      }));
+    } catch {
+      // Ignore corrupted drafts
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasContent = Object.values(formData).some(
+      (value) => value.trim() !== "",
+    );
+    if (hasContent) {
+      window.localStorage.setItem(draftKey, JSON.stringify(formData));
+    } else {
+      window.localStorage.removeItem(draftKey);
+    }
+  }, [formData]);
 
   useEffect(() => {
     if (!currentUser?.id) return;
@@ -275,6 +303,9 @@ export default function UserProfile() {
         subject: "",
         message: "",
       });
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(draftKey);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to submit feedback.";

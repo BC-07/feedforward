@@ -39,6 +39,7 @@ export default function Submit() {
     subject: "",
     message: "",
   });
+  const draftKey = "ff:submitDraft";
   const userEmail =
     typeof window !== "undefined"
       ? localStorage.getItem("currentUserEmail") || ""
@@ -61,6 +62,33 @@ export default function Submit() {
         );
       });
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.localStorage.getItem(draftKey);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as Partial<FormData>;
+      setFormData((current) => ({
+        ...current,
+        ...parsed,
+      }));
+    } catch {
+      // Ignore corrupted drafts
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hasContent = Object.values(formData).some(
+      (value) => value.trim() !== "",
+    );
+    if (hasContent) {
+      window.localStorage.setItem(draftKey, JSON.stringify(formData));
+    } else {
+      window.localStorage.removeItem(draftKey);
+    }
+  }, [formData]);
 
   const copyToClipboard = (text: string) => {
     const textArea = document.createElement("textarea");
@@ -109,6 +137,9 @@ export default function Submit() {
       setTrackingId(newTrackingId);
       toast.success("Feedback submitted successfully!");
       setFormData({ type: "", category: "", subject: "", message: "" });
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(draftKey);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to submit feedback.";
