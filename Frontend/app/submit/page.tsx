@@ -92,8 +92,8 @@ export default function Submit() {
           : null;
       const userName =
         typeof window !== "undefined"
-          ? localStorage.getItem("currentUserName") || "Anonymous"
-          : "Anonymous";
+          ? localStorage.getItem("currentUserName") || "Guest"
+          : "Guest";
 
       await createFeedback({
         id: newTrackingId,
@@ -101,7 +101,6 @@ export default function Submit() {
         userId,
         userName,
         userEmail: userEmail || undefined,
-        isAnonymous: !userId,
         status: "Pending",
         priority: "Medium",
         response: "",
@@ -197,8 +196,8 @@ export default function Submit() {
           <CardHeader>
             <CardTitle>Feedback Form</CardTitle>
             <CardDescription>
-              All submissions are anonymous and confidential. If you are signed
-              in, we will email your tracking ID and resolution updates.
+              If you are signed in, we will email your tracking ID and resolution
+              updates.
             </CardDescription>
           </CardHeader>
           <CardContent>

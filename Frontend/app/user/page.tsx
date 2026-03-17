@@ -33,7 +33,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   ArrowRight,
@@ -44,8 +43,6 @@ import {
   CheckCircle,
   Circle,
   MessageCircle,
-  User,
-  UserX,
   ChevronLeft,
 } from "lucide-react";
 
@@ -65,7 +62,6 @@ export default function UserProfile() {
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
-  const [isAnonymous, setIsAnonymous] = useState(true);
   const [formData, setFormData] = useState({
     type: "",
     category: "",
@@ -253,7 +249,6 @@ export default function UserProfile() {
         message: formData.message,
         status: "Pending",
         priority: formData.priority || "Medium",
-        isAnonymous,
         userId: currentUser.id,
         userName: currentUser.fullName,
         userEmail: currentUser.email,
@@ -503,39 +498,11 @@ export default function UserProfile() {
                 <CardHeader>
                   <CardTitle>Feedback Form</CardTitle>
                   <CardDescription>
-                    All submissions are anonymous and confidential
+                    Share your feedback and we will keep you updated.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
-                      <div className="flex items-center gap-3">
-                        {isAnonymous ? (
-                          <UserX className="h-5 w-5 text-accent" />
-                        ) : (
-                          <User className="h-5 w-5 text-accent" />
-                        )}
-                        <div>
-                          <Label
-                            htmlFor="anonymous"
-                            className="text-base cursor-pointer"
-                          >
-                            Submit Anonymously
-                          </Label>
-                          <p className="text-xs text-muted-foreground">
-                            {isAnonymous
-                              ? "Your identity will be kept confidential"
-                              : "Your name will be visible to administrators"}
-                          </p>
-                        </div>
-                      </div>
-                      <Switch
-                        id="anonymous"
-                        checked={isAnonymous}
-                        onCheckedChange={setIsAnonymous}
-                      />
-                    </div>
-
                     <div className="space-y-2">
                       <Label htmlFor="type">Feedback Type *</Label>
                       <Select

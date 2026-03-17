@@ -13,19 +13,18 @@ export default function Home() {
               Your Voice Matters
             </h1>
             <p className="text-xl text-gray-700 mb-10 max-w-3xl mx-auto leading-relaxed">
-              FeedForward enables anonymous feedback, suggestions, and complaints through an organized system.
+              FeedForward enables feedback, suggestions, and complaints through an organized system.
               Help us create a better environment for everyone.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/submit"
-                className="px-8 py-4 bg-orange-500 text-white hover:bg-orange-600 rounded-lg transition-colors flex items-center justify-center gap-2 text-lg"
+                href="/track"
+                className="px-8 py-4 bg-orange-500 text-white hover:bg-orange-600 rounded-lg transition-colors text-lg inline-flex items-center justify-center gap-2"
               >
-                Submit Feedback
+                Track Submission
                 <ArrowRight className="w-5 h-5" />
               </Link>
-
               <Link
                 href="/login"
                 className="px-8 py-4 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-lg text-center"
@@ -47,8 +46,8 @@ export default function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             <Feature
               icon={<Shield className="w-8 h-8 text-orange-500" />}
-              title="Anonymous Feedback"
-              text="Submit suggestions, complaints, or compliments anonymously without fear."
+              title="Secure Feedback"
+              text="Submit suggestions, complaints, or compliments through a trusted channel."
             />
             <Feature
               icon={<MessageSquare className="w-8 h-8 text-orange-500" />}
@@ -114,13 +113,6 @@ export default function Home() {
           Join our community in building a better organization together through sambayanihan.
         </p>
 
-        <Link
-          href="/submit"
-          className="px-8 py-4 bg-white text-orange-600 hover:bg-gray-200 rounded-lg transition-colors text-lg inline-flex items-center gap-2"
-        >
-          Submit Your First Feedback
-          <ArrowRight className="w-5 h-5" />
-        </Link>
       </section>
     </div>
   );
