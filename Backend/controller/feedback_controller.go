@@ -104,6 +104,9 @@ func GetFeedbackByID(c *fiber.Ctx) error {
 	if err != nil {
 		return notFound(c, "feedback not found", err)
 	}
+	if feedback.ID == "" {
+		return notFound(c, "feedback not found", nil)
+	}
 
 	return success(c, fiber.StatusOK, feedback)
 }

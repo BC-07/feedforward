@@ -33,6 +33,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
@@ -63,6 +70,9 @@ export default function UserProfile() {
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
+  const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isDeleteSuccessOpen, setIsDeleteSuccessOpen] = useState(false);
   const [formData, setFormData] = useState({
     type: "",
     category: "",
@@ -324,17 +334,13 @@ export default function UserProfile() {
       toast.error("Only pending submissions can be deleted.");
       return;
     }
-    if (!window.confirm(`Delete submission "${feedback.subject}"?`)) {
-      return;
-    }
-
     try {
       await deleteFeedback(feedback.id);
       await loadUserFeedbacks(currentUser.id);
       if (selectedFeedback?.id === feedback.id) {
         setSelectedFeedback(null);
       }
-      toast.success("Submission deleted.");
+      setIsDeleteSuccessOpen(true);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete submission.",
@@ -410,7 +416,8 @@ export default function UserProfile() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
+    <>
+      <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
       {trackingId && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-8">
           <div className="w-full max-w-lg">
@@ -837,12 +844,13 @@ export default function UserProfile() {
                           {feedback.status.toLowerCase() === "pending" && (
                             <Button
                               type="button"
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
-                              className="h-7 px-2 text-xs border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15"
+                              className="h-7 px-2 text-xs border-destructive text-destructive hover:bg-destructive/10"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                void handleDeleteFeedback(feedback);
+                                setDeleteTarget(feedback);
+                                setIsDeleteOpen(true);
                               }}
                             >
                               Delete
@@ -880,6 +888,59 @@ export default function UserProfile() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Submission</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-semibold">
+                {deleteTarget?.subject || "this submission"}
+              </span>
+              ? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDeleteOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteTarget) {
+                  void handleDeleteFeedback(deleteTarget);
+                }
+                setIsDeleteOpen(false);
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteSuccessOpen} onOpenChange={setIsDeleteSuccessOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Submission Deleted</DialogTitle>
+            <DialogDescription>
+              The submission was removed successfully.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end">
+            <Button type="button" onClick={() => setIsDeleteSuccessOpen(false)}>
+              OK
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
