@@ -27,7 +27,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   ArrowRight,
@@ -37,8 +36,6 @@ import {
   CheckCircle,
   Circle,
   MessageCircle,
-  User,
-  UserX,
   ChevronLeft,
 } from "lucide-react";
 import {
@@ -58,7 +55,7 @@ export default function UserProfile() {
   const [searchTrackingId, setSearchTrackingId] = useState("");
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackData | null>(null);
   const [isMessageExpanded, setIsMessageExpanded] = useState(false);
-  const [isAnonymous, setIsAnonymous] = useState(true);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     type: "",
@@ -129,10 +126,8 @@ export default function UserProfile() {
     document.body.removeChild(textArea);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitFeedbackEntry = async () => {
     if (!currentUser) return;
-
     setIsLoading(true);
     try {
       const res = await submitFeedback({
@@ -143,11 +138,12 @@ export default function UserProfile() {
         message: formData.message,
         userId: currentUser.id,
         userName: currentUser.fullName,
-        isAnonymous,
+        isAnonymous: false,
       });
 
       const newId = res.data.id;
       setTrackingId(newId);
+      setIsConfirmOpen(false);
       await loadUserFeedbacks(currentUser.id);
       toast.success("Feedback submitted successfully!");
       setFormData({ type: "", category: "", priority: "Medium", subject: "", message: "" });
@@ -156,6 +152,12 @@ export default function UserProfile() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    setIsConfirmOpen(true);
   };
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -283,39 +285,11 @@ export default function UserProfile() {
               <CardHeader>
                 <CardTitle>Feedback Form</CardTitle>
                 <CardDescription>
-                  All submissions are anonymous and confidential
+                  Submissions include your account identity for transparency
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      {isAnonymous ? (
-                        <UserX className="h-5 w-5 text-accent" />
-                      ) : (
-                        <User className="h-5 w-5 text-accent" />
-                      )}
-                      <div>
-                        <Label
-                          htmlFor="anonymous"
-                          className="text-base cursor-pointer"
-                        >
-                          Submit Anonymously
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          {isAnonymous
-                            ? "Your identity will be kept confidential"
-                            : "Your name will be visible to administrators"}
-                        </p>
-                      </div>
-                    </div>
-                    <Switch
-                      id="anonymous"
-                      checked={isAnonymous}
-                      onCheckedChange={setIsAnonymous}
-                    />
-                  </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="type">Feedback Type *</Label>
                     <Select
@@ -330,8 +304,14 @@ export default function UserProfile() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="suggestion">Suggestion</SelectItem>
-                        <SelectItem value="complaint">Complaint</SelectItem>
                         <SelectItem value="inquiry">Inquiry</SelectItem>
+                        <SelectItem value="concern">Concern</SelectItem>
+                        <SelectItem value="complaint">Complaint</SelectItem>
+                        <SelectItem value="compliment">Compliment</SelectItem>
+                        <SelectItem value="request">Request</SelectItem>
+                        <SelectItem value="recommendation">Recommendation</SelectItem>
+                        <SelectItem value="clarification">Clarification</SelectItem>
+                        <SelectItem value="report">Report</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -668,6 +648,65 @@ export default function UserProfile() {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={isConfirmOpen}
+        onOpenChange={setIsConfirmOpen}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirm Feedback Submission</DialogTitle>
+            <DialogDescription>
+              Review your details below before sending.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-[140px_1fr] gap-2">
+              <p className="text-muted-foreground">Type</p>
+              <p className="font-medium capitalize">{formData.type || "-"}</p>
+            </div>
+            <div className="grid grid-cols-[140px_1fr] gap-2">
+              <p className="text-muted-foreground">Category</p>
+              <p className="font-medium">{formData.category || "-"}</p>
+            </div>
+            <div className="grid grid-cols-[140px_1fr] gap-2">
+              <p className="text-muted-foreground">Severity Level</p>
+              <p className="font-medium">{formData.priority || "-"}</p>
+            </div>
+            <div className="grid grid-cols-[140px_1fr] gap-2">
+              <p className="text-muted-foreground">Subject</p>
+              <p className="font-medium">{formData.subject || "-"}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-muted-foreground">Message</p>
+              <div className="rounded-md border bg-muted/30 px-3 py-2 max-h-40 overflow-auto">
+                <p className="whitespace-pre-wrap break-all">{formData.message || "-"}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setIsConfirmOpen(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="flex-1 bg-accent hover:bg-accent/90"
+              onClick={submitFeedbackEntry}
+              disabled={isLoading}
+            >
+              {isLoading ? "Submitting..." : "Confirm & Submit"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={!!trackingId}

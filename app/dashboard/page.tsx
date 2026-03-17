@@ -362,8 +362,14 @@ export default function AdminDashboard() {
                   <SelectContent>
                     <SelectItem value="all">All Types</SelectItem>
                     <SelectItem value="suggestion">Suggestion</SelectItem>
-                    <SelectItem value="complaint">Complaint</SelectItem>
                     <SelectItem value="inquiry">Inquiry</SelectItem>
+                    <SelectItem value="concern">Concern</SelectItem>
+                    <SelectItem value="complaint">Complaint</SelectItem>
+                    <SelectItem value="compliment">Compliment</SelectItem>
+                    <SelectItem value="request">Request</SelectItem>
+                    <SelectItem value="recommendation">Recommendation</SelectItem>
+                    <SelectItem value="clarification">Clarification</SelectItem>
+                    <SelectItem value="report">Report</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -19,6 +19,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ArrowRight, Send } from "lucide-react";
 import { submitFeedback, listCategories, type Category } from "@/frontend/api";
@@ -40,6 +47,7 @@ export default function Submit() {
     message: "",
   });
   const [trackingId, setTrackingId] = useState<string | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -69,12 +77,11 @@ export default function Submit() {
     document.body.removeChild(textArea);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const submitFeedbackEntry = async () => {
     setIsLoading(true);
     try {
       const userId = localStorage.getItem("currentUserId") || "";
-      const userName = localStorage.getItem("currentUserName") || "Anonymous";
+      const userName = localStorage.getItem("currentUserName") || "Guest User";
 
       const res = await submitFeedback({
         type: formData.type,
@@ -84,9 +91,10 @@ export default function Submit() {
         message: formData.message,
         userId,
         userName,
-        isAnonymous: true,
+        isAnonymous: false,
       });
 
+      setIsConfirmOpen(false);
       setTrackingId(res.data.id);
       toast.success("Feedback submitted successfully!");
       setFormData({ type: "", category: "", priority: "Medium", subject: "", message: "" });
@@ -95,6 +103,11 @@ export default function Submit() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsConfirmOpen(true);
   };
 
   if (trackingId) {
@@ -148,8 +161,8 @@ export default function Submit() {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-3">Submit Your Feedback</h1>
           <p className="text-muted-foreground">
-            Help us improve by sharing your suggestions, complaints, and
-            inquiries.
+            Help us improve by sharing your feedback, concerns, requests, and
+            recommendations.
           </p>
         </div>
 
@@ -157,7 +170,7 @@ export default function Submit() {
           <CardHeader>
             <CardTitle>Feedback Form</CardTitle>
             <CardDescription>
-              All submissions are anonymous and confidential
+              Submissions are recorded with submitter identity for transparency
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -176,8 +189,14 @@ export default function Submit() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="suggestion">Suggestion</SelectItem>
-                    <SelectItem value="complaint">Complaint</SelectItem>
                     <SelectItem value="inquiry">Inquiry</SelectItem>
+                    <SelectItem value="concern">Concern</SelectItem>
+                    <SelectItem value="complaint">Complaint</SelectItem>
+                    <SelectItem value="compliment">Compliment</SelectItem>
+                    <SelectItem value="request">Request</SelectItem>
+                    <SelectItem value="recommendation">Recommendation</SelectItem>
+                    <SelectItem value="clarification">Clarification</SelectItem>
+                    <SelectItem value="report">Report</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -270,6 +289,62 @@ export default function Submit() {
             </form>
           </CardContent>
         </Card>
+
+        <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Confirm Feedback Submission</DialogTitle>
+              <DialogDescription>
+                Review your details below before sending.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 text-sm">
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                <p className="text-muted-foreground">Type</p>
+                <p className="font-medium capitalize">{formData.type || "-"}</p>
+              </div>
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                <p className="text-muted-foreground">Category</p>
+                <p className="font-medium">{formData.category || "-"}</p>
+              </div>
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                <p className="text-muted-foreground">Severity Level</p>
+                <p className="font-medium">{formData.priority || "-"}</p>
+              </div>
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                <p className="text-muted-foreground">Subject</p>
+                <p className="font-medium">{formData.subject || "-"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-muted-foreground">Message</p>
+                <div className="rounded-md border bg-muted/30 px-3 py-2 max-h-40 overflow-auto">
+                  <p className="whitespace-pre-wrap break-all">{formData.message || "-"}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setIsConfirmOpen(false)}
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="flex-1 bg-accent hover:bg-accent/90"
+                onClick={submitFeedbackEntry}
+                disabled={isLoading}
+              >
+                {isLoading ? "Submitting..." : "Confirm & Submit"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -171,7 +171,7 @@ func SubmitFeedback(c *fiber.Ctx) error {
 		Priority:    normalizePriorityLevel(req.Priority),
 		UserID:      userID,
 		UserName:    req.UserName,
-		IsAnonymous: req.IsAnonymous,
+		IsAnonymous: false,
 		Response:    "",
 		CreatedAt:   now,
 		UpdatedAt:   now,
