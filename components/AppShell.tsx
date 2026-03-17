@@ -6,16 +6,8 @@ import { ArrowRight, LogOut, User, UserCircle2, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
 import { useState, useEffect, useRef } from "react";
-import { updateAdminUnit } from "@/frontend/api";
 import {
   Sheet,
   SheetContent,
@@ -23,14 +15,6 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-
-const UNITS = [
-  "IT Unit",
-  "Finance & Registrar Office",
-  "Student Affair Office",
-  "Guidance Office",
-  "Faculty Office",
-];
 
 // ── Reusable Avatar component ──────────────────────────────────────────────
 const AvatarDisplay = ({
@@ -89,7 +73,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const userAvatarInputRef = useRef<HTMLInputElement>(null);
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [newAdminUnit, setNewAdminUnit] = useState("");
   const [passwordEdit, setPasswordEdit] = useState({
     current: "",
     next: "",
@@ -232,28 +215,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.setItem("admins", JSON.stringify(updatedAdmins));
     setPasswordEdit({ current: "", next: "", confirm: "" });
     toast.success("Password updated successfully!");
-  };
-
-  const handleDeleteAdminAccount = () => {
-    if (!window.confirm("Are you sure you want to delete your admin account? This cannot be undone.")) return;
-    const admins = JSON.parse(localStorage.getItem("admins") || "[]");
-    const updated = admins.filter((a: any) => a.id !== adminId);
-    localStorage.setItem("admins", JSON.stringify(updated));
-    handleAdminLogout();
-  };
-
-  const handleAdminUnitChange = async () => {
-    if (!adminId || !newAdminUnit || newAdminUnit === adminUnit) return;
-
-    try {
-      await updateAdminUnit(adminId, newAdminUnit);
-      localStorage.setItem("currentAdminDepartment", newAdminUnit);
-      setAdminUnit(newAdminUnit);
-      setNewAdminUnit("");
-      toast.success("Unit updated successfully!");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to update unit");
-    }
   };
 
   const handleDeleteUserAccount = () => {
@@ -433,32 +394,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="space-y-3 border rounded-2xl p-4">
-              <p className="text-sm font-semibold">Change Unit</p>
-              <p className="text-xs text-muted-foreground">
-                Each unit can only have one admin. If the selected unit is already taken, the change will be rejected.
-              </p>
-              <Select value={newAdminUnit} onValueChange={setNewAdminUnit}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNITS.map((unit) => (
-                    <SelectItem key={unit} value={unit}>
-                      {unit}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                className="w-full bg-accent hover:bg-accent/90"
-                onClick={handleAdminUnitChange}
-                disabled={!newAdminUnit || newAdminUnit === adminUnit}
-              >
-                Save Unit
-              </Button>
-            </div>
-
-            <div className="space-y-3 border rounded-2xl p-4">
               <p className="text-sm font-semibold">Change Password</p>
               <div className="space-y-2">
                 <Label htmlFor="adm-curpw" className="text-xs text-muted-foreground">Current Password</Label>
@@ -499,9 +434,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Button variant="outline" className="w-full mb-3" onClick={handleAdminLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
-              </Button>
-              <Button variant="destructive" className="w-full" onClick={handleDeleteAdminAccount}>
-                Delete Account
               </Button>
             </div>
           </div>

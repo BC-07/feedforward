@@ -54,7 +54,6 @@ const emptyCreateForm = {
   firstName: "",
   lastName: "",
   email: "",
-  password: "",
   unit: "",
 };
 
@@ -404,7 +403,8 @@ export default function SuperAdminDashboard() {
                   Create Admin
                 </CardTitle>
                 <CardDescription>
-                  Provision a new unit admin directly from the control console.
+                  Provision a new unit admin. A 6-character temporary password is
+                  auto-generated and emailed with a direct change-password link.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -447,21 +447,6 @@ export default function SuperAdminDashboard() {
                         setCreateForm((current) => ({
                           ...current,
                           email: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="create-password">Temporary Password</Label>
-                    <Input
-                      id="create-password"
-                      type="password"
-                      value={createForm.password}
-                      onChange={(event) =>
-                        setCreateForm((current) => ({
-                          ...current,
-                          password: event.target.value,
                         }))
                       }
                       required

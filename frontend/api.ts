@@ -127,6 +127,9 @@ export const registerAdmin = (data: {
 export const loginAdmin = (data: { email: string; password: string }) =>
   post<AdminData>("/admins/login", data);
 
+export const setAdminPassword = (data: { token: string; newPassword: string }) =>
+  post<{ success: boolean }>("/admins/set-password", data);
+
 export const updateAdminUnit = (adminId: string, unit: string) =>
   put<{ unit: string }>(`/admins/${adminId}/unit`, { unit });
 
@@ -193,7 +196,7 @@ export const listAdmins = async (token: string): Promise<Admin[]> => {
 
 export const createAdminBySuperAdmin = (
   token: string,
-  data: { firstName: string; lastName: string; email: string; password: string; unit: string },
+  data: { firstName: string; lastName: string; email: string; unit: string },
 ) => requestWithToken<Admin>("/superadmin/admins", token, {
   method: "POST",
   body: JSON.stringify(data),

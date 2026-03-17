@@ -19,6 +19,10 @@ export function proxy(request: NextRequest) {
     return redirectTo("/login");
   }
 
+  if (pathname.startsWith("/dashboard/change-password")) {
+    return NextResponse.next();
+  }
+
   if (pathname.startsWith("/dashboard") && !hasAdminSession) {
     return redirectTo("/login");
   }

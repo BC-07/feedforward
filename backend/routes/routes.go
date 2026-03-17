@@ -23,6 +23,7 @@ func AppRoutes(app *fiber.App) {
 	// Admin routes
 	api.Post("/admins/register", controller.RegisterAdmin)
 	api.Post("/admins/login", controller.LoginAdmin)
+	api.Post("/admins/set-password", controller.SetAdminPassword)
 	api.Put("/admins/:id/unit", controller.UpdateAdminUnit)
 
 	// Feedback routes — specific paths must be before /:id
