@@ -43,6 +43,8 @@ var validPriorities = map[string]bool{
 	"High":   true,
 }
 
+const disabledCategoryName = "Disabled"
+
 // Keep table names centralized so SQL changes stay in one place.
 const (
 	feedbackTable = "public.feedbacks"
@@ -169,6 +171,9 @@ func normalizeFeedback(feedback *model.FeedbackModel) error {
 	if feedback.ID == "" || feedback.Type == "" || feedback.Category == "" || feedback.Subject == "" || feedback.Message == "" {
 		return fmt.Errorf("missing required fields")
 	}
+	if isDisabledCategory(feedback.Category) {
+		return fmt.Errorf("invalid feedback category")
+	}
 	if feedback.Status == "" {
 		feedback.Status = "Pending"
 	}
@@ -279,6 +284,16 @@ func ensureCategoryStore() error {
 	})
 
 	return categoryTableInitErr
+}
+
+func ensureDisabledCategory() error {
+	if err := ensureCategoryStore(); err != nil {
+		return err
+	}
+	return middleware.DBConn.Exec(
+		`INSERT INTO `+categoryTable+` (name) VALUES (?) ON CONFLICT (name) DO NOTHING`,
+		disabledCategoryName,
+	).Error
 }
 
 func ensureAdminDisableColumn() error {
@@ -568,6 +583,10 @@ func categoryExists(name string) (bool, error) {
 	return count > 0, nil
 }
 
+func isDisabledCategory(name string) bool {
+	return strings.EqualFold(strings.TrimSpace(name), disabledCategoryName)
+}
+
 func categoryInUse(name string) (bool, error) {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" {
@@ -807,6 +826,9 @@ func deleteByID(c *fiber.Ctx, table string, entity string, id string) error {
 
 // Enforce one admin per unit in application logic because the live schema does not.
 func adminUnitTaken(unit string, excludeID string) (bool, error) {
+	if isDisabledCategory(unit) {
+		return false, nil
+	}
 	var count int64
 	query := `SELECT COUNT(*) FROM ` + adminTable + ` WHERE unit = ?`
 	args := []any{unit}

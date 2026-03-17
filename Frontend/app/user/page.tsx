@@ -132,7 +132,11 @@ export default function UserProfile() {
   useEffect(() => {
     void listCategories()
       .then((data) => {
-        setCategories(data.map((category) => category.name));
+        setCategories(
+          data
+            .map((category) => category.name)
+            .filter((name) => name.toLowerCase() !== "disabled"),
+        );
       })
       .catch((error) => {
         toast.error(

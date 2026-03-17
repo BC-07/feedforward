@@ -278,6 +278,9 @@ func UpdateFeedback(c *fiber.Ctx) error {
 	}
 	if raw, ok := payload["category"].(string); ok {
 		value := strings.TrimSpace(raw)
+		if isDisabledCategory(value) {
+			return invalidRequest(c, "invalid feedback category")
+		}
 		ok, err := categoryExists(value)
 		if err != nil {
 			return serverError(c, "failed to validate feedback category", err)

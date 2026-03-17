@@ -17,7 +17,15 @@ func ListCategories(c *fiber.Ctx) error {
 		return serverError(c, "failed to fetch categories", err)
 	}
 
-	return success(c, fiber.StatusOK, categories)
+	filtered := make([]model.CategoryModel, 0, len(categories))
+	for _, category := range categories {
+		if isDisabledCategory(category.Name) {
+			continue
+		}
+		filtered = append(filtered, category)
+	}
+
+	return success(c, fiber.StatusOK, filtered)
 }
 
 func CreateCategoryBySuperAdmin(c *fiber.Ctx) error {
@@ -39,6 +47,9 @@ func CreateCategoryBySuperAdmin(c *fiber.Ctx) error {
 	name := strings.TrimSpace(payload.Name)
 	if name == "" {
 		return invalidRequest(c, "category name is required")
+	}
+	if isDisabledCategory(name) {
+		return invalidRequest(c, "category name is reserved")
 	}
 
 	exists, err := categoryExists(name)
@@ -92,6 +103,9 @@ func UpdateCategoryBySuperAdmin(c *fiber.Ctx) error {
 	newName := strings.TrimSpace(payload.Name)
 	if newName == "" {
 		return invalidRequest(c, "category name is required")
+	}
+	if isDisabledCategory(newName) {
+		return invalidRequest(c, "category name is reserved")
 	}
 
 	var existing model.CategoryModel
@@ -267,6 +281,9 @@ func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
 	if payload.FirstName == "" || payload.LastName == "" || payload.Email == "" || payload.Password == "" || payload.Unit == "" {
 		return invalidRequest(c, "missing required admin fields")
 	}
+	if isDisabledCategory(payload.Unit) {
+		return invalidRequest(c, "invalid admin unit")
+	}
 
 	inUse, err := emailInUse(payload.Email, "", "")
 	if err != nil {
@@ -352,6 +369,9 @@ func UpdateAdminBySuperAdmin(c *fiber.Ctx) error {
 		args = append(args, value)
 	}
 	if value := strings.TrimSpace(payload.Unit); value != "" {
+		if isDisabledCategory(value) {
+			return invalidRequest(c, "invalid admin unit")
+		}
 		unitExists, err := categoryExists(value)
 		if err != nil {
 			return serverError(c, "failed to validate admin unit", err)
@@ -402,9 +422,16 @@ func DisableAdminBySuperAdmin(c *fiber.Ctx) error {
 	if err := ensureAdminDisableColumn(); err != nil {
 		return serverError(c, "failed to initialize admin access state", err)
 	}
+	if err := ensureDisabledCategory(); err != nil {
+		return serverError(c, "failed to initialize disabled admin unit", err)
+	}
+	if err := syncCategoryConstraints(); err != nil {
+		return serverError(c, "failed to sync category constraints", err)
+	}
 
 	result := middleware.DBConn.Exec(
-		`UPDATE `+adminTable+` SET is_disabled = TRUE, updated_at = ? WHERE id = ?`,
+		`UPDATE `+adminTable+` SET is_disabled = TRUE, unit = ?, updated_at = ? WHERE id = ?`,
+		disabledCategoryName,
 		utcNow(),
 		c.Params("id"),
 	)

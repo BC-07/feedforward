@@ -76,6 +76,9 @@ func RegisterAdmin(c *fiber.Ctx) error {
 	if payload.FirstName == "" || payload.LastName == "" || payload.Email == "" || payload.Password == "" || payload.Unit == "" {
 		return invalidRequest(c, "missing required admin fields")
 	}
+	if isDisabledCategory(payload.Unit) {
+		return invalidRequest(c, "invalid admin unit")
+	}
 
 	inUse, err := emailInUse(payload.Email, "", "")
 	if err != nil {

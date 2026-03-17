@@ -166,6 +166,9 @@ export default function SuperAdminDashboard() {
 
   const availableCategories = categories.filter((category) => {
     const name = category.name.trim().toLowerCase();
+    if (name === "disabled") {
+      return false;
+    }
     return !admins.some(
       (admin) =>
         !admin.isDisabled && admin.unit.trim().toLowerCase() === name,
@@ -175,6 +178,9 @@ export default function SuperAdminDashboard() {
   const editAvailableCategories = categories.filter((category) => {
     const name = category.name.trim().toLowerCase();
     const currentUnit = editForm.unit.trim().toLowerCase();
+    if (name === "disabled") {
+      return false;
+    }
     if (name === currentUnit) {
       return true;
     }
