@@ -139,15 +139,34 @@ func updatePassword(c *fiber.Ctx, table string, entity string) error {
 		return invalidRequest(c, "new password must be at least 6 characters")
 	}
 
-	result := middleware.DBConn.Exec(
-		fmt.Sprintf("UPDATE %s SET password = ?, updated_at = ? WHERE id = ? AND password = ?", table),
-		payload.NewPassword, utcNow(), c.Params("id"), payload.CurrentPassword,
-	)
-	if result.Error != nil {
-		return serverError(c, "failed to update password", result.Error)
+	var credential struct {
+		Password string `json:"password"`
 	}
-	if result.RowsAffected == 0 {
+	if err := middleware.DBConn.Raw(
+		fmt.Sprintf("SELECT password FROM %s WHERE id = ?", table),
+		c.Params("id"),
+	).Scan(&credential).Error; err != nil {
+		return serverError(c, "failed to load current password", err)
+	}
+	if strings.TrimSpace(credential.Password) == "" {
 		return unauthorized(c, fmt.Sprintf("%s current password is incorrect", entity))
+	}
+
+	matched, _ := verifyPassword(credential.Password, payload.CurrentPassword)
+	if !matched {
+		return unauthorized(c, fmt.Sprintf("%s current password is incorrect", entity))
+	}
+
+	hashedPassword, err := hashPassword(payload.NewPassword)
+	if err != nil {
+		return serverError(c, "failed to secure new password", err)
+	}
+
+	if err := middleware.DBConn.Exec(
+		fmt.Sprintf("UPDATE %s SET password = ?, updated_at = ? WHERE id = ?", table),
+		hashedPassword, utcNow(), c.Params("id"),
+	).Error; err != nil {
+		return serverError(c, "failed to update password", err)
 	}
 
 	return success(c, fiber.StatusOK, map[string]string{"id": c.Params("id")})
