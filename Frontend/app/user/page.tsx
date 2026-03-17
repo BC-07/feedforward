@@ -72,7 +72,6 @@ export default function UserProfile() {
   );
   const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [isDeleteSuccessOpen, setIsDeleteSuccessOpen] = useState(false);
   const [formData, setFormData] = useState({
     type: "",
     category: "",
@@ -340,7 +339,7 @@ export default function UserProfile() {
       if (selectedFeedback?.id === feedback.id) {
         setSelectedFeedback(null);
       }
-      setIsDeleteSuccessOpen(true);
+      toast.success("Submission deleted.");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete submission.",
@@ -926,21 +925,6 @@ export default function UserProfile() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDeleteSuccessOpen} onOpenChange={setIsDeleteSuccessOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Submission Deleted</DialogTitle>
-            <DialogDescription>
-              The submission was removed successfully.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end">
-            <Button type="button" onClick={() => setIsDeleteSuccessOpen(false)}>
-              OK
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
