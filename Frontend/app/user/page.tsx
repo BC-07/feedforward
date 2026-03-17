@@ -9,6 +9,7 @@ import {
 import { useRouter } from "next/navigation";
 import {
   createFeedback,
+  deleteFeedback,
   getFeedback,
   listCategories,
   listFeedbacks,
@@ -314,6 +315,30 @@ export default function UserProfile() {
     } catch {
       setSelectedFeedback(feedback);
       setSearchTrackingId(feedback.id);
+    }
+  };
+
+  const handleDeleteFeedback = async (feedback: Feedback) => {
+    if (!currentUser) return;
+    if (feedback.status.toLowerCase() !== "pending") {
+      toast.error("Only pending submissions can be deleted.");
+      return;
+    }
+    if (!window.confirm(`Delete submission "${feedback.subject}"?`)) {
+      return;
+    }
+
+    try {
+      await deleteFeedback(feedback.id);
+      await loadUserFeedbacks(currentUser.id);
+      if (selectedFeedback?.id === feedback.id) {
+        setSelectedFeedback(null);
+      }
+      toast.success("Submission deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete submission.",
+      );
     }
   };
 
@@ -802,12 +827,28 @@ export default function UserProfile() {
                     >
                       <div className="flex items-start justify-between mb-2">
                         <p className="font-semibold">{feedback.subject}</p>
-                        <Badge
-                          className={getStatusColor(feedback.status)}
-                          variant="outline"
-                        >
-                          {feedback.status}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            className={getStatusColor(feedback.status)}
+                            variant="outline"
+                          >
+                            {feedback.status}
+                          </Badge>
+                          {feedback.status.toLowerCase() === "pending" && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/15"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleDeleteFeedback(feedback);
+                              }}
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="font-mono">{feedback.id}</span>
