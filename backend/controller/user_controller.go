@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"FeedForward/backend/middleware"
@@ -126,5 +127,78 @@ func LoginUser(c *fiber.Ctx) error {
 			"name":  user.Name,
 			"email": user.Email,
 		},
+	})
+}
+
+func ChangeUserPassword(c *fiber.Ctx) error {
+	db := middleware.DBConn
+
+	var req model.ChangeUserPasswordRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Invalid request body", IsSuccess: false, Error: err},
+		})
+	}
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	currentPassword := strings.TrimSpace(req.CurrentPassword)
+	newPassword := strings.TrimSpace(req.NewPassword)
+
+	if email == "" || currentPassword == "" || newPassword == "" {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Email, current password, and new password are required", IsSuccess: false},
+		})
+	}
+
+	if len(newPassword) < 6 {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "New password must be at least 6 characters", IsSuccess: false},
+		})
+	}
+
+	var user model.User
+	if err := db.Table("public.users").Where("LOWER(TRIM(email)) = ?", email).First(&user).Error; err != nil {
+		return c.Status(404).JSON(response.ResponseModel{
+			RetCode: "404",
+			Message: "User not found",
+			Data:    errors.ErrorModel{Message: "No user found for this account", IsSuccess: false},
+		})
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(currentPassword)); err != nil {
+		return c.Status(401).JSON(response.ResponseModel{
+			RetCode: "401",
+			Message: "Current password is incorrect",
+			Data:    errors.ErrorModel{Message: "Current password is incorrect", IsSuccess: false},
+		})
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to process password", IsSuccess: false, Error: err},
+		})
+	}
+
+	if err := db.Table("public.users").Where("LOWER(TRIM(email)) = ?", email).Update("password", string(hashedPassword)).Error; err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to update password", IsSuccess: false, Error: err},
+		})
+	}
+
+	return c.Status(200).JSON(response.ResponseModel{
+		RetCode: "200",
+		Message: "Password changed successfully",
+		Data:    map[string]any{"success": true},
 	})
 }

@@ -17,7 +17,9 @@ func AppRoutes(app *fiber.App) {
 	// User routes
 	api.Post("/users/register", controller.RegisterUser)
 	api.Post("/users/login", controller.LoginUser)
+	api.Post("/users/change-password", controller.ChangeUserPassword)
 	api.Post("/users/forgot-password", controller.ForgotPassword)
+	api.Post("/users/verify-reset-otp", controller.VerifyResetOTP)
 	api.Post("/users/reset-password", controller.ResetPassword)
 
 	// Admin routes

@@ -28,6 +28,7 @@ import {
   loginAdmin,
   superAdminLogin,
   forgotPassword,
+  verifyResetOTP,
   resetPassword,
 } from "@/frontend/api";
 
@@ -52,9 +53,11 @@ export default function Login() {
   const [isSuperAdminLoading, setIsSuperAdminLoading] = useState(false);
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
-  const [resetToken, setResetToken] = useState("");
+  const [resetOtp, setResetOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [isResetCodeVerified, setIsResetCodeVerified] = useState(false);
   const [isForgotLoading, setIsForgotLoading] = useState(false);
+  const [isVerifyResetCodeLoading, setIsVerifyResetCodeLoading] = useState(false);
   const [isResetLoading, setIsResetLoading] = useState(false);
 
   useEffect(() => {
@@ -101,10 +104,18 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    const normalizedEmail = email.trim();
+    const normalizedPassword = password.trim();
+    if (!normalizedEmail || !normalizedPassword) {
+      toast.error("Email and password are required.");
+      return;
+    }
+
     setIsLoading(true);
+
     try {
-      // Try user login first
-      const userRes = await loginUser({ email, password });
+      const userRes = await loginUser({ email: normalizedEmail, password: normalizedPassword });
       const user = userRes.data;
       localStorage.setItem("isUserLoggedIn", "true");
       localStorage.setItem("currentUserId", user.id);
@@ -114,11 +125,17 @@ export default function Login() {
       toast.success(`Welcome back, ${user.name}!`);
       router.push("/user");
       return;
-    } catch {
-      // Not a user — try admin
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Request failed";
+      if (message !== "Invalid email or password") {
+        toast.error(message);
+        setIsLoading(false);
+        return;
+      }
     }
+
     try {
-      const adminRes = await loginAdmin({ email, password });
+      const adminRes = await loginAdmin({ email: normalizedEmail, password: normalizedPassword });
       const admin = adminRes.data;
       localStorage.setItem("isAdminLoggedIn", "true");
       localStorage.setItem("currentAdminId", admin.id);
@@ -137,26 +154,74 @@ export default function Login() {
 
   const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    const normalizedForgotEmail = forgotEmail.trim() || email.trim();
+    if (!normalizedForgotEmail) {
+      toast.error("Please enter your email before requesting OTP.");
+      return;
+    }
+
+    setForgotEmail(normalizedForgotEmail);
     setIsForgotLoading(true);
     try {
-      await forgotPassword({ email: forgotEmail });
-      toast.success("If your email exists, a reset code was sent.");
+      await forgotPassword({ email: normalizedForgotEmail });
+      toast.success("If your email exists, an OTP was sent.");
+      setIsResetCodeVerified(false);
+      setResetOtp("");
+      setNewPassword("");
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to send reset code");
+      toast.error(err instanceof Error ? err.message : "Failed to send OTP");
     } finally {
       setIsForgotLoading(false);
     }
   };
 
+  const handleVerifyResetCode = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    const normalizedForgotEmail = forgotEmail.trim();
+    const normalizedOtp = resetOtp.trim();
+    if (!normalizedForgotEmail || !normalizedOtp) {
+      toast.error("Email and OTP are required.");
+      return;
+    }
+
+    setIsVerifyResetCodeLoading(true);
+    try {
+      await verifyResetOTP({ email: normalizedForgotEmail, otp: normalizedOtp });
+      setIsResetCodeVerified(true);
+      toast.success("OTP verified. You can now set a new password.");
+    } catch (err: unknown) {
+      setIsResetCodeVerified(false);
+      toast.error(err instanceof Error ? err.message : "Failed to verify OTP");
+    } finally {
+      setIsVerifyResetCodeLoading(false);
+    }
+  };
+
   const handleResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const normalizedForgotEmail = forgotEmail.trim();
+    const normalizedNewPassword = newPassword.trim();
+
+    if (!normalizedForgotEmail || !normalizedNewPassword) {
+      toast.error("Email and new password are required.");
+      return;
+    }
+
+    if (!isResetCodeVerified) {
+      toast.error("Please verify OTP first.");
+      return;
+    }
     setIsResetLoading(true);
     try {
-      await resetPassword({ token: resetToken, newPassword });
+      await resetPassword({ email: normalizedForgotEmail, newPassword: normalizedNewPassword });
       toast.success("Password reset successful. You can now log in.");
       setForgotOpen(false);
-      setResetToken("");
+      setForgotEmail("");
+      setResetOtp("");
       setNewPassword("");
+      setIsResetCodeVerified(false);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to reset password");
     } finally {
@@ -218,17 +283,41 @@ export default function Login() {
               {isLoading ? "Logging in..." : "Log In"}
             </Button>
             <div className="text-center">
-              <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+              <Dialog
+                open={forgotOpen}
+                onOpenChange={(open) => {
+                  setForgotOpen(open);
+                  if (!open) {
+                    setIsResetCodeVerified(false);
+                    setIsForgotLoading(false);
+                    setIsVerifyResetCodeLoading(false);
+                    setIsResetLoading(false);
+                  }
+                }}
+              >
                 <DialogTrigger asChild>
-                  <button type="button" className="text-sm text-accent hover:underline font-medium">
+                  <button
+                    type="button"
+                    className="text-sm text-accent hover:underline font-medium"
+                    onClick={() => {
+                      if (email.trim() && !forgotEmail.trim()) {
+                        setForgotEmail(email.trim());
+                      }
+                    }}
+                  >
                     Forgot Password?
                   </button>
                 </DialogTrigger>
-                <DialogContent className="max-w-md">
+                <DialogContent
+                  className="max-w-md"
+                  onInteractOutside={() => {
+                    setIsResetCodeVerified(false);
+                  }}
+                >
                   <DialogHeader>
                     <DialogTitle>Reset Password</DialogTitle>
                     <DialogDescription>
-                      Request a reset code by email, then set your new password.
+                      Request an OTP by email, verify it, then set your new password.
                     </DialogDescription>
                   </DialogHeader>
 
@@ -243,19 +332,25 @@ export default function Login() {
                       required
                     />
                     <Button type="submit" variant="outline" className="w-full" disabled={isForgotLoading}>
-                      {isForgotLoading ? "Sending code..." : "Send Reset Code"}
+                      {isForgotLoading ? "Sending OTP..." : "Send OTP"}
+                    </Button>
+                  </form>
+
+                  <form onSubmit={handleVerifyResetCode} className="space-y-3 pt-2">
+                    <Label htmlFor="reset-otp">OTP</Label>
+                    <Input
+                      id="reset-otp"
+                      placeholder="Paste OTP from email"
+                      value={resetOtp}
+                      onChange={(e) => setResetOtp(e.target.value)}
+                      required
+                    />
+                    <Button type="submit" variant="outline" className="w-full" disabled={isVerifyResetCodeLoading}>
+                      {isVerifyResetCodeLoading ? "Verifying OTP..." : "Verify OTP"}
                     </Button>
                   </form>
 
                   <form onSubmit={handleResetPassword} className="space-y-3 pt-2">
-                    <Label htmlFor="reset-token">Reset Code</Label>
-                    <Input
-                      id="reset-token"
-                      placeholder="Paste reset code from email"
-                      value={resetToken}
-                      onChange={(e) => setResetToken(e.target.value)}
-                      required
-                    />
                     <Label htmlFor="new-password">New Password</Label>
                     <Input
                       id="new-password"
@@ -264,8 +359,13 @@ export default function Login() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       required
+                      disabled={!isResetCodeVerified}
                     />
-                    <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isResetLoading}>
+                    <Button
+                      type="submit"
+                      className="w-full bg-accent hover:bg-accent/90"
+                      disabled={isResetLoading || !isResetCodeVerified}
+                    >
                       {isResetLoading ? "Resetting..." : "Reset Password"}
                     </Button>
                   </form>

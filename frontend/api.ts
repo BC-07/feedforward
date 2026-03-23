@@ -107,10 +107,19 @@ export const registerUser = (data: {
 export const loginUser = (data: { email: string; password: string }) =>
   post<UserData>("/users/login", data);
 
+export const changeUserPassword = (data: {
+  email: string;
+  currentPassword: string;
+  newPassword: string;
+}) => post<{ success: boolean }>("/users/change-password", data);
+
 export const forgotPassword = (data: { email: string }) =>
   post<{ sent: boolean }>("/users/forgot-password", data);
 
-export const resetPassword = (data: { token: string; newPassword: string }) =>
+export const verifyResetOTP = (data: { email: string; otp: string }) =>
+  post<{ verified: boolean }>("/users/verify-reset-otp", data);
+
+export const resetPassword = (data: { email: string; newPassword: string }) =>
   post<{ success: boolean }>("/users/reset-password", data);
 
 // ===================== ADMIN API =====================

@@ -15,6 +15,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import { changeUserPassword } from "@/frontend/api";
 
 // ── Reusable Avatar component ──────────────────────────────────────────────
 const AvatarDisplay = ({
@@ -225,16 +226,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     handleUserLogout();
   };
 
-  const handleUserProfileSave = () => {
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const idx = users.findIndex((u: any) => u.id === userId);
-    if (idx === -1) return;
-
+  const handleUserProfileSave = async () => {
     if (userProfileEdit.newPassword || userProfileEdit.currentPassword) {
-      if (users[idx].password !== userProfileEdit.currentPassword) {
-        toast.error("Current password is incorrect");
+      if (!userProfileEdit.currentPassword || !userProfileEdit.newPassword || !userProfileEdit.confirmPassword) {
+        toast.error("Please fill in all password fields");
         return;
       }
+
       if (userProfileEdit.newPassword.length < 6) {
         toast.error("New password must be at least 6 characters");
         return;
@@ -243,16 +241,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         toast.error("New passwords do not match");
         return;
       }
-      users[idx].password = userProfileEdit.newPassword;
+
+      try {
+        await changeUserPassword({
+          email: userEmail,
+          currentPassword: userProfileEdit.currentPassword,
+          newPassword: userProfileEdit.newPassword,
+        });
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : "Failed to update password");
+        return;
+      }
     }
 
-    const existingName = users[idx].name || "";
+    const existingName = localStorage.getItem("currentUserName") || userName || "";
     const parts = existingName.split(" ");
-    const firstName = userProfileEdit.firstName.trim() || users[idx].firstName || parts[0] || "";
-    const lastName = userProfileEdit.lastName.trim() || users[idx].lastName || parts.slice(1).join(" ") || "";
+    const firstName = userProfileEdit.firstName.trim() || parts[0] || "";
+    const lastName = userProfileEdit.lastName.trim() || parts.slice(1).join(" ") || "";
     const fullName = `${firstName} ${lastName}`.trim();
-    users[idx] = { ...users[idx], name: fullName, firstName, lastName };
-    localStorage.setItem("users", JSON.stringify(users));
+
     localStorage.setItem("currentUserName", fullName);
     setUserName(fullName);
     setUserProfileEdit({

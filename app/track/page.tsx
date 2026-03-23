@@ -1,5 +1,6 @@
 ﻿"use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,26 +11,48 @@ import { toast } from "sonner";
 import { getFeedbackById, FeedbackData } from "@/frontend/api";
 
 export default function TrackFeedback() {
+  const searchParams = useSearchParams();
   const [trackingId, setTrackingId] = useState("");
   const [feedback, setFeedback] = useState<FeedbackData | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const searchByTrackingId = async (id: string, showErrorToast = true) => {
+    const normalizedId = id.trim();
+    if (!normalizedId) {
+      setFeedback(null);
+      setNotFound(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const res = await getFeedbackById(trackingId.trim());
+      const res = await getFeedbackById(normalizedId);
       setFeedback(res.data);
       setNotFound(false);
     } catch {
       setFeedback(null);
       setNotFound(true);
-      toast.error("Feedback not found. Please check your tracking ID.");
+      if (showErrorToast) {
+        toast.error("Feedback not found. Please check your tracking ID.");
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await searchByTrackingId(trackingId, true);
+  };
+
+  useEffect(() => {
+    const queryTrackingId = (searchParams.get("trackingId") || "").trim();
+    if (!queryTrackingId) return;
+
+    setTrackingId(queryTrackingId);
+    void searchByTrackingId(queryTrackingId, false);
+  }, [searchParams]);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -294,4 +317,4 @@ export default function TrackFeedback() {
     </div>
   );
 }
-
+

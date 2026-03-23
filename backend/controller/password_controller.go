@@ -26,7 +26,17 @@ type passwordResetEntry struct {
 var (
 	passwordResetTokens = map[string]passwordResetEntry{}
 	passwordResetMu     sync.Mutex
+	verifiedResetEmails = map[string]time.Time{}
+	verifiedResetMu     sync.Mutex
 )
+
+func cleanupExpiredVerifiedResetEmails(now time.Time) {
+	for email, expiresAt := range verifiedResetEmails {
+		if now.After(expiresAt) {
+			delete(verifiedResetEmails, email)
+		}
+	}
+}
 
 func generateSecureToken() (string, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
@@ -69,7 +79,7 @@ func ForgotPassword(c *fiber.Ctx) error {
 	if err := db.Table("public.users").Select("email").Where("LOWER(TRIM(email)) = ?", email).First(&user).Error; err != nil {
 		return c.Status(200).JSON(response.ResponseModel{
 			RetCode: "200",
-			Message: "If this email is registered, a reset code has been sent",
+			Message: "If this email is registered, an OTP has been sent",
 			Data:    map[string]any{"sent": true},
 		})
 	}
@@ -79,7 +89,7 @@ func ForgotPassword(c *fiber.Ctx) error {
 		return c.Status(500).JSON(response.ResponseModel{
 			RetCode: "500",
 			Message: status.RetCode500,
-			Data:    errors.ErrorModel{Message: "Failed to generate reset token", IsSuccess: false, Error: tokenErr},
+			Data:    errors.ErrorModel{Message: "Failed to generate OTP", IsSuccess: false, Error: tokenErr},
 		})
 	}
 
@@ -92,27 +102,77 @@ func ForgotPassword(c *fiber.Ctx) error {
 	}
 	passwordResetMu.Unlock()
 
-	resetBody := fmt.Sprintf(`
+	otpBody := fmt.Sprintf(`
 	<div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#111827;">
 	  <h2 style="margin:0 0 10px;">Reset your FeedForward password</h2>
-	  <p style="margin:0 0 12px;">Use the 6-digit code below to reset your password. This code expires in 5 minutes.</p>
+	  <p style="margin:0 0 12px;">Use the 6-digit OTP below to reset your password. This OTP expires in 5 minutes.</p>
 	  <div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;font-size:18px;font-weight:700;letter-spacing:.04em;word-break:break-all;">%s</div>
 	  <p style="margin:12px 0 0;font-size:12px;color:#6b7280;">If you did not request this, you can ignore this email.</p>
 	</div>
 	`, token)
 
-	if mailErr := SendHTMLEmail(email, "FeedForward password reset code", resetBody); mailErr != nil {
+	if mailErr := SendHTMLEmail(email, "FeedForward password reset OTP", otpBody); mailErr != nil {
 		return c.Status(500).JSON(response.ResponseModel{
 			RetCode: "500",
 			Message: status.RetCode500,
-			Data:    errors.ErrorModel{Message: "Failed to send reset email", IsSuccess: false, Error: mailErr},
+			Data:    errors.ErrorModel{Message: "Failed to send OTP email", IsSuccess: false, Error: mailErr},
 		})
 	}
 
 	return c.Status(200).JSON(response.ResponseModel{
 		RetCode: "200",
-		Message: "If this email is registered, a reset code has been sent",
+		Message: "If this email is registered, an OTP has been sent",
 		Data:    map[string]any{"sent": true},
+	})
+}
+
+func VerifyResetOTP(c *fiber.Ctx) error {
+	var req model.VerifyResetOTPRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Invalid request body", IsSuccess: false, Error: err},
+		})
+	}
+
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	otp := strings.TrimSpace(req.OTP)
+
+	if email == "" || otp == "" {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Email and OTP are required", IsSuccess: false},
+		})
+	}
+
+	now := time.Now()
+	passwordResetMu.Lock()
+	cleanupExpiredResetTokens(now)
+	entry, exists := passwordResetTokens[otp]
+	if exists && entry.Email == email {
+		delete(passwordResetTokens, otp)
+	}
+	passwordResetMu.Unlock()
+
+	if !exists || entry.Email != email {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Invalid or expired OTP", IsSuccess: false},
+		})
+	}
+
+	verifiedResetMu.Lock()
+	cleanupExpiredVerifiedResetEmails(now)
+	verifiedResetEmails[email] = now.Add(10 * time.Minute)
+	verifiedResetMu.Unlock()
+
+	return c.Status(200).JSON(response.ResponseModel{
+		RetCode: "200",
+		Message: "OTP verified",
+		Data:    map[string]any{"verified": true},
 	})
 }
 
@@ -128,14 +188,14 @@ func ResetPassword(c *fiber.Ctx) error {
 		})
 	}
 
-	token := strings.TrimSpace(req.Token)
+	email := strings.ToLower(strings.TrimSpace(req.Email))
 	newPassword := strings.TrimSpace(req.NewPassword)
 
-	if token == "" || newPassword == "" {
+	if email == "" || newPassword == "" {
 		return c.Status(400).JSON(response.ResponseModel{
 			RetCode: "400",
 			Message: status.RetCode400,
-			Data:    errors.ErrorModel{Message: "Token and new password are required", IsSuccess: false},
+			Data:    errors.ErrorModel{Message: "Email and new password are required", IsSuccess: false},
 		})
 	}
 	if len(newPassword) < 6 {
@@ -146,19 +206,20 @@ func ResetPassword(c *fiber.Ctx) error {
 		})
 	}
 
-	passwordResetMu.Lock()
-	cleanupExpiredResetTokens(time.Now())
-	entry, exists := passwordResetTokens[token]
-	if exists {
-		delete(passwordResetTokens, token)
+	now := time.Now()
+	verifiedResetMu.Lock()
+	cleanupExpiredVerifiedResetEmails(now)
+	_, verified := verifiedResetEmails[email]
+	if verified {
+		delete(verifiedResetEmails, email)
 	}
-	passwordResetMu.Unlock()
+	verifiedResetMu.Unlock()
 
-	if !exists {
+	if !verified {
 		return c.Status(400).JSON(response.ResponseModel{
 			RetCode: "400",
 			Message: status.RetCode400,
-			Data:    errors.ErrorModel{Message: "Invalid or expired reset code", IsSuccess: false},
+			Data:    errors.ErrorModel{Message: "Please verify OTP before resetting password", IsSuccess: false},
 		})
 	}
 
@@ -171,7 +232,7 @@ func ResetPassword(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := db.Table("public.users").Where("LOWER(TRIM(email)) = ?", strings.ToLower(strings.TrimSpace(entry.Email))).Update("password", string(hashedPassword)).Error; err != nil {
+	if err := db.Table("public.users").Where("LOWER(TRIM(email)) = ?", email).Update("password", string(hashedPassword)).Error; err != nil {
 		return c.Status(500).JSON(response.ResponseModel{
 			RetCode: "500",
 			Message: status.RetCode500,

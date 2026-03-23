@@ -70,6 +70,12 @@ type (
 		Password string `json:"password"`
 	}
 
+	ChangeUserPasswordRequest struct {
+		Email           string `json:"email"`
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword     string `json:"newPassword"`
+	}
+
 	FeedbackRequest struct {
 		Type        string `json:"type"`
 		Category    string `json:"category"`
@@ -85,8 +91,13 @@ type (
 		Email string `json:"email"`
 	}
 
+	VerifyResetOTPRequest struct {
+		Email string `json:"email"`
+		OTP   string `json:"otp"`
+	}
+
 	ResetPasswordRequest struct {
-		Token       string `json:"token"`
+		Email       string `json:"email"`
 		NewPassword string `json:"newPassword"`
 	}
 
