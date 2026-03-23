@@ -127,6 +127,8 @@ func ForgotPassword(c *fiber.Ctx) error {
 }
 
 func VerifyResetOTP(c *fiber.Ctx) error {
+	db := middleware.DBConn
+
 	var req model.VerifyResetOTPRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(response.ResponseModel{
@@ -169,10 +171,29 @@ func VerifyResetOTP(c *fiber.Ctx) error {
 	verifiedResetEmails[email] = now.Add(10 * time.Minute)
 	verifiedResetMu.Unlock()
 
+	var user model.User
+	if err := db.Table("public.users").Where("LOWER(TRIM(email)) = ?", email).First(&user).Error; err != nil {
+		return c.Status(404).JSON(response.ResponseModel{
+			RetCode: "404",
+			Message: "User not found",
+			Data:    errors.ErrorModel{Message: "No user found for this email", IsSuccess: false},
+		})
+	}
+
+	name := strings.TrimSpace(user.Name)
+	if name == "" {
+		name = strings.TrimSpace(user.FirstName + " " + user.LastName)
+	}
+
 	return c.Status(200).JSON(response.ResponseModel{
 		RetCode: "200",
-		Message: "OTP verified",
-		Data:    map[string]any{"verified": true},
+		Message: "OTP verified. Login successful",
+		Data: map[string]any{
+			"verified": true,
+			"id":       user.ID,
+			"name":     name,
+			"email":    strings.ToLower(strings.TrimSpace(user.Email)),
+		},
 	})
 }
 

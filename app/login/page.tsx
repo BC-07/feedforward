@@ -29,7 +29,6 @@ import {
   superAdminLogin,
   forgotPassword,
   verifyResetOTP,
-  resetPassword,
 } from "@/frontend/api";
 
 function clearSessionCookies() {
@@ -54,11 +53,8 @@ export default function Login() {
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [resetOtp, setResetOtp] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [isResetCodeVerified, setIsResetCodeVerified] = useState(false);
   const [isForgotLoading, setIsForgotLoading] = useState(false);
   const [isVerifyResetCodeLoading, setIsVerifyResetCodeLoading] = useState(false);
-  const [isResetLoading, setIsResetLoading] = useState(false);
 
   useEffect(() => {
     const isUserLoggedIn = localStorage.getItem("isUserLoggedIn") === "true";
@@ -166,9 +162,7 @@ export default function Login() {
     try {
       await forgotPassword({ email: normalizedForgotEmail });
       toast.success("If your email exists, an OTP was sent.");
-      setIsResetCodeVerified(false);
       setResetOtp("");
-      setNewPassword("");
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to send OTP");
     } finally {
@@ -188,44 +182,22 @@ export default function Login() {
 
     setIsVerifyResetCodeLoading(true);
     try {
-      await verifyResetOTP({ email: normalizedForgotEmail, otp: normalizedOtp });
-      setIsResetCodeVerified(true);
-      toast.success("OTP verified. You can now set a new password.");
-    } catch (err: unknown) {
-      setIsResetCodeVerified(false);
-      toast.error(err instanceof Error ? err.message : "Failed to verify OTP");
-    } finally {
-      setIsVerifyResetCodeLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const normalizedForgotEmail = forgotEmail.trim();
-    const normalizedNewPassword = newPassword.trim();
-
-    if (!normalizedForgotEmail || !normalizedNewPassword) {
-      toast.error("Email and new password are required.");
-      return;
-    }
-
-    if (!isResetCodeVerified) {
-      toast.error("Please verify OTP first.");
-      return;
-    }
-    setIsResetLoading(true);
-    try {
-      await resetPassword({ email: normalizedForgotEmail, newPassword: normalizedNewPassword });
-      toast.success("Password reset successful. You can now log in.");
+      const res = await verifyResetOTP({ email: normalizedForgotEmail, otp: normalizedOtp });
+      const user = res.data;
+      localStorage.setItem("isUserLoggedIn", "true");
+      localStorage.setItem("currentUserId", user.id);
+      localStorage.setItem("currentUserName", user.name);
+      localStorage.setItem("currentUserEmail", user.email);
+      setSessionCookie("ff_user_session", 60 * 60 * 24 * 7);
+      toast.success(`Welcome back, ${user.name}! Please change your password in your profile.`);
       setForgotOpen(false);
       setForgotEmail("");
       setResetOtp("");
-      setNewPassword("");
-      setIsResetCodeVerified(false);
+      router.push("/user");
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to reset password");
+      toast.error(err instanceof Error ? err.message : "Failed to verify OTP");
     } finally {
-      setIsResetLoading(false);
+      setIsVerifyResetCodeLoading(false);
     }
   };
 
@@ -250,11 +222,15 @@ export default function Login() {
                 <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   placeholder="Enter your email"
                   className="pl-10"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   required
                 />
               </div>
@@ -265,11 +241,13 @@ export default function Login() {
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="password"
+                  name="password"
                   type="password"
                   placeholder="Enter your password"
                   className="pl-10"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
                   required
                 />
               </div>
@@ -288,10 +266,8 @@ export default function Login() {
                 onOpenChange={(open) => {
                   setForgotOpen(open);
                   if (!open) {
-                    setIsResetCodeVerified(false);
                     setIsForgotLoading(false);
                     setIsVerifyResetCodeLoading(false);
-                    setIsResetLoading(false);
                   }
                 }}
               >
@@ -310,14 +286,11 @@ export default function Login() {
                 </DialogTrigger>
                 <DialogContent
                   className="max-w-md"
-                  onInteractOutside={() => {
-                    setIsResetCodeVerified(false);
-                  }}
                 >
                   <DialogHeader>
                     <DialogTitle>Reset Password</DialogTitle>
                     <DialogDescription>
-                      Request an OTP by email, verify it, then set your new password.
+                      Request an OTP by email, then verify it to log in once and change your password in profile.
                     </DialogDescription>
                   </DialogHeader>
 
@@ -325,10 +298,14 @@ export default function Login() {
                     <Label htmlFor="forgot-email">Email Address</Label>
                     <Input
                       id="forgot-email"
+                      name="forgotEmail"
                       type="email"
                       placeholder="Enter your registered email"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
+                      autoComplete="email"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       required
                     />
                     <Button type="submit" variant="outline" className="w-full" disabled={isForgotLoading}>
@@ -340,33 +317,16 @@ export default function Login() {
                     <Label htmlFor="reset-otp">OTP</Label>
                     <Input
                       id="reset-otp"
+                      name="otp"
                       placeholder="Paste OTP from email"
                       value={resetOtp}
                       onChange={(e) => setResetOtp(e.target.value)}
+                      autoComplete="one-time-code"
+                      inputMode="numeric"
                       required
                     />
                     <Button type="submit" variant="outline" className="w-full" disabled={isVerifyResetCodeLoading}>
                       {isVerifyResetCodeLoading ? "Verifying OTP..." : "Verify OTP"}
-                    </Button>
-                  </form>
-
-                  <form onSubmit={handleResetPassword} className="space-y-3 pt-2">
-                    <Label htmlFor="new-password">New Password</Label>
-                    <Input
-                      id="new-password"
-                      type="password"
-                      placeholder="At least 6 characters"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      required
-                      disabled={!isResetCodeVerified}
-                    />
-                    <Button
-                      type="submit"
-                      className="w-full bg-accent hover:bg-accent/90"
-                      disabled={isResetLoading || !isResetCodeVerified}
-                    >
-                      {isResetLoading ? "Resetting..." : "Reset Password"}
                     </Button>
                   </form>
                 </DialogContent>

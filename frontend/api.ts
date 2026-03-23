@@ -117,10 +117,7 @@ export const forgotPassword = (data: { email: string }) =>
   post<{ sent: boolean }>("/users/forgot-password", data);
 
 export const verifyResetOTP = (data: { email: string; otp: string }) =>
-  post<{ verified: boolean }>("/users/verify-reset-otp", data);
-
-export const resetPassword = (data: { email: string; newPassword: string }) =>
-  post<{ success: boolean }>("/users/reset-password", data);
+  post<{ verified: boolean; id: string; name: string; email: string }>("/users/verify-reset-otp", data);
 
 // ===================== ADMIN API =====================
 

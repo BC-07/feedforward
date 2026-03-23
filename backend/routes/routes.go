@@ -20,7 +20,6 @@ func AppRoutes(app *fiber.App) {
 	api.Post("/users/change-password", controller.ChangeUserPassword)
 	api.Post("/users/forgot-password", controller.ForgotPassword)
 	api.Post("/users/verify-reset-otp", controller.VerifyResetOTP)
-	api.Post("/users/reset-password", controller.ResetPassword)
 
 	// Admin routes
 	api.Post("/admins/register", controller.RegisterAdmin)
