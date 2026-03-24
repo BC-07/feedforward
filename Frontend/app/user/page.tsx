@@ -989,7 +989,14 @@ export default function UserProfile() {
                     }
                   }}
                 >
-                  {feedbacks.map((feedback) => (
+                  {[...feedbacks].sort((a, b) => {
+                    const order = ["pending", "in progress", "resolved"];
+                    const aIndex = order.indexOf(a.status.toLowerCase());
+                    const bIndex = order.indexOf(b.status.toLowerCase());
+                    const safeA = aIndex === -1 ? order.length : aIndex;
+                    const safeB = bIndex === -1 ? order.length : bIndex;
+                    return safeA - safeB;
+                  }).map((feedback) => (
                     <div
                       key={feedback.id}
                       className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"

@@ -857,7 +857,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main>{children}</main>
+      <main>
+        <div key={pathname} className="page-fade">
+          {children}
+        </div>
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-border bg-white mt-auto">

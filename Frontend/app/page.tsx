@@ -135,6 +135,13 @@ export default function Home() {
         <p className="text-xl text-white/90 mb-8">
           Join our community in building a better organization together through sambayanihan.
         </p>
+        <Link
+          href="/register"
+          className="px-8 py-4 bg-white text-orange-600 hover:bg-gray-200 rounded-lg transition-colors text-lg inline-flex items-center gap-2"
+        >
+          Join Now
+          <ArrowRight className="w-5 h-5" />
+        </Link>
 
       </section>
     </div>
