@@ -29,28 +29,30 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-white via-orange-50 to-white py-12 sm:py-20">
+      <section className="bg-gradient-to-br from-white via-orange-50 to-white pt-8 pb-4 sm:py-20 min-h-[55vh] sm:min-h-0 flex items-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-3xl sm:text-5xl md:text-6xl mb-4 sm:mb-6 text-black">
-              Your Voice Matters
-            </h1>
-            <p className="text-base sm:text-xl text-gray-700 mb-6 sm:mb-10 max-w-3xl mx-auto leading-relaxed">
-              FeedForward enables feedback, suggestions, and complaints through an organized system.
-              Help us create a better environment for everyone.
-            </p>
+          <div className="text-center max-w-4xl mx-auto flex flex-col items-center -mt-4 sm:mt-0">
+            <div className="-mt-6 sm:mt-0">
+              <h1 className="text-3xl sm:text-5xl md:text-6xl mb-4 sm:mb-6 text-black">
+                Your Voice Matters
+              </h1>
+              <p className="text-base sm:text-xl text-gray-700 mb-10 sm:mb-10 max-w-3xl mx-auto leading-relaxed">
+                FeedForward enables feedback, suggestions, and complaints through an organized system.
+                Help us create a better environment for everyone.
+              </p>
+            </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+            <div className="flex w-full flex-col sm:flex-row gap-3 sm:gap-4 justify-center sm:w-auto">
               <Link
                 href="/track"
-                className="px-6 sm:px-8 py-3 sm:py-4 bg-orange-500 text-white hover:bg-orange-600 rounded-lg transition-colors text-base sm:text-lg inline-flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-orange-500 text-white hover:bg-orange-600 rounded-lg transition-colors text-base sm:text-lg inline-flex items-center justify-center gap-2"
               >
                 Track Submission
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
                 href={isUserLoggedIn ? "/user" : "/login"}
-                className="px-6 sm:px-8 py-3 sm:py-4 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-base sm:text-lg text-center"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-base sm:text-lg text-center"
               >
                 {isUserLoggedIn ? "Go to Dashboard" : "Login / Sign Up"}
               </Link>
@@ -60,7 +62,7 @@ export default function Home() {
       </section>
 
       {/* Why Use FeedForward */}
-      <section className="py-12 sm:py-20 bg-white">
+      <section className="pt-6 pb-12 sm:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl sm:text-4xl text-center mb-10 sm:mb-16 text-black">
             Why Use FeedForward?
