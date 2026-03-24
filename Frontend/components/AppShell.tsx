@@ -703,10 +703,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => setIsUserProfileOpen(true)}
-                      className="flex items-center gap-2 text-sm hover:text-accent transition-colors"
+                      className="flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+                      aria-label="Open profile settings"
                     >
                       <AvatarDisplay src={userAvatar} fallback={<User />} size="sm" accentColor="accent" />
-                      <span className="font-medium">{userName}</span>
                     </button>
                     <Button variant="ghost" size="sm" onClick={handleUserLogout} className="text-sm">
                       <LogOut className="h-4 w-4 mr-1" />
