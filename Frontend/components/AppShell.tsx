@@ -33,6 +33,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const SESSION_EVENT = "feedforward:session-change";
 const emailLikePattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
@@ -59,6 +69,8 @@ type SessionSnapshot = {
   adminAvatar: string;
   superAdminName: string;
 };
+
+type LogoutRole = "user" | "admin" | "superadmin";
 
 const emptySessionSnapshot: SessionSnapshot = {
   isUserLoggedIn: false,
@@ -223,6 +235,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     new Set(),
   );
   const [isHydrated, setIsHydrated] = useState(false);
+  const [logoutConfirmRole, setLogoutConfirmRole] = useState<LogoutRole | null>(null);
+  const [isLogoutPending, setIsLogoutPending] = useState(false);
   const session = useSyncExternalStore(
     subscribeSessionSnapshot,
     getSessionSnapshot,
@@ -384,6 +398,74 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
   const adminNotificationCount = unreadAdminNotifications.length;
 
+  const clearSessionForRole = (role: LogoutRole) => {
+    if (role === "user") {
+      localStorage.removeItem("isUserLoggedIn");
+      localStorage.removeItem("currentUserId");
+      localStorage.removeItem("currentUserName");
+      localStorage.removeItem("currentUserEmail");
+      return;
+    }
+
+    if (role === "admin") {
+      localStorage.removeItem("isAdminLoggedIn");
+      localStorage.removeItem("currentAdminId");
+      localStorage.removeItem("currentAdminName");
+      localStorage.removeItem("currentAdminEmail");
+      localStorage.removeItem("currentAdminDepartment");
+      return;
+    }
+
+    localStorage.removeItem("isSuperAdminLoggedIn");
+    localStorage.removeItem("superAdminName");
+    localStorage.removeItem("superAdminExpiresAt");
+  };
+
+  const getLogoutSuccessMessage = (role: LogoutRole) => {
+    if (role === "user") return "Logged out successfully";
+    if (role === "admin") return "Admin logged out successfully";
+    return "Superadmin logged out successfully";
+  };
+
+  const getLogoutRedirect = (role: LogoutRole) => {
+    if (role === "superadmin") return "/login";
+    return "/";
+  };
+
+  const getLogoutDialogCopy = (role: LogoutRole) => {
+    if (role === "user") {
+      return {
+        title: "Logout your account?",
+        description: "You will need to log in again to access your user account.",
+      };
+    }
+
+    if (role === "admin") {
+      return {
+        title: "Logout as admin?",
+        description: "You will be signed out of the admin dashboard and returned to the homepage.",
+      };
+    }
+
+    return {
+      title: "Logout as superadmin?",
+      description: "You will be signed out of the superadmin panel and sent back to the login page.",
+    };
+  };
+
+  const performLogout = async (role: LogoutRole) => {
+    try {
+      await logout();
+    } catch {
+      // Best-effort logout
+    }
+
+    clearSessionForRole(role);
+    announceSessionChange();
+    toast.success(getLogoutSuccessMessage(role));
+    router.push(getLogoutRedirect(role));
+  };
+
   // ── Avatar upload handlers ───────────────────────────────────────────────
   const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -420,49 +502,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   // ── Auth / profile handlers ──────────────────────────────────────────────
-  const handleUserLogout = async () => {
-    try {
-      await logout();
-    } catch {
-      // Best-effort logout
-    }
-    localStorage.removeItem("isUserLoggedIn");
-    localStorage.removeItem("currentUserId");
-    localStorage.removeItem("currentUserName");
-    localStorage.removeItem("currentUserEmail");
-    announceSessionChange();
-    toast.success("Logged out successfully");
-    router.push("/");
+  const handleUserLogout = () => {
+    setLogoutConfirmRole("user");
   };
 
-  const handleAdminLogout = async () => {
-    try {
-      await logout();
-    } catch {
-      // Best-effort logout
-    }
-    localStorage.removeItem("isAdminLoggedIn");
-    localStorage.removeItem("currentAdminId");
-    localStorage.removeItem("currentAdminName");
-    localStorage.removeItem("currentAdminEmail");
-    localStorage.removeItem("currentAdminDepartment");
-    announceSessionChange();
-    toast.success("Admin logged out successfully");
-    router.push("/");
+  const handleAdminLogout = () => {
+    setLogoutConfirmRole("admin");
   };
 
-  const handleSuperAdminLogout = async () => {
+  const handleSuperAdminLogout = () => {
+    setLogoutConfirmRole("superadmin");
+  };
+
+  const handleLogoutConfirm = async () => {
+    if (!logoutConfirmRole || isLogoutPending) return;
+
+    const role = logoutConfirmRole;
+    setIsLogoutPending(true);
     try {
-      await logout();
-    } catch {
-      // Best-effort logout
+      await performLogout(role);
+      setLogoutConfirmRole(null);
+    } finally {
+      setIsLogoutPending(false);
     }
-    localStorage.removeItem("isSuperAdminLoggedIn");
-    localStorage.removeItem("superAdminName");
-    localStorage.removeItem("superAdminExpiresAt");
-    announceSessionChange();
-    toast.success("Superadmin logged out successfully");
-    router.push("/login");
   };
 
   const handleLogoClick = async (event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -476,16 +538,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       // Best-effort logout
     }
     if (effectiveSession.isAdminLoggedIn) {
-      localStorage.removeItem("isAdminLoggedIn");
-      localStorage.removeItem("currentAdminId");
-      localStorage.removeItem("currentAdminName");
-      localStorage.removeItem("currentAdminEmail");
-      localStorage.removeItem("currentAdminDepartment");
+      clearSessionForRole("admin");
     }
     if (effectiveSession.isSuperAdminLoggedIn) {
-      localStorage.removeItem("isSuperAdminLoggedIn");
-      localStorage.removeItem("superAdminName");
-      localStorage.removeItem("superAdminExpiresAt");
+      clearSessionForRole("superadmin");
     }
     announceSessionChange();
     router.push("/");
@@ -556,7 +612,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!window.confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
     try {
       await deleteUserAccount(userId);
-      handleUserLogout();
+      await performLogout("user");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete account.",
@@ -617,6 +673,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       );
     }
   };
+
+  const logoutDialogCopy = logoutConfirmRole
+    ? getLogoutDialogCopy(logoutConfirmRole)
+    : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -869,7 +929,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </footer>
 
-      {/* ── Admin Profile Sheet ─────────────────────────────────────────── */}
+      {/* Logout Confirmation */}
+      <AlertDialog
+        open={logoutConfirmRole !== null}
+        onOpenChange={(open) => {
+          if (!open && !isLogoutPending) {
+            setLogoutConfirmRole(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{logoutDialogCopy?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {logoutDialogCopy?.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLogoutPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isLogoutPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                void handleLogoutConfirm();
+              }}
+            >
+              {isLogoutPending ? "Logging out..." : "Logout"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Admin Profile Sheet */}
       <Sheet open={isProfileOpen} onOpenChange={setIsProfileOpen}>
         <SheetContent className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl">
           <SheetHeader className="px-2 flex items-center justify-center text-center">

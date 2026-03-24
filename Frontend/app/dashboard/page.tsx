@@ -73,6 +73,38 @@ interface AdminRecord {
   department?: string;
 }
 
+const SESSION_EVENT = "feedforward:session-change";
+
+function markAdminNotificationAsRead(
+  adminId: string,
+  unit: string,
+  feedbackId: string,
+) {
+  if (typeof window === "undefined") return;
+  if (!adminId.trim() || !unit.trim() || !feedbackId.trim()) return;
+
+  const key = `adminNotificationsRead:${adminId}:${unit}`;
+  const stored = localStorage.getItem(key);
+  const nextReadIds = new Set<string>();
+
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        parsed
+          .filter((value): value is string => typeof value === "string")
+          .forEach((value) => nextReadIds.add(value));
+      }
+    } catch {
+      // Ignore malformed stored read-state.
+    }
+  }
+
+  nextReadIds.add(feedbackId);
+  localStorage.setItem(key, JSON.stringify(Array.from(nextReadIds)));
+  window.dispatchEvent(new Event(SESSION_EVENT));
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const [currentAdmin, setCurrentAdmin] = useState<{
@@ -192,6 +224,13 @@ export default function AdminDashboard() {
         response: response || selectedFeedback.response,
         priority: newPriority || selectedFeedback.priority,
       });
+      if (currentAdmin?.id && currentAdmin.unit) {
+        markAdminNotificationAsRead(
+          currentAdmin.id,
+          currentAdmin.unit,
+          selectedFeedback.id,
+        );
+      }
       if (currentAdmin?.unit) {
         await loadFeedbacks(currentAdmin.unit);
       }

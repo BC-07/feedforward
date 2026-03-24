@@ -606,9 +606,11 @@ export default function UserProfile() {
             </DialogDescription>
           </DialogHeader>
           {deleteTarget && (
-            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-              <p className="font-semibold">{deleteTarget.subject}</p>
-              <p className="mt-1 text-xs text-muted-foreground font-mono">
+            <div className="min-w-0 rounded-lg border bg-muted/30 p-3 text-sm">
+              <p className="font-semibold break-words break-all">
+                {deleteTarget.subject}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground font-mono break-all">
                 {deleteTarget.id}
               </p>
             </div>
