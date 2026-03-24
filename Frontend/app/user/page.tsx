@@ -504,7 +504,7 @@ export default function UserProfile() {
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
       {trackingId && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-8 animate-in fade-in-0">
-          <div className="w-full max-w-lg">
+          <div className="w-full max-w-lg -translate-y-[10%]">
             <Card className="shadow-lg animate-in zoom-in-95 fade-in-0">
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">

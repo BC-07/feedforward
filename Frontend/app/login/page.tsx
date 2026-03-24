@@ -93,8 +93,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
-      <Card className="max-w-md w-full shadow-lg">
+    <div className="flex-1 flex flex-col justify-center sm:items-center sm:justify-center bg-gradient-to-br from-white to-muted px-4 py-4 sm:py-12">
+      <Card className="max-w-md w-full shadow-lg translate-y-[20%] sm:translate-y-0">
         <CardHeader className="text-center">
           <div className="mx-auto mb-3 sm:mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
             <LogIn className="h-8 w-8 text-accent" />

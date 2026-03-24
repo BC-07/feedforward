@@ -65,7 +65,7 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-      <body className="min-h-screen bg-background flex flex-col">
+      <body className="min-h-screen min-h-[100svh] bg-background flex flex-col">
         {/* Header */}
         <header className="border-b border-border bg-white">
           <div className="container mx-auto px-4 py-4">
@@ -154,7 +154,7 @@ export default function RootLayout({
 
         {/* Footer */}
         <footer className="border-t border-border bg-white mt-auto">
-          <div className="container mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
+          <div className="container mx-auto px-4 py-2 sm:py-6 text-center text-sm text-muted-foreground">
             <p>
               &copy; {new Date().getFullYear()} FeedForward. All rights
               reserved.

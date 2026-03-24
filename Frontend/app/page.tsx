@@ -32,7 +32,7 @@ export default function Home() {
       <section className="bg-gradient-to-br from-white via-orange-50 to-white pt-8 pb-4 sm:py-20 min-h-[55vh] sm:min-h-0 flex items-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto flex flex-col items-center -mt-4 sm:mt-0">
-            <div className="-mt-6 sm:mt-0">
+            <div className="relative -translate-y-[55px] sm:translate-y-0">
               <h1 className="text-3xl sm:text-5xl md:text-6xl mb-4 sm:mb-6 text-black">
                 Your Voice Matters
               </h1>

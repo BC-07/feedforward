@@ -679,7 +679,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     : null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-[100svh] flex flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-white">
         <div className="container mx-auto px-4 py-4">
@@ -930,7 +930,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main>
+      <main className="flex-1 flex flex-col">
         <div key={pathname} className="page-fade">
           {children}
         </div>
