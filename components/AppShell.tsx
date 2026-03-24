@@ -15,7 +15,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { changeUserPassword } from "@/frontend/api";
+import { changeUserPassword, logoutAdmin, logoutSuperAdmin, logoutUser } from "@/frontend/api";
 
 // ── Reusable Avatar component ──────────────────────────────────────────────
 const AvatarDisplay = ({
@@ -98,11 +98,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       !pathname.startsWith("/superadmin");
 
     if (leftSuperAdminRoute) {
+      void logoutSuperAdmin();
       localStorage.removeItem("isSuperAdminLoggedIn");
-      localStorage.removeItem("superAdminToken");
+      localStorage.removeItem("superAdminId");
       localStorage.removeItem("superAdminName");
+      localStorage.removeItem("superAdminToken");
       localStorage.removeItem("superAdminExpiresAt");
-      document.cookie = "ff_superadmin_session=; Path=/; Max-Age=0; SameSite=Lax";
     }
 
     const userLoggedIn = localStorage.getItem("isUserLoggedIn") === "true";
@@ -166,25 +167,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   // ── Auth / profile handlers ──────────────────────────────────────────────
-  const handleUserLogout = () => {
+  const handleUserLogout = async () => {
+    try {
+      await logoutUser();
+    } catch {
+      // no-op
+    }
+
     localStorage.removeItem("isUserLoggedIn");
     localStorage.removeItem("currentUserId");
     localStorage.removeItem("currentUserName");
     localStorage.removeItem("currentUserEmail");
-    document.cookie = "ff_user_session=; Path=/; Max-Age=0; SameSite=Lax";
     setIsUserLoggedIn(false);
     setUserName("");
     toast.success("Logged out successfully");
     router.push("/");
   };
 
-  const handleAdminLogout = () => {
+  const handleAdminLogout = async () => {
+    try {
+      await logoutAdmin();
+    } catch {
+      // no-op
+    }
+
     localStorage.removeItem("isAdminLoggedIn");
     localStorage.removeItem("currentAdminId");
     localStorage.removeItem("currentAdminName");
     localStorage.removeItem("currentAdminEmail");
     localStorage.removeItem("currentAdminDepartment");
-    document.cookie = "ff_admin_session=; Path=/; Max-Age=0; SameSite=Lax";
     setIsAdminLoggedIn(false);
     setAdminName("");
     toast.success("Admin logged out successfully");

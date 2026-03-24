@@ -43,6 +43,7 @@ import {
   getFeedbackById,
   getFeedbacksByUser,
   listCategories,
+  logoutUser,
   FeedbackData,
   type Category,
 } from "@/frontend/api";
@@ -98,12 +99,17 @@ export default function UserProfile() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+    } catch {
+      // no-op
+    }
+
     localStorage.removeItem("isUserLoggedIn");
     localStorage.removeItem("currentUserId");
     localStorage.removeItem("currentUserName");
     localStorage.removeItem("currentUserEmail");
-    document.cookie = "ff_user_session=; Path=/; Max-Age=0; SameSite=Lax";
     toast.success("Logged out successfully");
     router.push("/login");
   };

@@ -18,16 +18,17 @@ type (
 
 	// Admin represents a registered admin account
 	Admin struct {
-		ID         string `json:"id" gorm:"column:id;primaryKey"`
-		FirstName  string `json:"firstName" gorm:"column:first_name"`
-		LastName   string `json:"lastName" gorm:"column:last_name"`
-		Name       string `json:"name" gorm:"column:name;<-:false"`
-		Email      string `json:"email" gorm:"column:email"`
-		Password   string `json:"-" gorm:"column:password"`
-		Unit       string `json:"unit" gorm:"column:unit"`
-		IsDisabled bool   `json:"isDisabled" gorm:"column:is_disabled"`
-		CreatedAt  string `json:"createdAt" gorm:"column:created_at"`
-		UpdatedAt  string `json:"updatedAt" gorm:"column:updated_at"`
+		ID           string `json:"id" gorm:"column:id;primaryKey"`
+		FirstName    string `json:"firstName" gorm:"column:first_name"`
+		LastName     string `json:"lastName" gorm:"column:last_name"`
+		Name         string `json:"name" gorm:"column:name;<-:false"`
+		Email        string `json:"email" gorm:"column:email"`
+		Password     string `json:"-" gorm:"column:password"`
+		Unit         string `json:"unit" gorm:"column:unit"`
+		IsDisabled   bool   `json:"isDisabled" gorm:"column:is_disabled"`
+		IsSuperAdmin bool   `json:"isSuperAdmin" gorm:"column:is_superadmin"`
+		CreatedAt    string `json:"createdAt" gorm:"column:created_at"`
+		UpdatedAt    string `json:"updatedAt" gorm:"column:updated_at"`
 	}
 
 	// Feedback represents a submitted feedback entry
@@ -111,5 +112,17 @@ type (
 	Category struct {
 		ID   int    `json:"id" gorm:"column:id;primaryKey;autoIncrement"`
 		Name string `json:"name" gorm:"column:name"`
+	}
+
+	Session struct {
+		ID                 string  `json:"id" gorm:"column:id;primaryKey"`
+		Role               string  `json:"role" gorm:"column:role"`
+		UserID             *string `json:"userId,omitempty" gorm:"column:user_id"`
+		AdminID            *string `json:"adminId,omitempty" gorm:"column:admin_id"`
+		SuperadminUsername *string `json:"superadminUsername,omitempty" gorm:"column:superadmin_username"`
+		CreatedAt          string  `json:"createdAt" gorm:"column:created_at"`
+		LastActivityAt     string  `json:"lastActivityAt" gorm:"column:last_activity_at"`
+		ExpiresAt          string  `json:"expiresAt" gorm:"column:expires_at"`
+		ReauthExpiresAt    *string `json:"reauthExpiresAt,omitempty" gorm:"column:reauth_expires_at"`
 	}
 )

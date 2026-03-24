@@ -14,6 +14,7 @@ export interface UserData {
   id: string;
   name: string;
   email: string;
+  sessionId?: string;
 }
 
 export interface AdminData {
@@ -21,6 +22,20 @@ export interface AdminData {
   name: string;
   email: string;
   unit: string;
+  isSuperAdmin?: boolean;
+  sessionId?: string;
+}
+
+export interface SessionData {
+  id: string;
+  role: string;
+  userId?: string;
+  adminId?: string;
+  superadminUsername?: string;
+  createdAt: string;
+  lastActivityAt: string;
+  expiresAt: string;
+  reauthExpiresAt?: string;
 }
 
 export interface Admin {
@@ -62,6 +77,7 @@ async function request<T>(
 ): Promise<ApiResponse<T>> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     ...options,
   });
   const json = await res.json();
@@ -117,7 +133,10 @@ export const forgotPassword = (data: { email: string }) =>
   post<{ sent: boolean }>("/users/forgot-password", data);
 
 export const verifyResetOTP = (data: { email: string; otp: string }) =>
-  post<{ verified: boolean; id: string; name: string; email: string }>("/users/verify-reset-otp", data);
+  post<{ verified: boolean; id: string; name: string; email: string; sessionId?: string }>("/users/verify-reset-otp", data);
+
+export const logoutUser = () =>
+  post<{ success: boolean }>("/users/logout", {});
 
 // ===================== ADMIN API =====================
 
@@ -135,6 +154,9 @@ export const loginAdmin = (data: { email: string; password: string }) =>
 
 export const setAdminPassword = (data: { token: string; newPassword: string }) =>
   post<{ success: boolean }>("/admins/set-password", data);
+
+export const logoutAdmin = () =>
+  post<{ success: boolean }>("/admins/logout", {});
 
 export const updateAdminUnit = (adminId: string, unit: string) =>
   put<{ unit: string }>(`/admins/${adminId}/unit`, { unit });
@@ -173,15 +195,16 @@ export const deleteFeedback = (id: string) =>
 
 async function requestWithToken<T>(
   path: string,
-  token: string,
+  superAdminId: string,
   options?: RequestInit,
 ): Promise<ApiResponse<T>> {
   const { headers: extraHeaders, ...restOptions } = options ?? {};
   const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
     ...restOptions,
     headers: {
       "Content-Type": "application/json",
-      "X-SuperAdmin-Token": token,
+      "X-SuperAdmin-Id": superAdminId,
       ...(extraHeaders as Record<string, string>),
     },
   });
@@ -192,36 +215,39 @@ async function requestWithToken<T>(
   return json as ApiResponse<T>;
 }
 
-export const superAdminLogin = (key: string) =>
-  post<{ token: string; name: string; expiresAt: string }>("/superadmin/login", { key });
-
-export const listAdmins = async (token: string): Promise<Admin[]> => {
-  const res = await requestWithToken<Admin[]>("/superadmin/admins", token, { method: "GET" });
+export const listAdmins = async (superAdminId: string): Promise<Admin[]> => {
+  const res = await requestWithToken<Admin[]>("/superadmin/admins", superAdminId, { method: "GET" });
   return res.data;
 };
 
 export const createAdminBySuperAdmin = (
-  token: string,
+  superAdminId: string,
   data: { firstName: string; lastName: string; email: string; unit: string },
-) => requestWithToken<Admin>("/superadmin/admins", token, {
+) => requestWithToken<Admin>("/superadmin/admins", superAdminId, {
   method: "POST",
   body: JSON.stringify(data),
 });
 
 export const updateAdminBySuperAdmin = (
-  token: string,
+  superAdminId: string,
   id: string,
   data: { firstName: string; lastName: string; email: string; password: string; unit: string },
-) => requestWithToken<Admin>(`/superadmin/admins/${id}`, token, {
+) => requestWithToken<Admin>(`/superadmin/admins/${id}`, superAdminId, {
   method: "PUT",
   body: JSON.stringify(data),
 });
 
-export const deleteAdminBySuperAdmin = (token: string, id: string) =>
-  requestWithToken<string>(`/superadmin/admins/${id}`, token, { method: "DELETE" });
+export const deleteAdminBySuperAdmin = (superAdminId: string, id: string) =>
+  requestWithToken<string>(`/superadmin/admins/${id}`, superAdminId, { method: "DELETE" });
 
-export const disableAdminBySuperAdmin = (token: string, id: string) =>
-  requestWithToken<Admin>(`/superadmin/admins/${id}/disable`, token, { method: "PATCH" });
+export const disableAdminBySuperAdmin = (superAdminId: string, id: string) =>
+  requestWithToken<Admin>(`/superadmin/admins/${id}/disable`, superAdminId, { method: "PATCH" });
+
+export const logoutSuperAdmin = () =>
+  post<{ success: boolean }>("/superadmin/logout", {});
+
+export const getCurrentSession = () =>
+  get<SessionData>("/sessions/current");
 
 // ===================== CATEGORY API =====================
 
@@ -231,10 +257,10 @@ export const listCategories = async (): Promise<Category[]> => {
 };
 
 export const createCategoryBySuperAdmin = async (
-  token: string,
+  superAdminId: string,
   data: { name: string },
 ): Promise<Category[]> => {
-  const res = await requestWithToken<Category[]>("/superadmin/categories", token, {
+  const res = await requestWithToken<Category[]>("/superadmin/categories", superAdminId, {
     method: "POST",
     body: JSON.stringify(data),
   });
@@ -242,11 +268,11 @@ export const createCategoryBySuperAdmin = async (
 };
 
 export const updateCategoryBySuperAdmin = async (
-  token: string,
+  superAdminId: string,
   id: number,
   data: { name: string },
 ): Promise<Category[]> => {
-  const res = await requestWithToken<Category[]>(`/superadmin/categories/${id}`, token, {
+  const res = await requestWithToken<Category[]>(`/superadmin/categories/${id}`, superAdminId, {
     method: "PUT",
     body: JSON.stringify(data),
   });
@@ -254,10 +280,10 @@ export const updateCategoryBySuperAdmin = async (
 };
 
 export const deleteCategoryBySuperAdmin = async (
-  token: string,
+  superAdminId: string,
   id: number,
 ): Promise<Category[]> => {
-  const res = await requestWithToken<Category[]>(`/superadmin/categories/${id}`, token, {
+  const res = await requestWithToken<Category[]>(`/superadmin/categories/${id}`, superAdminId, {
     method: "DELETE",
   });
   return res.data;

@@ -3,10 +3,10 @@ import type { NextRequest } from "next/server";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hasUserSession = request.cookies.get("ff_user_session")?.value === "1";
-  const hasAdminSession = request.cookies.get("ff_admin_session")?.value === "1";
+  const hasUserSession = !!request.cookies.get("ff_user_session")?.value?.trim();
+  const hasAdminSession = !!request.cookies.get("ff_admin_session")?.value?.trim();
   const hasSuperAdminSession =
-    request.cookies.get("ff_superadmin_session")?.value === "1";
+    !!request.cookies.get("ff_superadmin_session")?.value?.trim();
 
   const redirectTo = (path: string) => {
     const url = request.nextUrl.clone();

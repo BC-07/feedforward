@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"strings"
 
 	"FeedForward/backend/middleware"
 	"FeedForward/backend/routes"
@@ -22,8 +24,13 @@ func init() {
 }
 
 func main() {
+	appName := strings.TrimSpace(middleware.GetEnv("PROJ_NAME"))
+	if appName == "" {
+		appName = "FeedForward"
+	}
+
 	app := fiber.New(fiber.Config{
-		AppName: middleware.GetEnv("PROJ_NAME"),
+		AppName: appName,
 	})
 
 	// CORS must be registered BEFORE routes
@@ -44,5 +51,13 @@ func main() {
 	routes.AppRoutes(app)
 
 	// Start Server
-	app.Listen(fmt.Sprintf(":%s", middleware.GetEnv("PROJ_PORT")))
+	port := strings.TrimSpace(middleware.GetEnv("PROJ_PORT"))
+	if port == "" {
+		port = "5566"
+	}
+
+	listenAddr := fmt.Sprintf(":%s", port)
+	if err := app.Listen(listenAddr); err != nil {
+		log.Fatalf("failed to start server on %s: %v", listenAddr, err)
+	}
 }

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"FeedForward/backend/middleware"
@@ -106,8 +107,26 @@ func LoginAdmin(c *fiber.Ctx) error {
 		})
 	}
 
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	password := strings.TrimSpace(req.Password)
+	if email == "" || password == "" {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Email and password are required", IsSuccess: false},
+		})
+	}
+
 	var admin model.Admin
-	if err := db.Table("public.admins").Where("email = ?", req.Email).First(&admin).Error; err != nil {
+	result := db.Table("public.admins").Where("LOWER(TRIM(email)) = ?", email).Limit(1).Find(&admin)
+	if result.Error != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to query admin account", IsSuccess: false, Error: result.Error},
+		})
+	}
+	if result.RowsAffected == 0 {
 		return c.Status(401).JSON(response.ResponseModel{
 			RetCode: "401",
 			Message: "Invalid email or password",
@@ -115,12 +134,19 @@ func LoginAdmin(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(req.Password)); err != nil {
-		return c.Status(401).JSON(response.ResponseModel{
-			RetCode: "401",
-			Message: "Invalid email or password",
-			Data:    errors.ErrorModel{Message: "Incorrect password", IsSuccess: false},
-		})
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(password)); err != nil {
+		if strings.TrimSpace(admin.Password) != password {
+			return c.Status(401).JSON(response.ResponseModel{
+				RetCode: "401",
+				Message: "Invalid email or password",
+				Data:    errors.ErrorModel{Message: "Incorrect password", IsSuccess: false},
+			})
+		}
+
+		hashedPassword, hashErr := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if hashErr == nil {
+			_ = db.Table("public.admins").Where("id = ?", admin.ID).Update("password", string(hashedPassword)).Error
+		}
 	}
 
 	if admin.IsDisabled {
@@ -131,14 +157,39 @@ func LoginAdmin(c *fiber.Ctx) error {
 		})
 	}
 
+	name := strings.TrimSpace(admin.Name)
+	if name == "" {
+		name = strings.TrimSpace(admin.FirstName + " " + admin.LastName)
+	}
+
+	adminID := admin.ID
+	role := middleware.SessionRoleAdmin
+	var superadminUsername *string
+	if admin.IsSuperAdmin {
+		role = middleware.SessionRoleSuperAdmin
+		superadmin := strings.ToLower(strings.TrimSpace(admin.Email))
+		superadminUsername = &superadmin
+	}
+
+	session, sessionErr := middleware.CreateSession(c, role, nil, &adminID, superadminUsername, 7*24*time.Hour, nil)
+	if sessionErr != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to create session", IsSuccess: false, Error: sessionErr},
+		})
+	}
+
 	return c.Status(200).JSON(response.ResponseModel{
 		RetCode: "200",
 		Message: "Login successful",
 		Data: map[string]any{
-			"id":    admin.ID,
-			"name":  admin.Name,
-			"email": admin.Email,
-			"unit":  admin.Unit,
+			"id":           admin.ID,
+			"name":         name,
+			"email":        admin.Email,
+			"unit":         admin.Unit,
+			"isSuperAdmin": admin.IsSuperAdmin,
+			"sessionId":    session.ID,
 		},
 	})
 }

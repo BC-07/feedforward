@@ -17,6 +17,7 @@ func AppRoutes(app *fiber.App) {
 	// User routes
 	api.Post("/users/register", controller.RegisterUser)
 	api.Post("/users/login", controller.LoginUser)
+	api.Post("/users/logout", controller.LogoutUser)
 	api.Post("/users/change-password", controller.ChangeUserPassword)
 	api.Post("/users/forgot-password", controller.ForgotPassword)
 	api.Post("/users/verify-reset-otp", controller.VerifyResetOTP)
@@ -24,8 +25,13 @@ func AppRoutes(app *fiber.App) {
 	// Admin routes
 	api.Post("/admins/register", controller.RegisterAdmin)
 	api.Post("/admins/login", controller.LoginAdmin)
+	api.Post("/admins/logout", controller.LogoutAdmin)
 	api.Post("/admins/set-password", controller.SetAdminPassword)
 	api.Put("/admins/:id/unit", controller.UpdateAdminUnit)
+	api.Post("/superadmin/logout", controller.LogoutSuperAdmin)
+
+	// Session routes
+	api.Get("/sessions/current", controller.CurrentSession)
 
 	// Feedback routes — specific paths must be before /:id
 	api.Post("/feedbacks", controller.SubmitFeedback)
@@ -36,7 +42,6 @@ func AppRoutes(app *fiber.App) {
 	api.Delete("/feedbacks/:id", controller.DeleteFeedback)
 
 	// Superadmin routes
-	api.Post("/superadmin/login", controller.SuperAdminLogin)
 	api.Get("/superadmin/admins", controller.SuperAdminListAdmins)
 	api.Post("/superadmin/admins", controller.SuperAdminCreateAdmin)
 	api.Put("/superadmin/admins/:id", controller.SuperAdminUpdateAdmin)

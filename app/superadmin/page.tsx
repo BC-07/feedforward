@@ -9,6 +9,7 @@ import {
   deleteCategoryBySuperAdmin,
   listAdmins,
   listCategories,
+  logoutSuperAdmin,
   updateCategoryBySuperAdmin,
   updateAdminBySuperAdmin,
   type Admin,
@@ -66,12 +67,12 @@ const emptyEditForm = {
 };
 
 async function fetchAdmins(
-  sessionToken: string,
+  superAdminId: string,
   onSuccess: (admins: Admin[]) => void,
   onAuthFailure: () => void,
 ) {
   try {
-    const data = await listAdmins(sessionToken);
+    const data = await listAdmins(superAdminId);
     startTransition(() => {
       onSuccess(data);
     });
@@ -87,21 +88,25 @@ async function fetchAdmins(
   }
 }
 
-function clearSuperAdminSession(onRedirect: () => void) {
+async function clearSuperAdminSession(onRedirect: () => void) {
+  try {
+    await logoutSuperAdmin();
+  } catch {
+    // no-op
+  }
+
   localStorage.removeItem("isSuperAdminLoggedIn");
-  localStorage.removeItem("superAdminToken");
+  localStorage.removeItem("superAdminId");
   localStorage.removeItem("superAdminName");
-  localStorage.removeItem("superAdminExpiresAt");
-  document.cookie = "ff_superadmin_session=; Path=/; Max-Age=0; SameSite=Lax";
   onRedirect();
 }
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
-  const [token] = useState(() =>
+  const [superAdminId] = useState(() =>
     typeof window === "undefined"
       ? ""
-      : localStorage.getItem("superAdminToken") || "",
+      : localStorage.getItem("superAdminId") || "",
   );
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -152,22 +157,15 @@ export default function SuperAdminDashboard() {
     if (typeof window === "undefined") return;
 
     const isLoggedIn = localStorage.getItem("isSuperAdminLoggedIn") === "true";
-    const sessionToken = localStorage.getItem("superAdminToken") || "";
-    const expiresAt = localStorage.getItem("superAdminExpiresAt") || "";
+    const sessionAdminId = localStorage.getItem("superAdminId") || "";
 
-    if (!isLoggedIn || !sessionToken) {
+    if (!isLoggedIn || !sessionAdminId) {
       router.push("/login");
       return;
     }
 
-    if (expiresAt && new Date(expiresAt).getTime() < Date.now()) {
-      clearSuperAdminSession(() => router.push("/login"));
-      toast.error("Superadmin session expired.");
-      return;
-    }
-
-    void fetchAdmins(sessionToken, setAdmins, () =>
-      clearSuperAdminSession(() => router.push("/login")),
+    void fetchAdmins(sessionAdminId, setAdmins, () =>
+      void clearSuperAdminSession(() => router.push("/login")),
     );
     void listCategories()
       .then((data: Category[]) => {
@@ -182,13 +180,13 @@ export default function SuperAdminDashboard() {
 
   const handleCreateAdmin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!token) return;
+    if (!superAdminId) return;
 
     try {
-      await createAdminBySuperAdmin(token, createForm);
+      await createAdminBySuperAdmin(superAdminId, createForm);
       setCreateForm(emptyCreateForm);
-      await fetchAdmins(token, setAdmins, () =>
-        clearSuperAdminSession(() => router.push("/login")),
+      await fetchAdmins(superAdminId, setAdmins, () =>
+        void clearSuperAdminSession(() => router.push("/login")),
       );
       toast.success("Admin created successfully");
     } catch (error) {
@@ -211,15 +209,15 @@ export default function SuperAdminDashboard() {
   };
 
   const handleUpdateAdmin = async () => {
-    if (!token || !selectedAdmin) return;
+    if (!superAdminId || !selectedAdmin) return;
 
     try {
-      await updateAdminBySuperAdmin(token, selectedAdmin.id, editForm);
+      await updateAdminBySuperAdmin(superAdminId, selectedAdmin.id, editForm);
       setIsEditOpen(false);
       setSelectedAdmin(null);
       setEditForm(emptyEditForm);
-      await fetchAdmins(token, setAdmins, () =>
-        clearSuperAdminSession(() => router.push("/login")),
+      await fetchAdmins(superAdminId, setAdmins, () =>
+        void clearSuperAdminSession(() => router.push("/login")),
       );
       toast.success("Admin updated successfully");
     } catch (error) {
@@ -230,13 +228,13 @@ export default function SuperAdminDashboard() {
   };
 
   const handleDisableAdmin = async (admin: Admin) => {
-    if (!token) return;
+    if (!superAdminId) return;
     if (!window.confirm(`Disable admin access for ${admin.name}?`)) return;
 
     try {
-      await disableAdminBySuperAdmin(token, admin.id);
-      await fetchAdmins(token, setAdmins, () =>
-        clearSuperAdminSession(() => router.push("/login")),
+      await disableAdminBySuperAdmin(superAdminId, admin.id);
+      await fetchAdmins(superAdminId, setAdmins, () =>
+        void clearSuperAdminSession(() => router.push("/login")),
       );
       toast.success("Admin account disabled");
     } catch (error) {
@@ -248,10 +246,10 @@ export default function SuperAdminDashboard() {
 
   const handleCreateCategory = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!token) return;
+    if (!superAdminId) return;
 
     try {
-      const updated = await createCategoryBySuperAdmin(token, {
+      const updated = await createCategoryBySuperAdmin(superAdminId, {
         name: newCategoryName,
       });
       setCategories(updated);
@@ -271,15 +269,15 @@ export default function SuperAdminDashboard() {
   };
 
   const handleSaveCategoryEdit = async () => {
-    if (!token || editingCategoryId === null) return;
+    if (!superAdminId || editingCategoryId === null) return;
 
     try {
-      const updated = await updateCategoryBySuperAdmin(token, editingCategoryId, {
+      const updated = await updateCategoryBySuperAdmin(superAdminId, editingCategoryId, {
         name: editingCategoryName,
       });
       setCategories(updated);
-      await fetchAdmins(token, setAdmins, () =>
-        clearSuperAdminSession(() => router.push("/login")),
+      await fetchAdmins(superAdminId, setAdmins, () =>
+        void clearSuperAdminSession(() => router.push("/login")),
       );
       setCreateForm((current) => ({
         ...current,
@@ -307,14 +305,14 @@ export default function SuperAdminDashboard() {
   };
 
   const handleDeleteCategory = async (category: Category) => {
-    if (!token) return;
+    if (!superAdminId) return;
     if (!window.confirm(`Delete category "${category.name}"?`)) return;
 
     try {
-      const updated = await deleteCategoryBySuperAdmin(token, category.id);
+      const updated = await deleteCategoryBySuperAdmin(superAdminId, category.id);
       setCategories(updated);
-      await fetchAdmins(token, setAdmins, () =>
-        clearSuperAdminSession(() => router.push("/login")),
+      await fetchAdmins(superAdminId, setAdmins, () =>
+  		void clearSuperAdminSession(() => router.push("/login")),
       );
       setCreateForm((current) => ({
         ...current,

@@ -33,5 +33,32 @@ func ConnectDB() bool {
 		return true
 	}
 
+	DBErr = DBConn.Exec(`
+		CREATE TABLE IF NOT EXISTS public.sessions
+		(
+			id character varying(64) NOT NULL,
+			role character varying(20) NOT NULL,
+			user_id character varying(64),
+			admin_id character varying(64),
+			superadmin_username character varying(120),
+			created_at timestamp with time zone NOT NULL DEFAULT now(),
+			last_activity_at timestamp with time zone NOT NULL,
+			expires_at timestamp with time zone NOT NULL,
+			reauth_expires_at timestamp with time zone,
+			CONSTRAINT sessions_pkey PRIMARY KEY (id)
+		);
+	`).Error
+	if DBErr != nil {
+		return true
+	}
+
+	DBErr = DBConn.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_sessions_expires_at
+		ON public.sessions (expires_at);
+	`).Error
+	if DBErr != nil {
+		return true
+	}
+
 	return false
 }

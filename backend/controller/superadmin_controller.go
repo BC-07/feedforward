@@ -60,37 +60,38 @@ func cleanupExpiredAdminSetupTokens(now time.Time) {
 }
 
 func superAdminAuth(c *fiber.Ctx) bool {
-	return c.Get("X-SuperAdmin-Token") == middleware.GetEnv("SUPERADMIN_KEY")
-}
+	db := middleware.DBConn
+	superAdminID := strings.TrimSpace(c.Get("X-SuperAdmin-Id"))
+	if superAdminID == "" {
+		return false
+	}
 
-func SuperAdminLogin(c *fiber.Ctx) error {
-	var req struct {
-		Key string `json:"key"`
+	sessionID := middleware.GetSessionIDFromCookies(c, middleware.SessionRoleSuperAdmin)
+	if sessionID == "" {
+		return false
 	}
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(response.ResponseModel{
-			RetCode: "400",
-			Message: status.RetCode400,
-			Data:    errors.ErrorModel{Message: "Invalid request body", IsSuccess: false, Error: err},
-		})
+
+	session, err := middleware.GetActiveSessionByIDAndRole(sessionID, middleware.SessionRoleSuperAdmin)
+	if err != nil || session == nil {
+		return false
 	}
-	if req.Key != middleware.GetEnv("SUPERADMIN_KEY") {
-		return c.Status(401).JSON(response.ResponseModel{
-			RetCode: "401",
-			Message: "Invalid superadmin key",
-			Data:    errors.ErrorModel{Message: "The provided key is incorrect", IsSuccess: false},
-		})
+	if session.AdminID == nil || strings.TrimSpace(*session.AdminID) != superAdminID {
+		return false
 	}
-	expiresAt := time.Now().Add(8 * time.Hour).Format(time.RFC3339)
-	return c.Status(200).JSON(response.ResponseModel{
-		RetCode: "200",
-		Message: "Superadmin login successful",
-		Data: map[string]any{
-			"token":     middleware.GetEnv("SUPERADMIN_KEY"),
-			"name":      "Superadmin",
-			"expiresAt": expiresAt,
-		},
-	})
+	middleware.TouchSession(sessionID)
+
+	var admin model.Admin
+	result := db.Table("public.admins").
+		Select("id, is_disabled, is_superadmin").
+		Where("id = ?", superAdminID).
+		Limit(1).
+		Find(&admin)
+
+	if result.Error != nil || result.RowsAffected == 0 {
+		return false
+	}
+
+	return admin.IsSuperAdmin && !admin.IsDisabled
 }
 
 func SuperAdminListAdmins(c *fiber.Ctx) error {

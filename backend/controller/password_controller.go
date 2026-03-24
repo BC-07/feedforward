@@ -185,14 +185,25 @@ func VerifyResetOTP(c *fiber.Ctx) error {
 		name = strings.TrimSpace(user.FirstName + " " + user.LastName)
 	}
 
+	userID := user.ID
+	session, sessionErr := middleware.CreateSession(c, middleware.SessionRoleUser, &userID, nil, nil, 7*24*time.Hour, nil)
+	if sessionErr != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to create session", IsSuccess: false, Error: sessionErr},
+		})
+	}
+
 	return c.Status(200).JSON(response.ResponseModel{
 		RetCode: "200",
 		Message: "OTP verified. Login successful",
 		Data: map[string]any{
-			"verified": true,
-			"id":       user.ID,
-			"name":     name,
-			"email":    strings.ToLower(strings.TrimSpace(user.Email)),
+			"verified":  true,
+			"id":        user.ID,
+			"name":      name,
+			"email":     strings.ToLower(strings.TrimSpace(user.Email)),
+			"sessionId": session.ID,
 		},
 	})
 }
