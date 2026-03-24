@@ -5,6 +5,7 @@ import (
 	"intern_template_v1/middleware"
 	"intern_template_v1/model"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -292,8 +293,65 @@ func UpdateFeedback(c *fiber.Ctx) error {
 			args = append(args, "")
 		} else if value, ok := raw.(string); ok {
 			trimmed := strings.TrimSpace(value)
-			sets = append(sets, "response = ?")
-			args = append(args, trimmed)
+			if trimmed != "" {
+				author := ""
+				if rawAuthor, ok := payload["responseAuthor"].(string); ok {
+					author = strings.TrimSpace(rawAuthor)
+				}
+				if author == "" {
+					if session, err := requireAdminSession(c); err == nil {
+						if session.AdminID != nil {
+							var adminRecord struct {
+								FirstName string `gorm:"column:first_name"`
+							}
+							_ = db.Raw(
+								`SELECT first_name FROM `+adminTable+` WHERE id = ?`,
+								*session.AdminID,
+							).Scan(&adminRecord).Error
+							author = strings.TrimSpace(adminRecord.FirstName)
+						}
+					}
+				}
+				if author == "" {
+					if rawEmail, ok := payload["responseAuthorEmail"].(string); ok {
+						email := strings.TrimSpace(rawEmail)
+						if email != "" {
+							var adminRecord struct {
+								FirstName string `gorm:"column:first_name"`
+							}
+							_ = db.Raw(
+								`SELECT first_name FROM `+adminTable+` WHERE email = ?`,
+								email,
+							).Scan(&adminRecord).Error
+							author = strings.TrimSpace(adminRecord.FirstName)
+						}
+					}
+				}
+				if author == "" && strings.TrimSpace(existing.Category) != "" {
+					var adminRecord struct {
+						FirstName string `gorm:"column:first_name"`
+					}
+					_ = db.Raw(
+						`SELECT first_name FROM `+adminTable+` WHERE LOWER(unit) = LOWER(?) AND COALESCE(is_disabled, FALSE) = FALSE LIMIT 1`,
+						strings.TrimSpace(existing.Category),
+					).Scan(&adminRecord).Error
+					author = strings.TrimSpace(adminRecord.FirstName)
+				}
+				stamp := time.Now().UTC().Format("Jan 2, 2006 3:04 PM UTC")
+				entry := fmt.Sprintf("[%s] %s", stamp, trimmed)
+				if author != "" {
+					entry = fmt.Sprintf("[%s] %s — %s", stamp, author, trimmed)
+				}
+				combined := entry
+				if existing.Response != nil {
+					existingText := strings.TrimSpace(*existing.Response)
+					if existingText != "" {
+						combined = existingText + "\n\n" + entry
+					}
+				}
+				sets = append(sets, "response = ?")
+				args = append(args, combined)
+			}
 		}
 	}
 	if len(sets) == 0 {

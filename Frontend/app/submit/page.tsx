@@ -160,7 +160,7 @@ export default function Submit() {
 
   if (trackingId) {
     return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center bg-gradient-to-br from-white to-muted p-4">
+      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
         <Card className="max-w-lg w-full shadow-lg">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
@@ -191,16 +191,16 @@ export default function Submit() {
                 Sign in to receive email updates when your feedback is resolved.
               </p>
             )}
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 w-full"
                 onClick={() => copyToClipboard(trackingId)}
               >
                 Copy ID
               </Button>
               <Button
-                className="flex-1 bg-accent hover:bg-accent/90"
+                className="flex-1 w-full bg-accent hover:bg-accent/90"
                 onClick={() => setTrackingId(null)}
               >
                 Submit Another
@@ -213,10 +213,10 @@ export default function Submit() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted p-4 py-12">
+    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
       <div className="container mx-auto max-w-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-3">Submit Your Feedback</h1>
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3">Submit Your Feedback</h1>
           <p className="text-muted-foreground">
             Help us improve by sharing your suggestions, complaints, and
             inquiries.
@@ -232,7 +232,7 @@ export default function Submit() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="type">Feedback Type *</Label>
                 <Select
@@ -295,7 +295,7 @@ export default function Submit() {
                 <Textarea
                   id="message"
                   placeholder="Provide detailed information about your feedback..."
-                  rows={6}
+                  rows={5}
                   value={formData.message}
                   onChange={(e) =>
                     setFormData({ ...formData, message: e.target.value })

@@ -29,28 +29,28 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-white via-orange-50 to-white py-20">
+      <section className="bg-gradient-to-br from-white via-orange-50 to-white py-12 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-5xl md:text-6xl mb-6 text-black">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl mb-4 sm:mb-6 text-black">
               Your Voice Matters
             </h1>
-            <p className="text-xl text-gray-700 mb-10 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-base sm:text-xl text-gray-700 mb-6 sm:mb-10 max-w-3xl mx-auto leading-relaxed">
               FeedForward enables feedback, suggestions, and complaints through an organized system.
               Help us create a better environment for everyone.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
               <Link
                 href="/track"
-                className="px-8 py-4 bg-orange-500 text-white hover:bg-orange-600 rounded-lg transition-colors text-lg inline-flex items-center justify-center gap-2"
+                className="px-6 sm:px-8 py-3 sm:py-4 bg-orange-500 text-white hover:bg-orange-600 rounded-lg transition-colors text-base sm:text-lg inline-flex items-center justify-center gap-2"
               >
                 Track Submission
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
                 href={isUserLoggedIn ? "/user" : "/login"}
-                className="px-8 py-4 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-lg text-center"
+                className="px-6 sm:px-8 py-3 sm:py-4 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-base sm:text-lg text-center"
               >
                 {isUserLoggedIn ? "Go to Dashboard" : "Login / Sign Up"}
               </Link>
@@ -60,13 +60,13 @@ export default function Home() {
       </section>
 
       {/* Why Use FeedForward */}
-      <section className="py-20 bg-white">
+      <section className="py-12 sm:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl text-center mb-16 text-black">
+          <h2 className="text-2xl sm:text-4xl text-center mb-10 sm:mb-16 text-black">
             Why Use FeedForward?
           </h2>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             <Feature
               icon={<Shield className="w-8 h-8 text-orange-500" />}
               title="Secure Feedback"
@@ -92,13 +92,13 @@ export default function Home() {
       </section>
 
       {/* Benefits */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-12 sm:py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl text-center mb-16 text-black">
+          <h2 className="text-2xl sm:text-4xl text-center mb-10 sm:mb-16 text-black">
             Benefits for Everyone
           </h2>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             <Benefit
               title="For Users"
               items={[
@@ -128,16 +128,16 @@ export default function Home() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 bg-gradient-to-br from-orange-500 to-orange-600 text-center text-white">
-        <h2 className="text-4xl mb-6">
+      <section className="py-12 sm:py-20 bg-gradient-to-br from-orange-500 to-orange-600 text-center text-white">
+        <h2 className="text-2xl sm:text-4xl mb-4 sm:mb-6">
           Ready to Make Your Voice Heard?
         </h2>
-        <p className="text-xl text-white/90 mb-8">
+        <p className="text-base sm:text-xl text-white/90 mb-6 sm:mb-8">
           Join our community in building a better organization together through sambayanihan.
         </p>
         <Link
           href="/register"
-          className="px-8 py-4 bg-white text-orange-600 hover:bg-gray-200 rounded-lg transition-colors text-lg inline-flex items-center gap-2"
+          className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-orange-600 hover:bg-gray-200 rounded-lg transition-colors text-base sm:text-lg inline-flex items-center gap-2"
         >
           Join Now
           <ArrowRight className="w-5 h-5" />

@@ -70,7 +70,7 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted p-4 sm:p-6">
       <Card className="max-w-2xl w-full shadow-lg">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
@@ -84,7 +84,7 @@ export default function Signup() {
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="first-name">
                   First Name <span className="text-destructive">*</span>
@@ -152,7 +152,7 @@ export default function Signup() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="password">
                   Password <span className="text-destructive">*</span>

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowRight, LogOut, User } from "lucide-react";
+import { ArrowRight, LogOut, User, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
@@ -86,9 +86,11 @@ export default function RootLayout({
                 <nav className="flex items-center gap-6">
                   <Link
                     href="/track"
-                    className="text-sm hover:text-accent transition-colors"
+                    className={`items-center gap-2 text-sm hover:text-accent transition-colors ${isUserLoggedIn ? "flex" : "hidden sm:flex"}`}
+                    aria-label="Track Submission"
                   >
-                    Track Submission
+                    <Eye className="h-4 w-4 sm:hidden" />
+                    <span className="hidden sm:inline">Track Submission</span>
                   </Link>
 
                   {isUserLoggedIn ? (
@@ -106,17 +108,20 @@ export default function RootLayout({
                         size="sm"
                         onClick={handleUserLogout}
                         className="text-sm"
+                        aria-label="Logout"
                       >
-                        <LogOut className="h-4 w-4 mr-1" />
-                        Logout
+                        <LogOut className="h-4 w-4 sm:mr-1" />
+                        <span className="hidden sm:inline">Logout</span>
                       </Button>
                     </div>
                   ) : (
                     <Link
                       href="/login"
-                      className="text-sm bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent/90 transition-colors"
+                      className="hidden items-center justify-center gap-2 text-sm bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent/90 transition-colors sm:flex"
+                      aria-label="Log In"
                     >
-                      Log In
+                      <User className="h-4 w-4 sm:hidden" />
+                      <span className="hidden sm:inline">Log In</span>
                     </Link>
                   )}
                 </nav>
@@ -129,9 +134,14 @@ export default function RootLayout({
                     <span className="font-medium">{adminName}</span>
                   </div>
 
-                  <Button variant="ghost" size="sm" onClick={handleAdminLogout}>
-                    <LogOut className="h-4 w-4 mr-1" />
-                    Logout
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleAdminLogout}
+                    aria-label="Logout"
+                  >
+                    <LogOut className="h-4 w-4 sm:mr-1" />
+                    <span className="hidden sm:inline">Logout</span>
                   </Button>
                 </div>
               )}

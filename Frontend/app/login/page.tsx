@@ -93,13 +93,13 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
       <Card className="max-w-md w-full shadow-lg">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
+          <div className="mx-auto mb-3 sm:mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
             <LogIn className="h-8 w-8 text-accent" />
           </div>
-          <CardTitle>Login to FeedForward</CardTitle>
+          <CardTitle className="text-2xl sm:text-3xl">Login to FeedForward</CardTitle>
           <CardDescription>Sign in with your account credentials</CardDescription>
         </CardHeader>
 

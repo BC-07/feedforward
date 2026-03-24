@@ -219,11 +219,17 @@ export default function AdminDashboard() {
     if (!selectedFeedback) return;
 
     try {
-      await updateFeedback(selectedFeedback.id, {
+      const payload: Partial<Feedback> & { responseAuthorEmail?: string } = {
         status: newStatus || selectedFeedback.status,
-        response: response || selectedFeedback.response,
         priority: newPriority || selectedFeedback.priority,
-      });
+      };
+      if (response.trim() !== "") {
+        payload.response = response.trim();
+        if (currentAdmin?.email) {
+          payload.responseAuthorEmail = currentAdmin.email;
+        }
+      }
+      await updateFeedback(selectedFeedback.id, payload);
       if (currentAdmin?.id && currentAdmin.unit) {
         markAdminNotificationAsRead(
           currentAdmin.id,
@@ -372,6 +378,41 @@ export default function AdminDashboard() {
     return `${datePart} ${timePart}`;
   };
 
+  const parseAdminResponses = (response?: string | null) => {
+    if (!response) return [];
+    return response
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const match = line.match(/^\[(.+?)\]\s*(.*)$/);
+        if (!match) {
+          return { time: null, author: null, message: line };
+        }
+        const rawMessage = match[2] || "";
+        const parts = rawMessage.split(" — ");
+        if (parts.length >= 2) {
+          const author = parts.shift()?.trim() || null;
+          const message = parts.join(" — ").trim();
+          return { time: match[1], author, message };
+        }
+        return { time: match[1], author: null, message: rawMessage };
+      })
+      .filter((entry) => entry.message);
+  };
+
+  const formatAdminTime = (timeRaw?: string | null) => {
+    if (!timeRaw) return null;
+    const parsed = new Date(timeRaw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+    return timeRaw.replace(/\s*UTC\s*$/i, "");
+  };
+
   const buildFileNameBase = () => {
     const now = new Date();
     const pad2 = (value: number) => String(value).padStart(2, "0");
@@ -428,7 +469,7 @@ export default function AdminDashboard() {
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text("FeedForward — Feedback Report", 40, 40);
+    doc.text("FeedForward - Feedback Report", 40, 40);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
@@ -549,11 +590,13 @@ export default function AdminDashboard() {
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
       {/* Header */}
       <div className="bg-primary text-primary-foreground">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container mx-auto px-4 py-5 sm:py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-              <p className="text-primary-foreground/80 mt-1">
+              <h1 className="text-2xl font-bold sm:text-3xl">
+                Admin Dashboard
+              </h1>
+              <p className="mt-1 text-sm text-primary-foreground/80 sm:text-base">
                 {currentAdmin?.name && (
                   <span className="flex items-center gap-2">
                     <UserCircle2 className="h-4 w-4" />
@@ -568,13 +611,15 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-6 sm:py-8">
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card className="shadow-lg">
             <CardHeader className="pb-3">
               <CardDescription>Total Feedback</CardDescription>
-              <CardTitle className="text-3xl">{stats.total}</CardTitle>
+              <CardTitle className="text-2xl sm:text-3xl">
+                {stats.total}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -586,7 +631,7 @@ export default function AdminDashboard() {
           <Card className="shadow-lg">
             <CardHeader className="pb-3">
               <CardDescription>Pending</CardDescription>
-              <CardTitle className="text-3xl text-yellow-600">
+              <CardTitle className="text-2xl text-yellow-600 sm:text-3xl">
                 {stats.pending}
               </CardTitle>
             </CardHeader>
@@ -600,7 +645,7 @@ export default function AdminDashboard() {
           <Card className="shadow-lg">
             <CardHeader className="pb-3">
               <CardDescription>In Progress</CardDescription>
-              <CardTitle className="text-3xl text-blue-600">
+              <CardTitle className="text-2xl text-blue-600 sm:text-3xl">
                 {stats.inProgress}
               </CardTitle>
             </CardHeader>
@@ -614,7 +659,7 @@ export default function AdminDashboard() {
           <Card className="shadow-lg">
             <CardHeader className="pb-3">
               <CardDescription>Resolved</CardDescription>
-              <CardTitle className="text-3xl text-green-600">
+              <CardTitle className="text-2xl text-green-600 sm:text-3xl">
                 {stats.resolved}
               </CardTitle>
             </CardHeader>
@@ -630,26 +675,32 @@ export default function AdminDashboard() {
         {/* Filters */}
         <Card className="mb-6">
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Search className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Search className="h-4 w-4 sm:h-5 sm:w-5" />
               Search &amp; Filter
             </CardTitle>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={exportFeedbacksPdf}
+                className="w-full sm:w-auto"
               >
                 Export PDF
               </Button>
-              <Button type="button" variant="outline" onClick={exportFeedbacksXlsx}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={exportFeedbacksXlsx}
+                className="w-full sm:w-auto"
+              >
                 Export XLSX
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-3 items-end">
-              <div className="flex gap-1 flex-1 min-w-[220px]">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:col-span-2 lg:col-span-2">
                 <div className="flex-1">
                   <Input
                     placeholder="Search by ID, subject, or message..."
@@ -658,16 +709,16 @@ export default function AdminDashboard() {
                   />
                 </div>
                 <Select value={filterName} onValueChange={setFilterName}>
-                  <SelectTrigger className="w-[100px] shrink-0">
+                  <SelectTrigger className="w-full sm:w-[120px]">
                     <SelectValue placeholder="Name" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="asc">A → Z</SelectItem>
-                    <SelectItem value="desc">Z → A</SelectItem>
+                    <SelectItem value="asc">A - Z</SelectItem>
+                    <SelectItem value="desc">Z - A</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              <div className="min-w-[140px]">
+              <div className="w-full">
                 <Select value={filterDate} onValueChange={setFilterDate}>
                   <SelectTrigger>
                     <SelectValue placeholder="Date" />
@@ -678,7 +729,7 @@ export default function AdminDashboard() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="min-w-[130px]">
+              <div className="w-full">
                 <Select value={filterType} onValueChange={setFilterType}>
                   <SelectTrigger>
                     <SelectValue placeholder="Type" />
@@ -693,7 +744,7 @@ export default function AdminDashboard() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="min-w-[130px]">
+              <div className="w-full">
                 <Select
                   value={filterPriority}
                   onValueChange={setFilterPriority}
@@ -709,7 +760,7 @@ export default function AdminDashboard() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="min-w-[130px]">
+              <div className="w-full">
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
                   <SelectTrigger>
                     <SelectValue placeholder="Status" />
@@ -729,15 +780,17 @@ export default function AdminDashboard() {
         {/* Feedback Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Feedback Submissions
-            </CardTitle>
-            <CardDescription>
-              Showing {filteredFeedbacks.length} of {feedbacks.length}{" "}
-              submissions
-              {currentAdmin?.unit && ` for ${currentAdmin.unit}`}
-            </CardDescription>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Feedback Submissions
+              </CardTitle>
+              <CardDescription>
+                Showing {filteredFeedbacks.length} of {feedbacks.length}{" "}
+                submissions
+                {currentAdmin?.unit && ` for ${currentAdmin.unit}`}
+              </CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             {filteredFeedbacks.length === 0 ? (
@@ -754,7 +807,7 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                <Table className="[&_th]:px-3 [&_td]:px-3">
+                <Table className="min-w-[980px] text-xs sm:text-sm [&_th]:px-3 [&_td]:px-3">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
@@ -845,7 +898,7 @@ export default function AdminDashboard() {
                                 size="sm"
                                 onClick={() => {
                                   setSelectedFeedback(feedback);
-                                  setResponse(feedback.response || "");
+                                  setResponse("");
                                   setNewStatus(feedback.status);
                                   setNewPriority(feedback.priority);
                                   setIsEditDialogOpen(true);
@@ -951,10 +1004,31 @@ export default function AdminDashboard() {
                                         <Label className="text-muted-foreground">
                                           Current Response
                                         </Label>
-                                        <div className="bg-accent/5 border border-accent/20 rounded-lg p-4 mt-2">
-                                          <p className="text-sm whitespace-pre-wrap">
-                                            {selectedFeedback.response}
-                                          </p>
+                                        <div className="bg-accent/5 border border-accent/20 rounded-lg p-4 mt-2 max-h-[260px] overflow-y-auto">
+                                          <div className="space-y-3">
+                                            {parseAdminResponses(
+                                              selectedFeedback.response,
+                                            ).map((entry, index) => (
+                                              <div
+                                                key={`${entry.time ?? "note"}-${index}`}
+                                              >
+                                                {entry.time && (
+                                                  <p className="text-[10px] font-semibold text-muted-foreground">
+                                                    {entry.author && (
+                                                      <span className="text-[11px] text-foreground">
+                                                        {entry.author}
+                                                      </span>
+                                                    )}
+                                                    {entry.author ? " " : ""}
+                                                    {formatAdminTime(entry.time)}
+                                                  </p>
+                                                )}
+                                                <p className="text-sm text-foreground/90 leading-relaxed">
+                                                  {entry.message}
+                                                </p>
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
                                       </div>
                                     )}

@@ -12,7 +12,7 @@ import {
   updateUserProfile,
   type Feedback,
 } from "@/lib/api";
-import { ArrowRight, LogOut, User, UserCircle2, Camera, Bell, MoreVertical } from "lucide-react";
+import { ArrowRight, LogOut, User, UserCircle2, Camera, Bell, MoreVertical, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -708,21 +708,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     >
                       <AvatarDisplay src={userAvatar} fallback={<User />} size="sm" accentColor="accent" />
                     </button>
-                    <Button variant="ghost" size="sm" onClick={handleUserLogout} className="text-sm">
-                      <LogOut className="h-4 w-4 mr-1" />
-                      Logout
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleUserLogout}
+                      className="text-sm"
+                      aria-label="Logout"
+                    >
+                      <LogOut className="h-4 w-4 sm:mr-1" />
+                      <span className="hidden sm:inline">Logout</span>
                     </Button>
                   </div>
                 ) : (
                   <>
-                    <Link href="/track" className="text-sm hover:text-accent transition-colors">
-                      Track Submission
+                    <Link
+                      href="/track"
+                      className="hidden items-center gap-2 text-sm hover:text-accent transition-colors sm:flex"
+                      aria-label="Track Submission"
+                    >
+                      <Eye className="h-4 w-4 sm:hidden" />
+                      <span className="hidden sm:inline">Track Submission</span>
                     </Link>
                     <Link
                       href="/login"
-                      className="text-sm bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent/90 transition-colors"
+                      className="hidden items-center justify-center gap-2 text-sm bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent/90 transition-colors sm:flex"
+                      aria-label="Log in"
                     >
-                      LogIn
+                      <User className="h-4 w-4 sm:hidden" />
+                      <span className="hidden sm:inline">LogIn</span>
                     </Link>
                   </>
                 )}
@@ -1094,7 +1107,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* ── User Profile Sheet ──────────────────────────────────────────── */}
       <Sheet open={isUserProfileOpen} onOpenChange={setIsUserProfileOpen}>
-        <SheetContent className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl">
+        <SheetContent className="mobile-profile-sheet w-[360px] max-w-[92vw] sm:w-[400px] overflow-y-auto rounded-l-3xl data-[state=open]:duration-1500 data-[state=closed]:duration-1000 data-[state=open]:ease-out data-[state=closed]:ease-in sm:data-[state=open]:duration-500 sm:data-[state=closed]:duration-300">
           <SheetHeader className="px-2 flex items-center justify-center text-center">
             <SheetTitle className="text-center w-full">My Profile</SheetTitle>
             <SheetDescription className="text-center w-full">View and update your account</SheetDescription>

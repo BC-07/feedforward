@@ -195,3 +195,19 @@
     transform: translateY(0);
   }
 }
+
+@media (max-width: 640px) {
+  .mobile-profile-sheet {
+    transform: translateX(100%) !important;
+    opacity: 0;
+    transition-property: transform, opacity;
+    transition-duration: 1400ms;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+  }
+
+  .mobile-profile-sheet[data-state="open"] {
+    transform: translateX(0) !important;
+    opacity: 1;
+  }
+}

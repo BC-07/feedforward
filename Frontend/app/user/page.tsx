@@ -83,6 +83,7 @@ export default function UserProfile() {
   const [formData, setFormData] = useState(emptyForm);
   const [confirmData, setConfirmData] = useState(emptyForm);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
@@ -103,6 +104,10 @@ export default function UserProfile() {
       );
     }
   }
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -419,6 +424,41 @@ export default function UserProfile() {
     });
   };
 
+  const parseAdminResponses = (response?: string | null) => {
+    if (!response) return [];
+    return response
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const match = line.match(/^\[(.+?)\]\s*(.*)$/);
+        if (!match) {
+          return { time: null, author: null, message: line };
+        }
+        const rawMessage = match[2] || "";
+        const parts = rawMessage.split(" — ");
+        if (parts.length >= 2) {
+          const author = parts.shift()?.trim() || null;
+          const message = parts.join(" — ").trim();
+          return { time: match[1], author, message };
+        }
+        return { time: match[1], author: null, message: rawMessage };
+      })
+      .filter((entry) => entry.message);
+  };
+
+  const formatAdminTime = (timeRaw?: string | null) => {
+    if (!timeRaw) return null;
+    const parsed = new Date(timeRaw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+    return timeRaw.replace(/\s*UTC\s*$/i, "");
+  };
+
   const getStatusMessage = (status: string) => {
     switch (status.toLowerCase()) {
       case "pending":
@@ -461,7 +501,7 @@ export default function UserProfile() {
 
   return (
     <>
-      <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
+    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
       {trackingId && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-8 animate-in fade-in-0">
           <div className="w-full max-w-lg">
@@ -641,11 +681,11 @@ export default function UserProfile() {
         </DialogContent>
       </Dialog>
       <div className="bg-accent text-accent-foreground">
-        <div className="container mx-auto px-4 py-6">
+        <div className="container mx-auto px-4 py-5 sm:py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold">User Dashboard</h1>
-              <p className="text-accent-foreground/80 mt-1">
+              <h1 className="text-2xl sm:text-3xl font-bold">User Dashboard</h1>
+              <p className="text-accent-foreground/80 mt-1 text-sm sm:text-base">
                 Welcome, {currentUser?.fullName}
               </p>
             </div>
@@ -653,12 +693,12 @@ export default function UserProfile() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-2 gap-8 items-stretch">
+      <div className="container mx-auto px-4 py-6 sm:py-8">
+        <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 items-stretch">
           <div ref={leftColumnRef} className="flex flex-col gap-6">
             {/* Track Feedback */}
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Track Your Feedback</h2>
+            <div className="order-2 sm:order-1">
+              <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Track Your Feedback</h2>
 
               <Card className="shadow-lg mb-6">
                 <CardHeader>
@@ -668,7 +708,7 @@ export default function UserProfile() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleSearch} className="flex gap-3">
+                  <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
                     <Input
                       placeholder="e.g., FF-ABC123XYZ"
                       value={searchTrackingId}
@@ -689,8 +729,8 @@ export default function UserProfile() {
             </div>
 
             {/* Submit Feedback */}
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Submit Feedback</h2>
+            <div className="order-1 sm:order-2">
+              <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Submit Feedback</h2>
               <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle>Feedback Form</CardTitle>
@@ -702,66 +742,89 @@ export default function UserProfile() {
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="type">Feedback Type *</Label>
-                      <Select
-                        value={formData.type}
-                        onValueChange={(value) =>
-                          setFormData({ ...formData, type: value })
-                        }
-                        required
-                      >
-                        <SelectTrigger id="type">
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="suggestion">Suggestion</SelectItem>
-                        <SelectItem value="complaint">Complaint</SelectItem>
-                        <SelectItem value="inquiry">Inquiry</SelectItem>
-                        <SelectItem value="request">Request</SelectItem>
-                        <SelectItem value="compliment">Compliment</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      {isHydrated ? (
+                        <Select
+                          value={formData.type}
+                          onValueChange={(value) =>
+                            setFormData({ ...formData, type: value })
+                          }
+                          required
+                        >
+                          <SelectTrigger id="type">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="suggestion">
+                              Suggestion
+                            </SelectItem>
+                            <SelectItem value="complaint">Complaint</SelectItem>
+                            <SelectItem value="inquiry">Inquiry</SelectItem>
+                            <SelectItem value="request">Request</SelectItem>
+                            <SelectItem value="compliment">Compliment</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div
+                          className="h-10 rounded-md border bg-muted/30"
+                          aria-hidden="true"
+                        />
+                      )}
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="category">Category *</Label>
-                      <Select
-                        value={formData.category}
-                        onValueChange={(value) =>
-                          setFormData({ ...formData, category: value })
-                        }
-                        required
-                      >
-                        <SelectTrigger id="category">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((category) => (
-                            <SelectItem key={category} value={category}>
-                              {category}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {isHydrated ? (
+                        <Select
+                          value={formData.category}
+                          onValueChange={(value) =>
+                            setFormData({ ...formData, category: value })
+                          }
+                          required
+                        >
+                          <SelectTrigger id="category">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categories.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div
+                          className="h-10 rounded-md border bg-muted/30"
+                          aria-hidden="true"
+                        />
+                      )}
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="priority">Severity Level *</Label>
-                      <Select
-                        value={formData.priority}
-                        onValueChange={(value) =>
-                          setFormData({ ...formData, priority: value })
-                        }
-                        required
-                      >
-                        <SelectTrigger id="priority">
-                          <SelectValue placeholder="Select severity" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Low">Low</SelectItem>
-                          <SelectItem value="Medium">Medium</SelectItem>
-                          <SelectItem value="High">High</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      {isHydrated ? (
+                        <Select
+                          value={formData.priority}
+                          onValueChange={(value) =>
+                            setFormData({ ...formData, priority: value })
+                          }
+                          required
+                        >
+                          <SelectTrigger id="priority">
+                            <SelectValue placeholder="Select severity" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Low">Low</SelectItem>
+                            <SelectItem value="Medium">Medium</SelectItem>
+                            <SelectItem value="High">High</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div
+                          className="h-10 rounded-md border bg-muted/30"
+                          aria-hidden="true"
+                        />
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -953,17 +1016,34 @@ export default function UserProfile() {
                   </Card>
 
                   {selectedFeedback.response && (
-                    <Card className="shadow-lg bg-blue-50/50 border-blue-200">
+                    <Card className="shadow-lg bg-muted/40 border-border">
                       <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-blue-900">
+                        <CardTitle className="flex items-center gap-2 text-foreground">
                           <MessageCircle className="h-5 w-5" />
                           Updates from Admin
                         </CardTitle>
                       </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-blue-900/80 leading-relaxed">
-                          {selectedFeedback.response}
-                        </p>
+                      <CardContent className="space-y-3 max-h-[320px] overflow-y-auto">
+                        {parseAdminResponses(selectedFeedback.response).map(
+                          (entry, index) => (
+                            <div key={`${entry.time ?? "note"}-${index}`}>
+                              {entry.time && (
+                                <p className="text-[10px] font-semibold text-muted-foreground">
+                                  {entry.author && (
+                                    <span className="text-[11px] text-foreground">
+                                      {entry.author}
+                                    </span>
+                                  )}
+                                  {entry.author ? " " : ""}
+                                  {formatAdminTime(entry.time)}
+                                </p>
+                              )}
+                              <p className="text-sm text-foreground/90 leading-relaxed">
+                                {entry.message}
+                              </p>
+                            </div>
+                          ),
+                        )}
                       </CardContent>
                     </Card>
                   )}
@@ -979,7 +1059,7 @@ export default function UserProfile() {
                 </CardHeader>
                 <CardContent
                   ref={submissionsScrollRef}
-                  className="space-y-4 flex-1 min-h-0 overflow-y-auto"
+                  className="space-y-4 flex-1 min-h-0 overflow-y-auto max-h-[420px] sm:max-h-none"
                   onScroll={(event) => {
                     const top = event.currentTarget.scrollTop;
                     submissionsScrollTop.current = top;

@@ -404,17 +404,17 @@ export default function SuperAdminDashboard() {
   return (
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-slate-50 via-stone-50 to-amber-50">
       <div className="border-b bg-slate-900 text-white">
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-6 sm:py-8">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/80">
                 <Shield className="h-3.5 w-3.5" />
                 Restricted Console
               </div>
-              <h1 className="text-3xl font-bold tracking-tight">
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
                 Superadmin Dashboard
               </h1>
-              <p className="mt-2 max-w-2xl text-sm text-white/70">
+              <p className="mt-2 max-w-2xl text-sm text-white/70 sm:text-base">
                 Hidden system control for managing admin accounts across all
                 units.
               </p>
@@ -423,7 +423,7 @@ export default function SuperAdminDashboard() {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-6 sm:py-8">
         {/*
         <div className="mb-8 grid gap-4 md:grid-cols-3">
           <Card>
@@ -570,7 +570,10 @@ export default function SuperAdminDashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <form onSubmit={handleCreateCategory} className="flex gap-2">
+                <form
+                  onSubmit={handleCreateCategory}
+                  className="flex flex-col gap-2 sm:flex-row"
+                >
                   <Input
                     placeholder="New category name"
                     value={newCategoryName}
@@ -653,13 +656,13 @@ export default function SuperAdminDashboard() {
                     Review, modify, and remove admin accounts in the system.
                   </CardDescription>
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-2 py-1">
+                <div className="flex flex-wrap items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-2 py-1">
                   <Button
                     type="button"
                     size="sm"
                     variant={adminFilter === "active" ? "default" : "ghost"}
                     onClick={() => setAdminFilter("active")}
-                    className="h-8 rounded-full px-3"
+                    className="h-8 rounded-full px-3 flex-1 sm:flex-none"
                   >
                     Active
                   </Button>
@@ -668,7 +671,7 @@ export default function SuperAdminDashboard() {
                     size="sm"
                     variant={adminFilter === "disabled" ? "default" : "ghost"}
                     onClick={() => setAdminFilter("disabled")}
-                    className="h-8 rounded-full px-3"
+                    className="h-8 rounded-full px-3 flex-1 sm:flex-none"
                   >
                     Disabled
                   </Button>
@@ -676,8 +679,8 @@ export default function SuperAdminDashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="rounded-lg border">
-                <Table>
+              <div className="rounded-lg border overflow-x-auto">
+                <Table className="min-w-[900px] text-xs sm:text-sm">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
@@ -734,7 +737,7 @@ export default function SuperAdminDashboard() {
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex flex-wrap justify-end gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"

@@ -105,6 +105,41 @@ export default function TrackFeedback() {
     });
   };
 
+  const parseAdminResponses = (response?: string | null) => {
+    if (!response) return [];
+    return response
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const match = line.match(/^\[(.+?)\]\s*(.*)$/);
+        if (!match) {
+          return { time: null, author: null, message: line };
+        }
+        const rawMessage = match[2] || "";
+        const parts = rawMessage.split(" — ");
+        if (parts.length >= 2) {
+          const author = parts.shift()?.trim() || null;
+          const message = parts.join(" — ").trim();
+          return { time: match[1], author, message };
+        }
+        return { time: match[1], author: null, message: rawMessage };
+      })
+      .filter((entry) => entry.message);
+  };
+
+  const formatAdminTime = (timeRaw?: string | null) => {
+    if (!timeRaw) return null;
+    const parsed = new Date(timeRaw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+      });
+    }
+    return timeRaw.replace(/\s*UTC\s*$/i, "");
+  };
+
   const getStatusMessage = (status: string) => {
     switch (status.toLowerCase()) {
       case "pending":
@@ -135,10 +170,10 @@ export default function TrackFeedback() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted p-4 py-12">
+    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
       <div className="container mx-auto max-w-3xl">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-3">Track Your Submission</h1>
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3">Track Your Submission</h1>
           <p className="text-muted-foreground">
             Enter your tracking ID to check the status of your feedback
           </p>
@@ -150,7 +185,7 @@ export default function TrackFeedback() {
             <CardDescription>Your tracking ID was provided when you submitted feedback</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSearch} className="flex gap-3">
+            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1">
                 <Label htmlFor="tracking-id" className="sr-only">
                   Tracking ID
@@ -163,7 +198,7 @@ export default function TrackFeedback() {
                   required
                 />
               </div>
-              <Button type="submit" className="bg-accent hover:bg-accent/90">
+              <Button type="submit" className="bg-accent hover:bg-accent/90 sm:w-auto w-full">
                 <Search className="mr-2 h-4 w-4" />
                 Search
               </Button>
@@ -290,15 +325,32 @@ export default function TrackFeedback() {
 
             {/* Admin Response Card */}
             {feedback.response && (
-              <Card className="shadow-lg bg-blue-50/50 border-blue-200">
+              <Card className="shadow-lg bg-muted/40 border-border">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-blue-900">
+                  <CardTitle className="flex items-center gap-2 text-foreground">
                     <MessageCircle className="h-5 w-5" />
                     Updates from Admin
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-blue-900/80 leading-relaxed">{feedback.response}</p>
+                <CardContent className="space-y-3 max-h-[320px] overflow-y-auto">
+                  {parseAdminResponses(feedback.response).map((entry, index) => (
+                    <div key={`${entry.time ?? "note"}-${index}`}>
+                      {entry.time && (
+                        <p className="text-[10px] font-semibold text-muted-foreground">
+                          {entry.author && (
+                            <span className="text-[11px] text-foreground">
+                              {entry.author}
+                            </span>
+                          )}
+                          {entry.author ? " " : ""}
+                          {formatAdminTime(entry.time)}
+                        </p>
+                      )}
+                      <p className="text-sm text-foreground/90 leading-relaxed">
+                        {entry.message}
+                      </p>
+                    </div>
+                  ))}
                 </CardContent>
               </Card>
             )}
