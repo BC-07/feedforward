@@ -484,7 +484,7 @@ export default function UserProfile() {
       },
       { name: "Resolved", description: "Issue addressed", completed: false },
     ];
-    const statusOrder = ["pending", "in progress", "resolved"];
+    const statusOrder = ["Pending", "In Progress", "Resolved"];
     const currentIndex = statusOrder.indexOf(currentStatus.toLowerCase());
     return steps.map((step, index) => ({
       ...step,
