@@ -562,7 +562,7 @@ export default function UserProfile() {
         </div>
       )}
       <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <DialogContent className="w-full max-w-lg">
+        <DialogContent className="w-[calc(100%-1.5rem)] max-w-lg max-h-[90vh] overflow-y-auto p-5 sm:w-full sm:p-6">
           <DialogHeader>
             <DialogTitle>Confirm Your Feedback</DialogTitle>
             <DialogDescription>
@@ -570,29 +570,37 @@ export default function UserProfile() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                <p className="text-xs font-semibold text-muted-foreground">
+                <p className="text-[11px] font-semibold text-muted-foreground">
                   TYPE
                 </p>
-                <p className="mt-1 font-semibold capitalize">
+                <p className="mt-1 text-sm font-semibold capitalize">
                   {confirmData.type || "—"}
                 </p>
               </div>
               <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                <p className="text-xs font-semibold text-muted-foreground">
+                <p className="text-[11px] font-semibold text-muted-foreground">
                   CATEGORY
                 </p>
-                <p className="mt-1 font-semibold break-words break-all">
+                <p className="mt-1 text-sm font-semibold break-words break-all">
                   {confirmData.category || "—"}
                 </p>
               </div>
               <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                <p className="text-xs font-semibold text-muted-foreground">
+                <p className="text-[11px] font-semibold text-muted-foreground">
                   SEVERITY
                 </p>
-                <p className="mt-1 font-semibold capitalize">
+                <p className="mt-1 text-sm font-semibold capitalize">
                   {confirmData.priority || "—"}
+                </p>
+              </div>
+              <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
+                <p className="text-[11px] font-semibold text-muted-foreground">
+                  ANONYMOUS
+                </p>
+                <p className="mt-1 text-sm font-semibold">
+                  {isAnonymous ? "Yes" : "No"}
                 </p>
               </div>
             </div>
@@ -737,7 +745,7 @@ export default function UserProfile() {
                 <CardHeader>
                   <CardTitle>Feedback Form</CardTitle>
                   <CardDescription>
-                    Check anonymous if you want your name hidden as ***** from
+                    Check anonymous if you want your name hidden from
                     admin views.
                   </CardDescription>
                 </CardHeader>
@@ -874,7 +882,7 @@ export default function UserProfile() {
                           Submit anonymously
                         </Label>
                         <p className="text-sm text-muted-foreground">
-                          When checked, admins will see your name as *****.
+                          When checked, your name will be hidden to the admins.
                         </p>
                       </div>
                     </div>
