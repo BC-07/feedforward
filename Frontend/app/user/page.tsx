@@ -1,6 +1,7 @@
 "use client";
 import {
   startTransition,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -42,12 +43,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
+import { parseAdminResponses } from "@/lib/responseLog";
+import { formatLocalTime } from "@/lib/time";
+import { useDraftStorage } from "@/lib/useDraftStorage";
+import { toastApiError } from "@/lib/errorHandling";
 import {
   ArrowRight,
   Send,
-  LogOut,
   Search,
   Clock,
   CheckCircle,
@@ -81,7 +84,11 @@ export default function UserProfile() {
     null,
   );
   const [isAnonymous, setIsAnonymous] = useState(false);
-  const [formData, setFormData] = useState(emptyForm);
+  const {
+    value: formData,
+    setValue: setFormData,
+    clear: clearDraft,
+  } = useDraftStorage(draftKey, emptyForm);
   const [confirmData, setConfirmData] = useState(emptyForm);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -100,13 +107,12 @@ export default function UserProfile() {
       const userFeedbacks = await listFeedbacks({ userId });
       setFeedbacks(userFeedbacks);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to load feedbacks.",
-      );
+      toastApiError(error, "Failed to load feedbacks.");
     }
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsHydrated(true);
   }, []);
 
@@ -121,6 +127,7 @@ export default function UserProfile() {
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentUser({
       id: userId,
       fullName: localStorage.getItem("currentUserName") || "",
@@ -131,32 +138,7 @@ export default function UserProfile() {
     });
   }, [router]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const saved = window.localStorage.getItem(draftKey);
-    if (!saved) return;
-    try {
-      const parsed = JSON.parse(saved) as Partial<typeof formData>;
-      setFormData((current) => ({
-        ...current,
-        ...parsed,
-      }));
-    } catch {
-      // Ignore corrupted drafts
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const hasContent = Object.values(formData).some(
-      (value) => value.trim() !== "",
-    );
-    if (hasContent) {
-      window.localStorage.setItem(draftKey, JSON.stringify(formData));
-    } else {
-      window.localStorage.removeItem(draftKey);
-    }
-  }, [formData]);
+  // Draft storage handled by useDraftStorage.
 
   useEffect(() => {
     if (!currentUser?.id) return;
@@ -168,9 +150,7 @@ export default function UserProfile() {
         });
       })
       .catch((error) => {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to load feedbacks.",
-        );
+        toastApiError(error, "Failed to load feedbacks.");
       });
   }, [currentUser?.id]);
 
@@ -184,9 +164,7 @@ export default function UserProfile() {
         );
       })
       .catch((error) => {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to load categories.",
-        );
+        toastApiError(error, "Failed to load categories.");
       });
   }, []);
 
@@ -205,6 +183,7 @@ export default function UserProfile() {
 
   useEffect(() => {
     if (!isLargeScreen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLeftColumnHeight(null);
       return;
     }
@@ -222,7 +201,7 @@ export default function UserProfile() {
     return () => observer.disconnect();
   }, [isLargeScreen]);
 
-  const restoreSubmissionsScroll = (force = false) => {
+  const restoreSubmissionsScroll = useCallback((force = false) => {
     if (!force && (selectedFeedback || trackingId)) return;
     const node = submissionsScrollRef.current;
     if (!node) return;
@@ -232,7 +211,7 @@ export default function UserProfile() {
         node.scrollTop = top;
       });
     });
-  };
+  }, [selectedFeedback, trackingId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -252,7 +231,7 @@ export default function UserProfile() {
       submissionsScrollTop.current = Number.isNaN(value) ? 0 : value;
     }
     restoreSubmissionsScroll();
-  }, [feedbacks.length, selectedFeedback, trackingId, leftColumnHeight]);
+  }, [feedbacks.length, selectedFeedback, trackingId, leftColumnHeight, restoreSubmissionsScroll]);
 
   const handleLogout = () => {
     localStorage.removeItem("isUserLoggedIn");
@@ -317,6 +296,7 @@ export default function UserProfile() {
       await loadUserFeedbacks(currentUser.id);
       toast.success("Feedback submitted successfully!");
       setFormData(emptyForm);
+      clearDraft();
       setConfirmData(emptyForm);
       setIsAnonymous(false);
       setIsConfirmOpen(false);
@@ -384,9 +364,7 @@ export default function UserProfile() {
       }
       toast.success("Submission deleted.");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete submission.",
-      );
+      toastApiError(error, "Failed to delete submission.");
     }
   };
 
@@ -426,40 +404,7 @@ export default function UserProfile() {
     });
   };
 
-  const parseAdminResponses = (response?: string | null) => {
-    if (!response) return [];
-    return response
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const match = line.match(/^\[(.+?)\]\s*(.*)$/);
-        if (!match) {
-          return { time: null, author: null, message: line };
-        }
-        const rawMessage = match[2] || "";
-        const parts = rawMessage.split(" — ");
-        if (parts.length >= 2) {
-          const author = parts.shift()?.trim() || null;
-          const message = parts.join(" — ").trim();
-          return { time: match[1], author, message };
-        }
-        return { time: match[1], author: null, message: rawMessage };
-      })
-      .filter((entry) => entry.message);
-  };
-
-  const formatAdminTime = (timeRaw?: string | null) => {
-    if (!timeRaw) return null;
-    const parsed = new Date(timeRaw);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleTimeString(undefined, {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-    }
-    return timeRaw.replace(/\s*UTC\s*$/i, "");
-  };
+  const formatAdminTime = formatLocalTime;
 
   const getStatusMessage = (status: string) => {
     switch (status.toLowerCase()) {
@@ -1179,3 +1124,4 @@ export default function UserProfile() {
   </>
   );
 }
+

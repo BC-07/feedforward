@@ -12,13 +12,13 @@ import {
   updateUserProfile,
   type Feedback,
 } from "@/lib/api";
-import { ArrowRight, LogOut, User, UserCircle2, Camera, Bell, MoreVertical, Eye } from "lucide-react";
+import { LogOut, User, UserCircle2, Camera, Bell, MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   Sheet,
   SheetContent,
@@ -184,6 +184,7 @@ const AvatarDisplay = ({
 
   if (src) {
     return (
+      /* eslint-disable-next-line @next/next/no-img-element */
       <img
         src={src}
         alt="Profile"
@@ -207,10 +208,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isSuperAdminRoute = pathname.startsWith("/superadmin");
-  const isLandingPage = pathname === "/";
-  const isTrackPage = pathname === "/track";
-  const isLoginPage = pathname === "/login";
-  const isRegisterPage = pathname === "/register";
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
@@ -303,10 +300,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     adminEmail,
     adminUnit,
     adminAvatar,
-    superAdminName,
   } = effectiveSession;
 
-  const refreshAdminNotifications = async () => {
+  const saveReadNotificationIds = useCallback(
+    (nextSet: Set<string>) => {
+      if (typeof window === "undefined") return;
+      if (!isAdminLoggedIn || !adminId || !adminUnit) return;
+      const key = `adminNotificationsRead:${adminId}:${adminUnit}`;
+      localStorage.setItem(key, JSON.stringify(Array.from(nextSet)));
+      setReadNotificationIds(new Set(nextSet));
+    },
+    [adminId, adminUnit, isAdminLoggedIn],
+  );
+
+  const refreshAdminNotifications = useCallback(async () => {
     if (!isAdminLoggedIn || !adminUnit) return;
     setIsNotificationsLoading(true);
     try {
@@ -341,7 +348,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     } finally {
       setIsNotificationsLoading(false);
     }
-  };
+  }, [adminUnit, isAdminLoggedIn, readNotificationIds, saveReadNotificationIds]);
 
   const handleNotificationsClearAll = () => {
     if (!window.confirm("Mark all notifications as read?")) return;
@@ -374,15 +381,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isAdminLoggedIn || !adminUnit) return;
     void refreshAdminNotifications();
-  }, [isAdminLoggedIn, adminUnit]);
-
-  const saveReadNotificationIds = (nextSet: Set<string>) => {
-    if (typeof window === "undefined") return;
-    if (!isAdminLoggedIn || !adminId || !adminUnit) return;
-    const key = `adminNotificationsRead:${adminId}:${adminUnit}`;
-    localStorage.setItem(key, JSON.stringify(Array.from(nextSet)));
-    setReadNotificationIds(new Set(nextSet));
-  };
+  }, [isAdminLoggedIn, adminUnit, refreshAdminNotifications]);
 
   const toggleNotificationRead = (id: string) => {
     const next = new Set(readNotificationIds);
@@ -682,17 +681,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     ? getLogoutDialogCopy(logoutConfirmRole)
     : null;
 
+  const AppFooter = () => (
+    <footer className="border-t border-muted bg-white mt-auto">
+      <div className="container mx-auto px-4 py-6">
+        <div className="text-center text-sm text-muted-foreground">
+          <p>&copy; {new Date().getFullYear()} FeedForward. All rights reserved.</p>
+          <p className="mt-1">Making feedback management smart, fast, and safe.</p>
+        </div>
+      </div>
+    </footer>
+  );
+
   return (
     <div className="min-h-[100svh] flex flex-col bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-white">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <Link
               href="/"
               className="flex items-center gap-2"
               onClick={handleLogoClick}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/favicon.ico"
                 alt="FeedForward logo"
@@ -729,16 +740,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 ) : (
                   <>
-                    {!isLandingPage && !isLoginPage && !isRegisterPage && (
-                      <Link
-                        href="/login"
-                        className="hidden items-center justify-center gap-2 text-sm bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent/90 transition-colors sm:flex"
-                        aria-label="Log in"
-                      >
-                        <User className="h-4 w-4 sm:hidden" />
-                        <span className="hidden sm:inline">LogIn</span>
-                      </Link>
-                    )}
                   </>
                 )}
               </nav>
@@ -939,14 +940,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-muted bg-white mt-auto">
-        <div className="container mx-auto px-4 py-6">
-          <div className="text-center text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} FeedForward. All rights reserved.</p>
-            <p className="mt-1">Making feedback management smart, fast, and safe.</p>
-          </div>
-        </div>
-      </footer>
+      <AppFooter />
 
       {/* Logout Confirmation */}
       <AlertDialog

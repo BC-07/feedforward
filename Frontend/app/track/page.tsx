@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Search, Clock, CheckCircle, Circle, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
+import { parseAdminResponses } from "@/lib/responseLog";
+import { formatLocalTime } from "@/lib/time";
 
 export default function TrackFeedback() {
   const searchParams = useSearchParams();
@@ -57,6 +59,7 @@ export default function TrackFeedback() {
     const param = searchParams.get("trackingId");
     if (!param) return;
     const normalized = normalizeTrackingId(param);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTrackingId(normalized);
     if (!isValidTrackingId(normalized)) {
       setFeedback(null);
@@ -105,40 +108,7 @@ export default function TrackFeedback() {
     });
   };
 
-  const parseAdminResponses = (response?: string | null) => {
-    if (!response) return [];
-    return response
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const match = line.match(/^\[(.+?)\]\s*(.*)$/);
-        if (!match) {
-          return { time: null, author: null, message: line };
-        }
-        const rawMessage = match[2] || "";
-        const parts = rawMessage.split(" — ");
-        if (parts.length >= 2) {
-          const author = parts.shift()?.trim() || null;
-          const message = parts.join(" — ").trim();
-          return { time: match[1], author, message };
-        }
-        return { time: match[1], author: null, message: rawMessage };
-      })
-      .filter((entry) => entry.message);
-  };
-
-  const formatAdminTime = (timeRaw?: string | null) => {
-    if (!timeRaw) return null;
-    const parsed = new Date(timeRaw);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleTimeString(undefined, {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-    }
-    return timeRaw.replace(/\s*UTC\s*$/i, "");
-  };
+  const formatAdminTime = formatLocalTime;
 
   const getStatusMessage = (status: string) => {
     switch (status.toLowerCase()) {
@@ -373,3 +343,4 @@ export default function TrackFeedback() {
     </div>
   );
 }
+

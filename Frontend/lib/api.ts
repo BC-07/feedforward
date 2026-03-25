@@ -86,12 +86,6 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return payload.data;
 }
 
-function withAuthToken(token: string): HeadersInit {
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-}
-
 export async function listFeedbacks(filters?: {
   category?: string;
   userId?: string;

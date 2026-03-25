@@ -24,6 +24,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { toastApiError } from "@/lib/errorHandling";
 import { UserPlus, Mail, Lock, User } from "lucide-react";
 
 export default function Signup() {
@@ -63,9 +64,7 @@ export default function Signup() {
       toast.success("Account created successfully!");
       router.push("/login");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create account.",
-      );
+      toastApiError(error, "Failed to create account.");
     }
   };
 
