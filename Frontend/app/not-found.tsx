@@ -14,7 +14,7 @@ export default function NotFound() {
             Error 404
           </p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-            That page doesn't exist.
+            That page doesn&apos;t exist.
           </h1>
           <p className="mt-3 text-sm text-slate-600">
             The link may be broken, or the page may have been removed. Try going

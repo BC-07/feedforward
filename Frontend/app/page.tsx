@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { ArrowRight, Shield, MessageSquare, BarChart3, Eye } from "lucide-react";
 
 export default function Home() {
@@ -156,7 +157,18 @@ export default function Home() {
   );
 }
 
-const Feature = ({ icon, title, text }: any) => (
+type FeatureProps = {
+  icon: ReactNode;
+  title: string;
+  text: string;
+};
+
+type BenefitProps = {
+  title: string;
+  items: string[];
+};
+
+const Feature = ({ icon, title, text }: FeatureProps) => (
   <div className="text-center p-6">
     <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
       {icon}
@@ -166,7 +178,7 @@ const Feature = ({ icon, title, text }: any) => (
   </div>
 );
 
-const Benefit = ({ title, items }: any) => (
+const Benefit = ({ title, items }: BenefitProps) => (
   <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
     <h3 className="text-2xl mb-4 text-black">{title}</h3>
     <ul className="space-y-3 text-gray-700">

@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   listCategories,
@@ -52,6 +52,9 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { parseAdminResponses } from "@/lib/responseLog";
+import { formatLocalTime } from "@/lib/time";
+import { toastApiError } from "@/lib/errorHandling";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
@@ -130,13 +133,13 @@ export default function AdminDashboard() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [newUnit, setNewUnit] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
-  const applyFeedbackUpdate = (data: Feedback[]) => {
+  const applyFeedbackUpdate = useCallback((data: Feedback[]) => {
     setFeedbacks(data);
     if (typeof window === "undefined") return;
     if (!currentAdmin?.unit) return;
     const key = `adminFeedbacksCache:${currentAdmin.unit}`;
     sessionStorage.setItem(key, JSON.stringify(data));
-  };
+  }, [currentAdmin]);
 
   async function loadFeedbacks(unit: string) {
     if (!unit.trim()) {
@@ -147,9 +150,7 @@ export default function AdminDashboard() {
       const data = await listFeedbacks({ category: unit });
       applyFeedbackUpdate(data);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to load feedbacks.",
-      );
+      toastApiError(error, "Failed to load feedbacks.");
     }
   }
 
@@ -162,6 +163,7 @@ export default function AdminDashboard() {
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentAdmin({
       id: localStorage.getItem("currentAdminId") || "",
       name: localStorage.getItem("currentAdminName") || "",
@@ -179,12 +181,13 @@ export default function AdminDashboard() {
     try {
       const parsed = JSON.parse(cached);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         applyFeedbackUpdate(parsed as Feedback[]);
       }
     } catch {
       // Ignore cache parse errors
     }
-  }, [currentAdmin?.unit]);
+  }, [currentAdmin?.unit, applyFeedbackUpdate]);
 
   useEffect(() => {
     if (!currentAdmin?.unit) return;
@@ -196,11 +199,9 @@ export default function AdminDashboard() {
         });
       })
       .catch((error) => {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to load feedbacks.",
-        );
+        toastApiError(error, "Failed to load feedbacks.");
       });
-  }, [currentAdmin?.unit]);
+  }, [currentAdmin?.unit, applyFeedbackUpdate]);
 
 
   useEffect(() => {
@@ -209,9 +210,7 @@ export default function AdminDashboard() {
         setCategories(data.map((category) => category.name));
       })
       .catch((error) => {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to load categories.",
-        );
+        toastApiError(error, "Failed to load categories.");
       });
   }, []);
 
@@ -247,9 +246,7 @@ export default function AdminDashboard() {
       setNewPriority("");
       setIsEditDialogOpen(false);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update feedback.",
-      );
+      toastApiError(error, "Failed to update feedback.");
     }
   };
 
@@ -378,40 +375,7 @@ export default function AdminDashboard() {
     return `${datePart} ${timePart}`;
   };
 
-  const parseAdminResponses = (response?: string | null) => {
-    if (!response) return [];
-    return response
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const match = line.match(/^\[(.+?)\]\s*(.*)$/);
-        if (!match) {
-          return { time: null, author: null, message: line };
-        }
-        const rawMessage = match[2] || "";
-        const parts = rawMessage.split(" — ");
-        if (parts.length >= 2) {
-          const author = parts.shift()?.trim() || null;
-          const message = parts.join(" — ").trim();
-          return { time: match[1], author, message };
-        }
-        return { time: match[1], author: null, message: rawMessage };
-      })
-      .filter((entry) => entry.message);
-  };
-
-  const formatAdminTime = (timeRaw?: string | null) => {
-    if (!timeRaw) return null;
-    const parsed = new Date(timeRaw);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleTimeString(undefined, {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-    }
-    return timeRaw.replace(/\s*UTC\s*$/i, "");
-  };
+  const formatAdminTime = formatLocalTime;
 
   const buildFileNameBase = () => {
     const now = new Date();
@@ -1600,3 +1564,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+

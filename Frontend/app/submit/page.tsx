@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ArrowRight, Send } from "lucide-react";
+import { useDraftStorage } from "@/lib/useDraftStorage";
+import { toastApiError } from "@/lib/errorHandling";
 
 interface FormData {
   type: string;
@@ -33,13 +35,16 @@ interface FormData {
 
 export default function Submit() {
   const router = useRouter();
-  const [formData, setFormData] = useState<FormData>({
+  const {
+    value: formData,
+    setValue: setFormData,
+    clear: clearDraft,
+  } = useDraftStorage<FormData>("ff:submitDraft", {
     type: "",
     category: "",
     subject: "",
     message: "",
   });
-  const draftKey = "ff:submitDraft";
   const userEmail =
     typeof window !== "undefined"
       ? localStorage.getItem("currentUserEmail") || ""
@@ -57,38 +62,11 @@ export default function Submit() {
         ),
       )
       .catch((error) => {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to load categories.",
-        );
+        toastApiError(error, "Failed to load categories.");
       });
   }, []);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const saved = window.localStorage.getItem(draftKey);
-    if (!saved) return;
-    try {
-      const parsed = JSON.parse(saved) as Partial<FormData>;
-      setFormData((current) => ({
-        ...current,
-        ...parsed,
-      }));
-    } catch {
-      // Ignore corrupted drafts
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const hasContent = Object.values(formData).some(
-      (value) => value.trim() !== "",
-    );
-    if (hasContent) {
-      window.localStorage.setItem(draftKey, JSON.stringify(formData));
-    } else {
-      window.localStorage.removeItem(draftKey);
-    }
-  }, [formData]);
+  // Draft storage handled by useDraftStorage.
 
   const copyToClipboard = (text: string) => {
     const textArea = document.createElement("textarea");
@@ -138,6 +116,7 @@ export default function Submit() {
       setTrackingId(newTrackingId);
       toast.success("Feedback submitted successfully!");
       setFormData({ type: "", category: "", subject: "", message: "" });
+      clearDraft();
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(draftKey);
       }

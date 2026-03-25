@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 import { LogIn, Mail, Lock } from "lucide-react";
+import { toastApiError } from "@/lib/errorHandling";
 
 export default function Login() {
   const router = useRouter();
@@ -86,9 +87,7 @@ export default function Login() {
       toast.success(`Welcome back, ${admin.name}!`);
       router.push("/dashboard");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Invalid email or password",
-      );
+      toastApiError(error, "Invalid email or password");
     }
   };
 

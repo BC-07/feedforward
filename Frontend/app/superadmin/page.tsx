@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/select";
 import { Shield, UserCog, UserPlus, Trash2, Pencil, Tag, Save, Ban } from "lucide-react";
 import { toast } from "sonner";
+import { getErrorMessage, toastApiError } from "@/lib/errorHandling";
 
 const emptyCreateForm = {
   firstName: "",
@@ -80,9 +81,8 @@ async function fetchAdmins(
     });
     return true;
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Failed to load admins.";
-    toast.error(message);
+    toastApiError(error, "Failed to load admins.");
+    const message = getErrorMessage(error, "");
     if (message.toLowerCase().includes("superadmin")) {
       onAuthFailure();
     }
@@ -210,9 +210,7 @@ export default function SuperAdminDashboard() {
         setCategories(data);
       })
       .catch((error) => {
-        toast.error(
-          error instanceof Error ? error.message : "Failed to load categories.",
-        );
+        toastApiError(error, "Failed to load categories.");
       });
   }, [router]);
 
@@ -227,9 +225,7 @@ export default function SuperAdminDashboard() {
       );
       toast.success("Admin created successfully");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create admin.",
-      );
+      toastApiError(error, "Failed to create admin.");
     }
   };
 
@@ -306,9 +302,7 @@ export default function SuperAdminDashboard() {
       setReauthTarget(null);
       setReauthPassword("");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Re-authentication failed.",
-      );
+      toastApiError(error, "Re-authentication failed.");
     }
   };
 
@@ -323,9 +317,7 @@ export default function SuperAdminDashboard() {
       setNewCategoryName("");
       toast.success("Category created successfully");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to create category.",
-      );
+      toastApiError(error, "Failed to create category.");
     }
   };
 
@@ -365,9 +357,7 @@ export default function SuperAdminDashboard() {
       setEditingCategoryOriginalName("");
       toast.success("Category updated successfully");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to update category.",
-      );
+      toastApiError(error, "Failed to update category.");
     }
   };
 
@@ -395,9 +385,7 @@ export default function SuperAdminDashboard() {
       }
       toast.success("Category deleted successfully");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete category.",
-      );
+      toastApiError(error, "Failed to delete category.");
     }
   };
 

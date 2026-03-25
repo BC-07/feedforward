@@ -24,6 +24,14 @@ type ChartContextProps = {
 
 const ChartContext = React.createContext<ChartContextProps | null>(null);
 
+type ChartPayloadItem = {
+  dataKey?: string;
+  name?: string;
+  value?: number | string;
+  color?: string;
+  payload?: Record<string, unknown>;
+};
+
 function useChart() {
   const context = React.useContext(ChartContext);
 
@@ -126,11 +134,17 @@ function ChartTooltipContent({
     nameKey?: string;
     labelKey?: string;
     active?: boolean;
-    payload?: Array<any>;
-    label?: any;
-    labelFormatter?: (...args: any[]) => React.ReactNode;
+    payload?: ChartPayloadItem[];
+    label?: React.ReactNode;
+    labelFormatter?: (value: React.ReactNode, payload: ChartPayloadItem[]) => React.ReactNode;
     labelClassName?: string;
-    formatter?: (...args: any[]) => React.ReactNode;
+    formatter?: (
+      value: unknown,
+      name: string | undefined,
+      item: ChartPayloadItem,
+      index: number,
+      payload: Record<string, unknown> | undefined,
+    ) => React.ReactNode;
     color?: string;
   }) {
   const { config } = useChart();
@@ -189,7 +203,8 @@ function ChartTooltipContent({
         {payload.map((item, index) => {
           const key = `${nameKey || item.name || item.dataKey || "value"}`;
           const itemConfig = getPayloadConfigFromPayload(config, item, key);
-          const indicatorColor = color || item.payload.fill || item.color;
+          const indicatorColor =
+            color || item.payload?.["fill"]?.toString() || item.color;
 
           return (
             <div
@@ -239,9 +254,11 @@ function ChartTooltipContent({
                         {itemConfig?.label || item.name}
                       </span>
                     </div>
-                    {item.value && (
+                    {item.value !== undefined && (
                       <span className="text-foreground font-mono font-medium tabular-nums">
-                        {item.value.toLocaleString()}
+                        {typeof item.value === "number"
+                          ? item.value.toLocaleString()
+                          : String(item.value)}
                       </span>
                     )}
                   </div>
@@ -266,7 +283,7 @@ function ChartLegendContent({
 }: React.ComponentProps<"div"> & {
     hideIcon?: boolean;
     nameKey?: string;
-    payload?: Array<any>;
+    payload?: ChartPayloadItem[];
     verticalAlign?: "top" | "bottom" | "middle";
   }) {
   const { config } = useChart();

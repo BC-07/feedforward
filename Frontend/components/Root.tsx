@@ -27,6 +27,7 @@ export default function RootLayout({
     const userLoggedIn = localStorage.getItem("isUserLoggedIn") === "true";
     const adminLoggedIn = localStorage.getItem("isAdminLoggedIn") === "true";
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsUserLoggedIn(userLoggedIn);
     setIsAdminLoggedIn(adminLoggedIn);
 
