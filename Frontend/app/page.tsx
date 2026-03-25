@@ -59,7 +59,7 @@ export default function Home() {
             </div>
             <Link
               href="/track"
-              className="mt-4 text-sm text-muted-foreground hover:text-orange-600 transition-colors"
+              className="mt-4 text-sm text-orange-600 underline underline-offset-4 hover:text-orange-700 transition-colors"
             >
               Already submitted? Track your feedback here.
             </Link>
