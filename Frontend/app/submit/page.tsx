@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -46,6 +47,7 @@ export default function Submit() {
       : "";
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  const [isAnonymous, setIsAnonymous] = useState(false);
 
   useEffect(() => {
     void listCategories()
@@ -131,12 +133,14 @@ export default function Submit() {
         userEmail: userEmail || undefined,
         status: "Pending",
         priority: "Medium",
+        isAnonymous,
         response: "",
       });
 
       setTrackingId(newTrackingId);
       toast.success("Feedback submitted successfully!");
       setFormData({ type: "", category: "", subject: "", message: "" });
+      setIsAnonymous(false);
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(draftKey);
       }
@@ -227,8 +231,9 @@ export default function Submit() {
           <CardHeader>
             <CardTitle>Feedback Form</CardTitle>
             <CardDescription>
-              If you are signed in, we will email your tracking ID and resolution
-              updates.
+              If you are signed in, we will email your tracking ID and
+              resolution updates. Check anonymous to hide your name as ***** in
+              admin views.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -302,6 +307,28 @@ export default function Submit() {
                   }
                   required
                 />
+              </div>
+
+              <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-4">
+                <Checkbox
+                  id="submit-anonymous"
+                  checked={isAnonymous}
+                  onCheckedChange={(checked) =>
+                    setIsAnonymous(checked === true)
+                  }
+                  className="mt-0.5"
+                />
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="submit-anonymous"
+                    className="cursor-pointer text-sm font-medium"
+                  >
+                    Submit anonymously
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    When checked, admins will see your name as *****.
+                  </p>
+                </div>
               </div>
 
               <Button
