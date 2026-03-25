@@ -128,7 +128,6 @@ func CreateFeedback(c *fiber.Ctx) error {
 	if err := normalizeFeedback(&feedback); err != nil {
 		return invalidRequest(c, err.Error())
 	}
-	feedback.IsAnonymous = false
 
 	if feedback.UserID == nil && feedback.UserEmail != nil {
 		user, err := fetchUserByEmail(*feedback.UserEmail)
