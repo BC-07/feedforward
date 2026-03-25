@@ -432,7 +432,48 @@ export default function AdminDashboard() {
     return `feedback-report_${categoryStamp}_${statusStamp}_${dateStamp}_${timeStamp}`;
   };
 
+  const createPdfLogoDataUrl = () => {
+    if (typeof document === "undefined") return null;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 220;
+    canvas.height = 120;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.lineJoin = "miter";
+    ctx.lineCap = "square";
+
+    ctx.strokeStyle = "#ff9500";
+    ctx.lineWidth = 20;
+    ctx.beginPath();
+    ctx.moveTo(140, 18);
+    ctx.lineTo(196, 60);
+    ctx.lineTo(140, 102);
+    ctx.stroke();
+
+    ctx.strokeStyle = "#111111";
+    ctx.lineWidth = 20;
+    ctx.beginPath();
+    ctx.moveTo(24, 60);
+    ctx.lineTo(126, 60);
+    ctx.moveTo(78, 18);
+    ctx.lineTo(126, 60);
+    ctx.lineTo(78, 102);
+    ctx.stroke();
+
+    return canvas.toDataURL("image/png");
+  };
+
   const exportFeedbacksPdf = () => {
+    const brandOrange: [number, number, number] = [255, 149, 0];
+    const brandDark: [number, number, number] = [17, 24, 39];
+    const brandMuted: [number, number, number] = [107, 114, 128];
+    const brandBorder: [number, number, number] = [210, 214, 220];
+    const reportSurface: [number, number, number] = [248, 249, 251];
+    const reportSurfaceAlt: [number, number, number] = [242, 244, 247];
     const rows = filteredFeedbacks.map((feedback) => ({
       id: feedback.id,
       type: feedback.type,
@@ -467,29 +508,68 @@ export default function AdminDashboard() {
       format: "a4",
     });
 
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const logoDataUrl = createPdfLogoDataUrl();
+    const logoWidth = 76;
+    const logoHeight = 42;
+    const logoY = 24;
+    const titleY = 90;
+    const generatedY = 108;
+    const filterY = 124;
+    const tableStartY = 152;
+
+    if (logoDataUrl) {
+      doc.addImage(
+        logoDataUrl,
+        "PNG",
+        pageWidth / 2 - logoWidth / 2,
+        logoY,
+        logoWidth,
+        logoHeight,
+      );
+    }
+
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("FeedForward - Feedback Report", 40, 40);
+    doc.setFontSize(18);
+    doc.setTextColor(...brandDark);
+    doc.text("FeedForward - Feedback Report", pageWidth / 2, titleY, {
+      align: "center",
+    });
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Generated: ${nowText}`, 40, 58);
-    doc.text(`Filter: ${filterSummary}`, 40, 74);
+    doc.setTextColor(...brandMuted);
+    doc.text(`Generated Date: ${nowText}`, pageWidth / 2, generatedY, {
+      align: "center",
+    });
+    doc.text(`Filter: ${filterSummary}`, pageWidth / 2, filterY, {
+      align: "center",
+      maxWidth: pageWidth - 120,
+    });
+    doc.setDrawColor(...brandOrange);
+    doc.setLineWidth(1);
+    doc.line(80, filterY + 14, pageWidth - 80, filterY + 14);
 
     if (!rows.length) {
-      doc.setTextColor(120);
+      doc.setTextColor(...brandOrange);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
       doc.text(
         "No feedback submissions match the current filters.",
-        40,
-        110,
+        pageWidth / 2,
+        tableStartY + 24,
+        { align: "center" },
       );
       doc.save(fileName);
       return;
     }
 
     const body: Array<
-      Array<string> | Array<{ content: string; colSpan: number; styles?: any }>
+      Array<string> | Array<{
+        content: string;
+        colSpan: number;
+        styles?: Record<string, string | number | number[]>;
+      }>
     > = [];
 
     rows.forEach((row) => {
@@ -517,25 +597,102 @@ export default function AdminDashboard() {
       ]);
     });
 
-    const pageWidth = doc.internal.pageSize.getWidth();
     const tableWidth = 70 + 70 + 80 + 70 + 110 + 220;
     const leftMargin = Math.max(40, (pageWidth - tableWidth) / 2);
 
     autoTable(doc, {
-      startY: 100,
-      head: [["ID", "Type", "Status", "Priority", "Submitted", "Subject"]],
+      startY: tableStartY,
+      head: [[
+        "TRACKING ID",
+        "TYPE",
+        "STATUS",
+        "PRIORITY",
+        "SUBMITTED ON",
+        "SUBJECT",
+      ]],
       body,
       theme: "grid",
       margin: { left: leftMargin, right: leftMargin },
-      styles: { fontSize: 9, cellPadding: 6, valign: "top" },
-      headStyles: { fillColor: [243, 244, 246], textColor: [55, 65, 81] },
+      styles: {
+        fontSize: 9,
+        cellPadding: { top: 8, right: 10, bottom: 8, left: 10 },
+        valign: "top",
+        lineColor: brandBorder,
+        lineWidth: 0.25,
+        textColor: brandDark,
+        fillColor: [255, 255, 255],
+      },
+      headStyles: {
+        fillColor: brandDark,
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 9,
+        halign: "center",
+        valign: "middle",
+        cellPadding: { top: 9, right: 10, bottom: 9, left: 10 },
+        lineColor: brandDark,
+        lineWidth: 0.4,
+      },
+      alternateRowStyles: { fillColor: reportSurfaceAlt },
       columnStyles: {
-        0: { cellWidth: 70 },
-        1: { cellWidth: 70 },
-        2: { cellWidth: 80 },
-        3: { cellWidth: 70 },
-        4: { cellWidth: 110 },
-        5: { cellWidth: 220 },
+        0: {
+          cellWidth: 82,
+          fontStyle: "bold",
+        },
+        1: {
+          cellWidth: 72,
+          halign: "center",
+        },
+        2: {
+          cellWidth: 88,
+          halign: "center",
+        },
+        3: {
+          cellWidth: 74,
+          halign: "center",
+        },
+        4: {
+          cellWidth: 118,
+          halign: "center",
+        },
+        5: { cellWidth: 206 },
+      },
+      didParseCell: (data) => {
+        const isMessageRow =
+          data.section === "body" &&
+          Array.isArray(data.row.raw) &&
+          data.row.raw.length === 1 &&
+          typeof data.row.raw[0] === "object" &&
+          data.row.raw[0] !== null &&
+          "content" in data.row.raw[0] &&
+          String(data.row.raw[0].content).startsWith("Message:");
+
+        if (isMessageRow) {
+          data.cell.styles.fillColor = reportSurface;
+          data.cell.styles.textColor = brandMuted;
+          data.cell.styles.fontStyle = "normal";
+          data.cell.styles.cellPadding = {
+            top: 8,
+            right: 10,
+            bottom: 10,
+            left: 10,
+          };
+        }
+
+        const isSpacerRow =
+          data.section === "body" &&
+          Array.isArray(data.row.raw) &&
+          data.row.raw.length === 1 &&
+          typeof data.row.raw[0] === "object" &&
+          data.row.raw[0] !== null &&
+          "content" in data.row.raw[0] &&
+          String(data.row.raw[0].content) === "";
+
+        if (isSpacerRow) {
+          data.cell.styles.fillColor = [255, 255, 255];
+          data.cell.styles.lineColor = [255, 255, 255];
+          data.cell.styles.lineWidth = 0;
+        }
       },
     });
 
@@ -543,36 +700,280 @@ export default function AdminDashboard() {
   };
 
   const exportFeedbacksXlsx = async () => {
+    const brandOrangeArgb = "FFFF9500";
+    const brandDarkArgb = "FF111827";
+    const brandMutedArgb = "FF6B7280";
+    const brandBorderArgb = "FFD2D6DC";
+    const reportSurfaceArgb = "FFF8F9FB";
+    const reportSurfaceAltArgb = "FFF2F4F7";
+    const reportColumns = ["A", "B", "C", "D", "E", "F"] as const;
+    const reportColumnWidths = [18, 14, 16, 12, 22, 42] as const;
+    const thinBorder = {
+      top: { style: "thin" as const, color: { argb: brandBorderArgb } },
+      left: { style: "thin" as const, color: { argb: brandBorderArgb } },
+      bottom: { style: "thin" as const, color: { argb: brandBorderArgb } },
+      right: { style: "thin" as const, color: { argb: brandBorderArgb } },
+    };
+    const excelColumnWidthToPixels = (width: number) => Math.floor(width * 7 + 5);
+    const getCenteredImageColumnOffset = (
+      columnWidths: readonly number[],
+      imageWidthPx: number,
+    ) => {
+      const totalWidthPx = columnWidths.reduce(
+        (sum, width) => sum + excelColumnWidthToPixels(width),
+        0,
+      );
+      let remainingOffsetPx = Math.max(0, (totalWidthPx - imageWidthPx) / 2);
+
+      for (let index = 0; index < columnWidths.length; index += 1) {
+        const columnWidthPx = excelColumnWidthToPixels(columnWidths[index]);
+        if (remainingOffsetPx <= columnWidthPx) {
+          return index + remainingOffsetPx / columnWidthPx;
+        }
+        remainingOffsetPx -= columnWidthPx;
+      }
+
+      return 0;
+    };
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Feedback");
+    workbook.creator = "FeedForward";
+    workbook.created = new Date();
+
+    const worksheet = workbook.addWorksheet("Feedback Report", {
+      views: [{ showGridLines: false }],
+    });
+
+    worksheet.pageSetup = {
+      paperSize: 9,
+      orientation: "landscape",
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: {
+        left: 0.35,
+        right: 0.35,
+        top: 0.5,
+        bottom: 0.5,
+        header: 0.2,
+        footer: 0.2,
+      },
+    };
 
     worksheet.columns = [
-      { header: "ID", key: "id", width: 14 },
-      { header: "Type", key: "type", width: 12 },
-      { header: "Status", key: "status", width: 14 },
-      { header: "Priority", key: "priority", width: 10 },
-      { header: "Submitted", key: "submitted", width: 20 },
-      { header: "Subject", key: "subject", width: 30 },
-      { header: "Message", key: "message", width: 60 },
+      { key: "id", width: reportColumnWidths[0] },
+      { key: "type", width: reportColumnWidths[1] },
+      { key: "status", width: reportColumnWidths[2] },
+      { key: "priority", width: reportColumnWidths[3] },
+      { key: "submitted", width: reportColumnWidths[4] },
+      { key: "subject", width: reportColumnWidths[5] },
     ];
 
-    worksheet.getRow(1).font = { bold: true };
+    const filterParts = [
+      filterType !== "all" ? `Type = ${filterType}` : null,
+      filterStatus !== "all"
+        ? `Status = ${filterStatus === "inprogress" ? "In Progress" : filterStatus}`
+        : null,
+      filterPriority !== "all" ? `Priority = ${filterPriority}` : null,
+      filterDate === "recent" ? "Date = Most Recent" : "Date = Oldest",
+      currentAdmin?.unit ? `Category = ${currentAdmin.unit}` : null,
+      searchQuery ? `Search = "${searchQuery}"` : null,
+    ].filter(Boolean);
 
-    filteredFeedbacks.forEach((feedback) => {
-      worksheet.addRow({
-        id: feedback.id,
-        type: feedback.type,
-        status: feedback.status,
-        priority: feedback.priority,
-        submitted: formatSubmittedAt(feedback.createdAt),
-        subject: feedback.subject,
-        message: feedback.message,
+    const filterSummary = filterParts.length
+      ? filterParts.join(" | ")
+      : "No filters applied";
+
+    const nowText = new Date().toLocaleString("en-US");
+    const logoDataUrl = createPdfLogoDataUrl();
+    if (logoDataUrl) {
+      const logoWidthPx = 76;
+      const logoColumnOffset = getCenteredImageColumnOffset(
+        reportColumnWidths,
+        logoWidthPx,
+      );
+      const imageId = workbook.addImage({
+        base64: logoDataUrl,
+        extension: "png",
       });
+      worksheet.addImage(imageId, {
+        tl: { col: logoColumnOffset, row: 0.2 },
+        ext: { width: logoWidthPx, height: 42 },
+      });
+    }
+
+    worksheet.mergeCells("A4:F4");
+    worksheet.mergeCells("A5:F5");
+    worksheet.mergeCells("A6:F6");
+    worksheet.mergeCells("A7:F7");
+
+    worksheet.getCell("A4").value = "FeedForward - Feedback Report";
+    worksheet.getCell("A5").value = `Generated Date: ${nowText}`;
+    worksheet.getCell("A6").value = `Filter: ${filterSummary}`;
+
+    worksheet.getCell("A4").font = {
+      bold: true,
+      size: 16,
+      color: { argb: brandDarkArgb },
+    };
+    worksheet.getCell("A5").font = {
+      size: 10,
+      color: { argb: brandMutedArgb },
+    };
+    worksheet.getCell("A6").font = {
+      size: 10,
+      color: { argb: brandMutedArgb },
+    };
+
+    ["A4", "A5", "A6"].forEach((cellRef) => {
+      worksheet.getCell(cellRef).alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
     });
 
-    worksheet.columns.forEach((column) => {
-      column.alignment = { vertical: "top", wrapText: true };
+    reportColumns.forEach((column) => {
+      const dividerCell = worksheet.getCell(`${column}7`);
+      dividerCell.border = {
+        bottom: { style: "medium", color: { argb: brandOrangeArgb } },
+      };
     });
+
+    worksheet.getRow(1).height = 24;
+    worksheet.getRow(2).height = 18;
+    worksheet.getRow(3).height = 12;
+    worksheet.getRow(4).height = 24;
+    worksheet.getRow(5).height = 18;
+    worksheet.getRow(6).height = 30;
+    worksheet.getRow(7).height = 10;
+
+    const tableHeaderRowNumber = 9;
+    const headerRow = worksheet.getRow(tableHeaderRowNumber);
+    headerRow.values = [
+      "TRACKING ID",
+      "TYPE",
+      "STATUS",
+      "PRIORITY",
+      "SUBMITTED ON",
+      "SUBJECT",
+    ];
+    headerRow.height = 24;
+    headerRow.eachCell((cell) => {
+      cell.font = {
+        bold: true,
+        size: 9,
+        color: { argb: "FFFFFFFF" },
+      };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: brandDarkArgb },
+      };
+      cell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+      };
+      cell.border = {
+        top: { style: "thin", color: { argb: brandDarkArgb } },
+        left: { style: "thin", color: { argb: brandDarkArgb } },
+        bottom: { style: "thin", color: { argb: brandDarkArgb } },
+        right: { style: "thin", color: { argb: brandDarkArgb } },
+      };
+    });
+
+    let currentRowNumber = tableHeaderRowNumber + 1;
+
+    if (filteredFeedbacks.length === 0) {
+      worksheet.mergeCells(`A${currentRowNumber}:F${currentRowNumber}`);
+      const noteCell = worksheet.getCell(`A${currentRowNumber}`);
+      noteCell.value = "No feedback submissions match the current filters.";
+      noteCell.font = {
+        bold: true,
+        color: { argb: brandOrangeArgb },
+      };
+      noteCell.alignment = {
+        horizontal: "center",
+        vertical: "middle",
+      };
+      worksheet.getRow(currentRowNumber).height = 24;
+    } else {
+      filteredFeedbacks.forEach((feedback, index) => {
+        const dataRow = worksheet.getRow(currentRowNumber);
+        dataRow.values = [
+          feedback.id,
+          feedback.type,
+          feedback.status,
+          feedback.priority,
+          formatSubmittedAt(feedback.createdAt),
+          feedback.subject,
+        ];
+        dataRow.height = 34;
+        dataRow.eachCell((cell, colNumber) => {
+          cell.font = {
+            bold: colNumber === 1,
+            color: { argb: brandDarkArgb },
+          };
+          cell.alignment = {
+            vertical: "top",
+            wrapText: true,
+            horizontal:
+              colNumber >= 2 && colNumber <= 5 ? "center" : "left",
+          };
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: {
+              argb: index % 2 === 0 ? "FFFFFFFF" : reportSurfaceAltArgb,
+            },
+          };
+          cell.border = thinBorder;
+        });
+
+        currentRowNumber += 1;
+        worksheet.mergeCells(`A${currentRowNumber}:F${currentRowNumber}`);
+        const messageRow = worksheet.getRow(currentRowNumber);
+        const messageCell = worksheet.getCell(`A${currentRowNumber}`);
+        messageCell.value = `Message: ${feedback.message}`;
+        messageCell.font = {
+          size: 10,
+          color: { argb: brandMutedArgb },
+        };
+        messageCell.alignment = {
+          vertical: "top",
+          wrapText: true,
+        };
+        messageRow.height = 28;
+        reportColumns.forEach((column) => {
+          const cell = worksheet.getCell(`${column}${currentRowNumber}`);
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: reportSurfaceArgb },
+          };
+          cell.border = thinBorder;
+        });
+
+        currentRowNumber += 1;
+        worksheet.mergeCells(`A${currentRowNumber}:F${currentRowNumber}`);
+        const spacerRow = worksheet.getRow(currentRowNumber);
+        spacerRow.height = 6;
+        reportColumns.forEach((column) => {
+          const cell = worksheet.getCell(`${column}${currentRowNumber}`);
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: "FFFFFFFF" },
+          };
+          cell.border = {};
+        });
+
+        currentRowNumber += 1;
+      });
+    }
+
+    worksheet.views = [
+      { state: "frozen", ySplit: tableHeaderRowNumber, showGridLines: false },
+    ];
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], {
