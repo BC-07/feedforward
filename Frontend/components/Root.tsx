@@ -153,7 +153,7 @@ export default function RootLayout({
         <main className="flex-1">{children}</main>
 
         {/* Footer */}
-        <footer className="border-t border-border bg-white mt-auto">
+        <footer className="border-t border-muted bg-white mt-auto">
           <div className="container mx-auto px-4 py-2 sm:py-6 text-center text-sm text-muted-foreground">
             <p>
               &copy; {new Date().getFullYear()} FeedForward. All rights

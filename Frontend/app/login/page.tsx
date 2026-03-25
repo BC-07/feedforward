@@ -93,65 +93,71 @@ export default function Login() {
   };
 
   return (
-    <div className="flex-1 flex flex-col justify-center sm:items-center sm:justify-center bg-gradient-to-br from-white to-muted px-4 py-4 sm:py-12">
-      <Card className="max-w-md w-full shadow-lg translate-y-[20%] sm:translate-y-0">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-3 sm:mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
-            <LogIn className="h-8 w-8 text-accent" />
-          </div>
-          <CardTitle className="text-2xl sm:text-3xl">Login to FeedForward</CardTitle>
-          <CardDescription>Sign in with your account credentials</CardDescription>
-        </CardHeader>
-
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  className="pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
+    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
+      <div className="container mx-auto flex min-h-full max-w-md items-center justify-center">
+        <Card className="w-full shadow-lg">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-3 sm:mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
+              <LogIn className="h-8 w-8 text-accent" />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  className="pl-10"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-            <Button
-              type="submit"
-              className="w-full bg-accent hover:bg-accent/90"
-              size="lg"
-            >
-              Log In
-            </Button>
-            <p className="text-center text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <Link href="/register" className="text-accent hover:underline font-medium">
-                Sign up
-              </Link>
-            </p>
-          </form>
+            <CardTitle className="text-2xl sm:text-3xl">Login to FeedForward</CardTitle>
+            <CardDescription>Sign in with your account credentials</CardDescription>
+          </CardHeader>
 
-        </CardContent>
-      </Card>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    className="pl-10"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    className="pl-10"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full bg-accent hover:bg-accent/90"
+                size="lg"
+              >
+                Log In
+              </Button>
+              <p className="text-center text-sm text-muted-foreground">
+                Don&apos;t have an account?{" "}
+                <Link
+                  href="/register"
+                  className="font-medium text-accent hover:underline"
+                >
+                  Sign up
+                </Link>
+              </p>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

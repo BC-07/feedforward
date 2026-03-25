@@ -207,6 +207,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isDashboardRoute = pathname.startsWith("/dashboard");
   const isSuperAdminRoute = pathname.startsWith("/superadmin");
+  const isLandingPage = pathname === "/";
+  const isTrackPage = pathname === "/track";
+  const isLoginPage = pathname === "/login";
+  const isRegisterPage = pathname === "/register";
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
@@ -721,22 +725,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 ) : (
                   <>
-                    <Link
-                      href="/track"
-                      className="hidden items-center gap-2 text-sm hover:text-accent transition-colors sm:flex"
-                      aria-label="Track Submission"
-                    >
-                      <Eye className="h-4 w-4 sm:hidden" />
-                      <span className="hidden sm:inline">Track Submission</span>
-                    </Link>
-                    <Link
-                      href="/login"
-                      className="hidden items-center justify-center gap-2 text-sm bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent/90 transition-colors sm:flex"
-                      aria-label="Log in"
-                    >
-                      <User className="h-4 w-4 sm:hidden" />
-                      <span className="hidden sm:inline">LogIn</span>
-                    </Link>
+                    {!isLandingPage && !isTrackPage && (
+                      <Button
+                        asChild
+                        className="hidden bg-accent text-white hover:bg-accent/90 sm:inline-flex"
+                      >
+                        <Link href="/track" aria-label="Track Submission">
+                          <Eye className="h-4 w-4 sm:hidden" />
+                          <span className="hidden sm:inline">Track Submission</span>
+                        </Link>
+                      </Button>
+                    )}
+                    {!isLandingPage && !isLoginPage && !isRegisterPage && (
+                      <Link
+                        href="/login"
+                        className="hidden items-center justify-center gap-2 text-sm bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent/90 transition-colors sm:flex"
+                        aria-label="Log in"
+                      >
+                        <User className="h-4 w-4 sm:hidden" />
+                        <span className="hidden sm:inline">LogIn</span>
+                      </Link>
+                    )}
                   </>
                 )}
               </nav>
@@ -937,7 +946,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-white mt-auto">
+      <footer className="border-t border-muted bg-white mt-auto">
         <div className="container mx-auto px-4 py-6">
           <div className="text-center text-sm text-muted-foreground">
             <p>&copy; {new Date().getFullYear()} FeedForward. All rights reserved.</p>
