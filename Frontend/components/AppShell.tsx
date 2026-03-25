@@ -693,7 +693,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               className="flex items-center gap-2"
               onClick={handleLogoClick}
             >
-              <ArrowRight className="h-8 w-8 text-accent" />
+              <img
+                src="/favicon.ico"
+                alt="FeedForward logo"
+                className="h-8 w-8"
+              />
               <div>
                 <h1 className="text-xl font-bold text-primary tracking-tight">FEED FORWARD</h1>
                 <p className="text-xs text-muted-foreground">SMART. FAST. SAFE.</p>
