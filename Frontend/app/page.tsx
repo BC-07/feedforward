@@ -44,10 +44,10 @@ export default function Home() {
 
             <div className="flex w-full flex-col sm:flex-row gap-3 sm:gap-4 justify-center sm:w-auto">
               <Link
-                href="/track"
+                href="/submit"
                 className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-orange-500 text-white hover:bg-orange-600 rounded-lg transition-colors text-base sm:text-lg inline-flex items-center justify-center gap-2"
               >
-                Track Submission
+                Submit Feedback
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
@@ -57,6 +57,12 @@ export default function Home() {
                 {isUserLoggedIn ? "Go to Dashboard" : "Login / Sign Up"}
               </Link>
             </div>
+            <Link
+              href="/track"
+              className="mt-4 text-sm text-muted-foreground hover:text-orange-600 transition-colors"
+            >
+              Already submitted? Track your feedback here.
+            </Link>
           </div>
         </div>
       </section>

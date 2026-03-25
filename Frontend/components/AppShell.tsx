@@ -725,17 +725,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 ) : (
                   <>
-                    {!isLandingPage && !isTrackPage && (
-                      <Button
-                        asChild
-                        className="hidden bg-accent text-white hover:bg-accent/90 sm:inline-flex"
-                      >
-                        <Link href="/track" aria-label="Track Submission">
-                          <Eye className="h-4 w-4 sm:hidden" />
-                          <span className="hidden sm:inline">Track Submission</span>
-                        </Link>
-                      </Button>
-                    )}
                     {!isLandingPage && !isLoginPage && !isRegisterPage && (
                       <Link
                         href="/login"
