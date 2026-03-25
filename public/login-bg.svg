@@ -1,0 +1,29 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1920" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F8BF35"/>
+      <stop offset="0.48" stop-color="#F58A1D"/>
+      <stop offset="1" stop-color="#E22A00"/>
+    </linearGradient>
+    <linearGradient id="stripeLight" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFD56A" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#FFD56A" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="stripeDark" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#C61E00" stop-opacity="0.36"/>
+      <stop offset="1" stop-color="#C61E00" stop-opacity="0.10"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+
+  <path d="M-120 930L520 560L690 620L40 1000L-120 930Z" fill="url(#stripeLight)"/>
+  <path d="M40 760L620 420L760 470L180 810L40 760Z" fill="url(#stripeLight)"/>
+  <path d="M220 590L700 310L840 360L360 640L220 590Z" fill="url(#stripeLight)"/>
+
+  <path d="M1040 420L1600 90L1760 150L1190 480L1040 420Z" fill="url(#stripeDark)"/>
+  <path d="M1160 630L1790 260L1920 320L1290 690L1160 630Z" fill="url(#stripeDark)"/>
+  <path d="M1260 850L1920 460V610L1410 910L1260 850Z" fill="url(#stripeDark)"/>
+
+  <ellipse cx="330" cy="130" rx="360" ry="220" fill="#FFFFFF" fill-opacity="0.10"/>
+</svg>

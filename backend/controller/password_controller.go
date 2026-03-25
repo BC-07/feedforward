@@ -3,6 +3,7 @@ package controller
 import (
 	"crypto/rand"
 	"fmt"
+	"html"
 	"math/big"
 	"strings"
 	"sync"
@@ -54,6 +55,52 @@ func cleanupExpiredResetTokens(now time.Time) {
 	}
 }
 
+func formatOTPDisplay(otp string) string {
+	parts := make([]string, 0, len(otp))
+	for _, char := range otp {
+		parts = append(parts, string(char))
+	}
+	return strings.Join(parts, "&nbsp;&nbsp;&nbsp;")
+}
+
+func buildOTPEmailHTML(title string, greetingName string, intro string, buttonText string, buttonURL string, otp string, note string) string {
+	greeting := "Hello,"
+	name := strings.TrimSpace(greetingName)
+	if name != "" {
+		greeting = fmt.Sprintf("Hello %s,", html.EscapeString(name))
+	}
+
+	return fmt.Sprintf(`
+	<div style="background:#f3f4f6;padding:24px;font-family:Arial,Helvetica,sans-serif;">
+	  <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:10px;border:1px solid #e5e7eb;overflow:hidden;">
+	    <div style="padding:26px 24px 22px;text-align:center;">
+	      <div style="font-size:42px;line-height:1;color:#f59e0b;">&#128274;</div>
+	      <div style="margin-top:14px;font-size:32px;font-weight:300;color:#1f2937;">%s</div>
+	      <div style="margin-top:18px;font-size:22px;color:#374151;">%s</div>
+	      <div style="margin-top:8px;font-size:17px;color:#4b5563;line-height:1.5;">%s</div>
+
+	      <div style="margin-top:20px;">
+	        <a href="%s" style="display:inline-block;background:#c9474d;color:#ffffff;text-decoration:none;font-size:30px;font-weight:700;padding:16px 38px;border-radius:6px;">%s</a>
+	      </div>
+
+	      <div style="margin-top:26px;font-size:18px;color:#4b5563;line-height:1.5;">Or, copy and paste this OTP in FeedForward.</div>
+	      <div style="margin-top:16px;font-size:42px;font-weight:700;letter-spacing:.32em;color:#111827;">%s</div>
+
+	      <div style="margin-top:24px;font-size:16px;color:#6b7280;line-height:1.5;">%s</div>
+	    </div>
+	  </div>
+	</div>
+	`,
+		html.EscapeString(title),
+		greeting,
+		html.EscapeString(intro),
+		html.EscapeString(buttonURL),
+		html.EscapeString(buttonText),
+		formatOTPDisplay(html.EscapeString(otp)),
+		html.EscapeString(note),
+	)
+}
+
 func ForgotPassword(c *fiber.Ctx) error {
 	db := middleware.DBConn
 
@@ -76,7 +123,7 @@ func ForgotPassword(c *fiber.Ctx) error {
 	}
 
 	var user model.User
-	if err := db.Table("public.users").Select("email").Where("LOWER(TRIM(email)) = ?", email).First(&user).Error; err != nil {
+	if err := db.Table("public.users").Select("email, first_name, last_name, name").Where("LOWER(TRIM(email)) = ?", email).First(&user).Error; err != nil {
 		return c.Status(200).JSON(response.ResponseModel{
 			RetCode: "200",
 			Message: "If this email is registered, an OTP has been sent",
@@ -102,14 +149,20 @@ func ForgotPassword(c *fiber.Ctx) error {
 	}
 	passwordResetMu.Unlock()
 
-	otpBody := fmt.Sprintf(`
-	<div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#111827;">
-	  <h2 style="margin:0 0 10px;">Reset your FeedForward password</h2>
-	  <p style="margin:0 0 12px;">Use the 6-digit OTP below to reset your password. This OTP expires in 5 minutes.</p>
-	  <div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;font-size:18px;font-weight:700;letter-spacing:.04em;word-break:break-all;">%s</div>
-	  <p style="margin:12px 0 0;font-size:12px;color:#6b7280;">If you did not request this, you can ignore this email.</p>
-	</div>
-	`, token)
+	userName := strings.TrimSpace(user.Name)
+	if userName == "" {
+		userName = strings.TrimSpace(user.FirstName + " " + user.LastName)
+	}
+
+	otpBody := buildOTPEmailHTML(
+		"Confirm it's you",
+		userName,
+		"Use the button below or copy the code to continue resetting your password. This OTP expires in 5 minutes.",
+		"Confirm email",
+		fmt.Sprintf("%s/login", getTrackBaseURL()),
+		token,
+		"If you did not request a password reset, ignore this email.",
+	)
 
 	if mailErr := SendHTMLEmail(email, "FeedForward password reset OTP", otpBody); mailErr != nil {
 		return c.Status(500).JSON(response.ResponseModel{

@@ -48,10 +48,15 @@ Follow these steps to set up and run the project locally:
    APP_BASE_URL = http://localhost:3000
    MAIL_HOST = smtp.gmail.com
    MAIL_PORT = 587
-   MAIL_USERNAME = systemfeedforward@gmail.com
+   MAIL_USERNAME = your-sender-email@gmail.com
    MAIL_PASSWORD = your-gmail-app-password
-   MAIL_FROM = systemfeedforward@gmail.com
+   MAIL_FROM = your-sender-email@gmail.com
    ```
+
+   Notes:
+   - `MAIL_USERNAME` and `MAIL_PASSWORD` must be valid SMTP credentials.
+   - For Gmail, use an App Password (not your normal account password).
+   - For Gmail delivery, keep `MAIL_FROM` the same as `MAIL_USERNAME`.
 
 4. Run the application:
    ```bash

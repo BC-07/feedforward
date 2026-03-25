@@ -126,8 +126,18 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted p-4">
-      <Card className="max-w-md w-full shadow-lg">
+    <div
+      className="relative min-h-screen overflow-hidden bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: "url('/login-bg.svg')" }}
+    >
+      <div className="absolute inset-0 bg-black/5" />
+
+      <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
+        <div className="relative w-full max-w-md">
+          <div className="pointer-events-none absolute -left-6 -top-6 h-16 w-16 rounded-full bg-accent/90 shadow-lg" />
+          <div className="pointer-events-none absolute -bottom-5 -right-5 h-10 w-10 rounded-full bg-accent/80 shadow-md" />
+
+          <Card className="relative w-full border-0 bg-card shadow-2xl rounded-3xl">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
             <UserPlus className="h-8 w-8 text-accent" />
@@ -297,7 +307,9 @@ export default function Signup() {
             </p>
           </form>
         </CardContent>
-      </Card>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

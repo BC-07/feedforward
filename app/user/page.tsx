@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -37,6 +38,8 @@ import {
   Circle,
   MessageCircle,
   ChevronLeft,
+  User,
+  UserX,
 } from "lucide-react";
 import {
   submitFeedback,
@@ -64,6 +67,7 @@ export default function UserProfile() {
     priority: "Medium",
     subject: "",
     message: "",
+    isAnonymous: false,
   });
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -144,7 +148,7 @@ export default function UserProfile() {
         message: formData.message,
         userId: currentUser.id,
         userName: currentUser.fullName,
-        isAnonymous: false,
+        isAnonymous: formData.isAnonymous,
       });
 
       const newId = res.data.id;
@@ -152,7 +156,7 @@ export default function UserProfile() {
       setIsConfirmOpen(false);
       await loadUserFeedbacks(currentUser.id);
       toast.success("Feedback submitted successfully!");
-      setFormData({ type: "", category: "", priority: "Medium", subject: "", message: "" });
+      setFormData({ type: "", category: "", priority: "Medium", subject: "", message: "", isAnonymous: false });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to submit feedback");
     } finally {
@@ -291,11 +295,42 @@ export default function UserProfile() {
               <CardHeader>
                 <CardTitle>Feedback Form</CardTitle>
                 <CardDescription>
-                  Submissions include your account identity for transparency
+                  All submissions are anonymous and confidential
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="rounded-xl border bg-muted/30 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10 transition-all duration-200">
+                          {formData.isAnonymous ? (
+                            <UserX className="h-5 w-5 text-accent transition-all duration-200" />
+                          ) : (
+                            <User className="h-5 w-5 text-accent transition-all duration-200" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-semibold">Submit Anonymously</p>
+                          <p className="text-sm text-muted-foreground transition-all duration-200">
+                            {formData.isAnonymous
+                              ? "Your identity will be kept confidential"
+                              : "Your name will be visible to administrators"}
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        id="is-anonymous"
+                        checked={formData.isAnonymous}
+                        className="data-[state=checked]:bg-black data-[state=unchecked]:bg-gray-300"
+                        onCheckedChange={(checked) =>
+                          setFormData({ ...formData, isAnonymous: checked })
+                        }
+                        aria-label="Toggle anonymous feedback"
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="type">Feedback Type *</Label>
                     <Select
@@ -689,6 +724,10 @@ export default function UserProfile() {
               <div className="rounded-md border bg-muted/30 px-3 py-2 max-h-40 overflow-auto">
                 <p className="whitespace-pre-wrap break-all">{formData.message || "-"}</p>
               </div>
+            </div>
+            <div className="grid grid-cols-[140px_1fr] gap-2">
+              <p className="text-muted-foreground">Anonymous</p>
+              <p className="font-medium">{formData.isAnonymous ? "Yes" : "No"}</p>
             </div>
           </div>
 

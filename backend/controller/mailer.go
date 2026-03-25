@@ -30,10 +30,10 @@ func loadMailConfig() mailConfig {
 	if port == "" {
 		port = "587"
 	}
-	if username == "" {
-		username = "systemfeedforward@gmail.com"
-	}
 	if from == "" {
+		from = username
+	}
+	if strings.EqualFold(host, "smtp.gmail.com") && !strings.EqualFold(from, username) {
 		from = username
 	}
 
@@ -52,8 +52,14 @@ func SendHTMLEmail(to string, subject string, htmlBody string) error {
 	}
 
 	config := loadMailConfig()
+	if config.username == "" {
+		return errors.New("MAIL_USERNAME is not configured")
+	}
 	if config.password == "" {
 		return errors.New("MAIL_PASSWORD is not configured")
+	}
+	if config.from == "" {
+		return errors.New("MAIL_FROM is not configured")
 	}
 
 	addr := fmt.Sprintf("%s:%s", config.host, config.port)

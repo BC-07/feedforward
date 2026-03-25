@@ -137,86 +137,98 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted p-4">
-      <Card className="max-w-md w-full shadow-lg">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
-            <LogIn className="h-8 w-8 text-accent" />
-          </div>
-          <CardTitle>Login to FeedForward</CardTitle>
-          <CardDescription>
-            Enter your credentials to continue
-          </CardDescription>
-        </CardHeader>
+    <div
+      className="relative min-h-screen overflow-hidden bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: "url('/login-bg.svg')" }}
+    >
+      <div className="absolute inset-0 bg-black/5" />
 
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  className="pl-10"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  required
-                />
+      <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
+        <div className="relative w-full max-w-md">
+          <div className="pointer-events-none absolute -left-6 -top-6 h-16 w-16 rounded-full bg-accent/90 shadow-lg" />
+          <div className="pointer-events-none absolute -bottom-5 -right-5 h-10 w-10 rounded-full bg-accent/80 shadow-md" />
+
+          <Card className="relative w-full border-0 bg-card shadow-2xl rounded-3xl">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
+              <LogIn className="h-8 w-8 text-accent" />
+            </div>
+            <CardTitle>Login to FeedForward</CardTitle>
+            <CardDescription>
+              Enter your credentials to continue
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    className="pl-10"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">{isOtpMode ? "One-Time Password (OTP)" : "Password"}</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder={isOtpMode ? "Enter the OTP sent to your email" : "Enter your password"}
-                  className="pl-10"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete={isOtpMode ? "one-time-code" : "current-password"}
-                  required
-                />
+              <div className="space-y-2">
+                <Label htmlFor="password">{isOtpMode ? "One-Time Password (OTP)" : "Password"}</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    placeholder={isOtpMode ? "Enter the OTP sent to your email" : "Enter your password"}
+                    className="pl-10"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete={isOtpMode ? "one-time-code" : "current-password"}
+                    required
+                  />
+                </div>
               </div>
-            </div>
-            <Button
-              type="submit"
-              className="w-full bg-accent hover:bg-accent/90"
-              size="lg"
-              disabled={isLoading}
-            >
-              {isLoading ? (isOtpMode ? "Verifying OTP..." : "Logging in...") : (isOtpMode ? "Verify OTP" : "Log In")}
-            </Button>
-            <div className="text-center">
-              <button
-                type="button"
-                className="text-sm text-accent hover:underline font-medium"
-                onClick={handleForgotPasswordClick}
-                disabled={isOtpRequestLoading || isLoading}
+              <Button
+                type="submit"
+                className="w-full bg-accent hover:bg-accent/90"
+                size="lg"
+                disabled={isLoading}
               >
-                {isOtpRequestLoading ? "Sending OTP..." : isOtpMode ? "Resend OTP" : "Forgot Password?"}
-              </button>
-            </div>
-            <p className="text-center text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <Link
-                href="/register"
-                className="text-accent hover:underline font-medium"
-              >
-                Sign up
-              </Link>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+                {isLoading ? (isOtpMode ? "Verifying OTP..." : "Logging in...") : (isOtpMode ? "Verify OTP" : "Log In")}
+              </Button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  className="text-sm text-accent hover:underline font-medium"
+                  onClick={handleForgotPasswordClick}
+                  disabled={isOtpRequestLoading || isLoading}
+                >
+                  {isOtpRequestLoading ? "Sending OTP..." : isOtpMode ? "Resend OTP" : "Forgot Password?"}
+                </button>
+              </div>
+              <p className="text-center text-sm text-muted-foreground">
+                Don&apos;t have an account?{" "}
+                <Link
+                  href="/register"
+                  className="text-accent hover:underline font-medium"
+                >
+                  Sign up
+                </Link>
+              </p>
+            </form>
+          </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

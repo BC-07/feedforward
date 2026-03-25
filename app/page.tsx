@@ -28,10 +28,10 @@ export default function Home() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/track"
+                href="/submit"
                 className="px-8 py-4 bg-orange-500 text-white hover:bg-orange-600 rounded-lg transition-colors text-lg text-center"
               >
-                Track Submission
+                Submit Feedback
               </Link>
               <Link
                 href={isUserLoggedIn ? "/user" : "/login"}
@@ -55,7 +55,7 @@ export default function Home() {
             <Feature
               icon={<Shield className="w-8 h-8 text-orange-500" />}
               title="Transparent Feedback"
-              text="Submit suggestions, complaints, or compliments with clear accountability."
+              text="Submit suggestions, complaints, or compliments with the option to stay anonymous."
             />
             <Feature
               icon={<MessageSquare className="w-8 h-8 text-orange-500" />}
@@ -121,10 +121,10 @@ export default function Home() {
           Join our community in building a better organization together through sambayanihan.
         </p>
         <Link
-          href={isUserLoggedIn ? "/user" : "/login"}
+          href="/submit"
           className="px-8 py-4 bg-white text-orange-600 hover:bg-gray-200 rounded-lg transition-colors text-lg inline-flex items-center gap-2"
         >
-          {isUserLoggedIn ? "Open Dashboard" : "Login to Submit Feedback"}
+          Submit Feedback
         </Link>
       </section>
     </div>

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,6 +37,7 @@ interface FormData {
   priority: string;
   subject: string;
   message: string;
+  isAnonymous: boolean;
 }
 
 export default function Submit() {
@@ -45,6 +47,7 @@ export default function Submit() {
     priority: "Medium",
     subject: "",
     message: "",
+    isAnonymous: false,
   });
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -91,13 +94,13 @@ export default function Submit() {
         message: formData.message,
         userId,
         userName,
-        isAnonymous: false,
+        isAnonymous: formData.isAnonymous,
       });
 
       setIsConfirmOpen(false);
       setTrackingId(res.data.id);
       toast.success("Feedback submitted successfully!");
-      setFormData({ type: "", category: "", priority: "Medium", subject: "", message: "" });
+      setFormData({ type: "", category: "", priority: "Medium", subject: "", message: "", isAnonymous: false });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to submit feedback");
     } finally {
@@ -277,6 +280,19 @@ export default function Submit() {
                 />
               </div>
 
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="is-anonymous"
+                  checked={formData.isAnonymous}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, isAnonymous: checked === true })
+                  }
+                />
+                <Label htmlFor="is-anonymous" className="text-sm text-muted-foreground leading-5">
+                  Submit anonymously
+                </Label>
+              </div>
+
               <Button
                 type="submit"
                 className="w-full bg-accent hover:bg-accent/90"
@@ -321,6 +337,10 @@ export default function Submit() {
                 <div className="rounded-md border bg-muted/30 px-3 py-2 max-h-40 overflow-auto">
                   <p className="whitespace-pre-wrap break-all">{formData.message || "-"}</p>
                 </div>
+              </div>
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                <p className="text-muted-foreground">Anonymous</p>
+                <p className="font-medium">{formData.isAnonymous ? "Yes" : "No"}</p>
               </div>
             </div>
 

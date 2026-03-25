@@ -31,21 +31,51 @@ func normalizePriorityLevel(rawPriority string) string {
 	}
 }
 
-func getAdminEmailByUnit(db *gorm.DB, unit string) (string, error) {
+func getAdminEmailsByUnit(db *gorm.DB, unit string) ([]string, error) {
 	trimmedUnit := strings.TrimSpace(unit)
-	if trimmedUnit == "" {
-		return "", nil
-	}
+	seen := map[string]struct{}{}
+	var recipients []string
 
-	var admin model.Admin
-	if err := db.Table("public.admins").Select("email").Where("LOWER(TRIM(unit)) = LOWER(TRIM(?)) AND is_disabled = FALSE", trimmedUnit).First(&admin).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return "", nil
+	appendUniqueEmail := func(raw string) {
+		email := strings.TrimSpace(raw)
+		if email == "" {
+			return
 		}
-		return "", err
+		key := strings.ToLower(email)
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		recipients = append(recipients, email)
 	}
 
-	return strings.TrimSpace(admin.Email), nil
+	var unitAdmins []model.Admin
+	if trimmedUnit != "" {
+		if err := db.Table("public.admins").
+			Select("email").
+			Where("LOWER(TRIM(unit)) = LOWER(TRIM(?)) AND is_disabled = FALSE", trimmedUnit).
+			Find(&unitAdmins).Error; err != nil {
+			return nil, err
+		}
+		for _, admin := range unitAdmins {
+			appendUniqueEmail(admin.Email)
+		}
+	}
+
+	if len(recipients) == 0 {
+		var activeAdmins []model.Admin
+		if err := db.Table("public.admins").
+			Select("email").
+			Where("is_disabled = FALSE").
+			Find(&activeAdmins).Error; err != nil {
+			return nil, err
+		}
+		for _, admin := range activeAdmins {
+			appendUniqueEmail(admin.Email)
+		}
+	}
+
+	return recipients, nil
 }
 
 func getUserEmailByID(db *gorm.DB, userID string) (string, error) {
@@ -171,7 +201,7 @@ func SubmitFeedback(c *fiber.Ctx) error {
 		Priority:    normalizePriorityLevel(req.Priority),
 		UserID:      userID,
 		UserName:    req.UserName,
-		IsAnonymous: false,
+		IsAnonymous: req.IsAnonymous,
 		Response:    "",
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -203,11 +233,11 @@ func SubmitFeedback(c *fiber.Ctx) error {
 		}
 	}
 
-	adminEmail, adminErr := getAdminEmailByUnit(db, feedback.Category)
+	adminEmails, adminErr := getAdminEmailsByUnit(db, feedback.Category)
 	if adminErr != nil {
-		log.Printf("submit feedback: failed to lookup admin email: %v", adminErr)
+		log.Printf("submit feedback: failed to lookup admin emails: %v", adminErr)
 	}
-	if adminEmail != "" {
+	if len(adminEmails) > 0 {
 		adminBody := buildFeedbackEmailHTML(
 			"New feedback submitted",
 			"A new feedback entry needs your review.",
@@ -216,8 +246,10 @@ func SubmitFeedback(c *fiber.Ctx) error {
 			fmt.Sprintf("%s/dashboard", getTrackBaseURL()),
 			"",
 		)
-		if mailErr := SendHTMLEmail(adminEmail, "FeedForward: New feedback submitted", adminBody); mailErr != nil {
-			log.Printf("submit feedback: failed to send admin notification: %v", mailErr)
+		for _, adminEmail := range adminEmails {
+			if mailErr := SendHTMLEmail(adminEmail, "FeedForward: New feedback submitted", adminBody); mailErr != nil {
+				log.Printf("submit feedback: failed to send admin notification to %s: %v", adminEmail, mailErr)
+			}
 		}
 	}
 
