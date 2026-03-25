@@ -32,11 +32,11 @@ export default function Home() {
       <section className="bg-gradient-to-br from-white via-orange-50 to-white pt-8 pb-4 sm:py-20 min-h-[55vh] sm:min-h-0 flex items-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-4xl mx-auto flex flex-col items-center -mt-4 sm:mt-0">
-            <div className="relative -translate-y-[55px] sm:translate-y-0">
-              <h1 className="text-3xl sm:text-5xl md:text-6xl mb-4 sm:mb-6 text-black">
+            <div className="relative -translate-y-[15px] sm:translate-y-0">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl mb-4 sm:mb-6 text-black">
                 Your Voice Matters
               </h1>
-              <p className="text-base sm:text-xl text-gray-700 mb-10 sm:mb-10 max-w-3xl mx-auto leading-relaxed">
+              <p className="text-lg sm:text-xl text-gray-700 mb-10 sm:mb-10 max-w-3xl mx-auto leading-relaxed">
                 FeedForward enables feedback, suggestions, and complaints through an organized system.
                 Help us create a better environment for everyone.
               </p>
