@@ -58,7 +58,10 @@ export default function Submit() {
         setCategories(
           data
             .map((category) => category.name)
-            .filter((name) => name.toLowerCase() !== "disabled"),
+            .filter((name) => {
+              const normalized = name.toLowerCase();
+              return normalized !== "disabled" && normalized !== "inactive";
+            }),
         ),
       )
       .catch((error) => {

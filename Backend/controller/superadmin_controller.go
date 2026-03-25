@@ -472,9 +472,16 @@ func EnableAdminBySuperAdmin(c *fiber.Ctx) error {
 	if err := ensureAdminDisableColumn(); err != nil {
 		return serverError(c, "failed to initialize admin access state", err)
 	}
+	if err := ensureInactiveCategory(); err != nil {
+		return serverError(c, "failed to initialize inactive admin unit", err)
+	}
+	if err := syncCategoryConstraints(); err != nil {
+		return serverError(c, "failed to sync category constraints", err)
+	}
 
 	result := middleware.DBConn.Exec(
-		`UPDATE `+adminTable+` SET is_disabled = FALSE, updated_at = ? WHERE id = ?`,
+		`UPDATE `+adminTable+` SET is_disabled = FALSE, unit = ?, updated_at = ? WHERE id = ?`,
+		inactiveCategoryName,
 		utcNow(),
 		c.Params("id"),
 	)

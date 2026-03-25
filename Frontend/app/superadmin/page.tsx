@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createCategoryBySuperAdmin,
@@ -11,6 +11,8 @@ import {
   getSessionMe,
   listAdmins,
   listCategories,
+  logout,
+  pingSuperAdminSession,
   reverifySuperAdmin,
   updateCategoryBySuperAdmin,
   updateAdminBySuperAdmin,
@@ -99,6 +101,11 @@ function clearSuperAdminSession(onRedirect: () => void) {
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
+  const isDev = process.env.NODE_ENV !== "production";
+  const idleLimitMs = 5 * 60 * 1000;
+  const lastServerActivityRef = useRef<number | null>(null);
+  const lastPingAtRef = useRef<number>(0);
+  const idleExpiryCheckRef = useRef<number>(0);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [createForm, setCreateForm] = useState(emptyCreateForm);
@@ -120,6 +127,7 @@ export default function SuperAdminDashboard() {
     null,
   );
   const [reauthTarget, setReauthTarget] = useState<Admin | null>(null);
+  const [idleRemainingMs, setIdleRemainingMs] = useState(idleLimitMs);
 
   /*
   const stats = {
@@ -166,7 +174,7 @@ export default function SuperAdminDashboard() {
 
   const availableCategories = categories.filter((category) => {
     const name = category.name.trim().toLowerCase();
-    if (name === "disabled") {
+    if (name === "disabled" || name === "inactive") {
       return false;
     }
     return !admins.some(
@@ -178,7 +186,7 @@ export default function SuperAdminDashboard() {
   const editAvailableCategories = categories.filter((category) => {
     const name = category.name.trim().toLowerCase();
     const currentUnit = editForm.unit.trim().toLowerCase();
-    if (name === "disabled") {
+    if (name === "disabled" || name === "inactive") {
       return false;
     }
     if (name === currentUnit) {
@@ -190,6 +198,92 @@ export default function SuperAdminDashboard() {
     );
   });
 
+  const formatIdleTime = (remainingMs: number) => {
+    const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleActivity = () => {
+      const now = Date.now();
+      if (now - lastPingAtRef.current < 4000) {
+        return;
+      }
+      lastPingAtRef.current = now;
+      void pingSuperAdminSession()
+        .then((session) => {
+          if (session.lastActivityAt) {
+            lastServerActivityRef.current = new Date(
+              session.lastActivityAt,
+            ).getTime();
+          }
+        })
+        .catch(() => {
+          // apiFetch handles session expiry redirect
+        });
+    };
+
+    const events: Array<keyof WindowEventMap> = [
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "pointerdown",
+      "focus",
+    ];
+    events.forEach((eventName) =>
+      window.addEventListener(eventName, handleActivity, { passive: true }),
+    );
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        handleActivity();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      events.forEach((eventName) =>
+        window.removeEventListener(eventName, handleActivity),
+      );
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (lastServerActivityRef.current === null) {
+        setIdleRemainingMs(idleLimitMs);
+        return;
+      }
+      const elapsed = Date.now() - lastServerActivityRef.current;
+      setIdleRemainingMs(Math.max(0, idleLimitMs - elapsed));
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [idleLimitMs]);
+
+  useEffect(() => {
+    if (idleRemainingMs > 0) return;
+    const now = Date.now();
+    if (now - idleExpiryCheckRef.current < 5000) return;
+    idleExpiryCheckRef.current = now;
+    void getSessionMe()
+      .then((session) => {
+        if (session.lastActivityAt) {
+          lastServerActivityRef.current = new Date(
+            session.lastActivityAt,
+          ).getTime();
+        }
+      })
+      .catch(() => {
+        // apiFetch handles session expiry redirect
+      });
+  }, [idleRemainingMs]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     void getSessionMe()
@@ -197,6 +291,11 @@ export default function SuperAdminDashboard() {
         if (session.role !== "superadmin") {
           clearSuperAdminSession(() => router.push("/login"));
           return;
+        }
+        if (session.lastActivityAt) {
+          lastServerActivityRef.current = new Date(
+            session.lastActivityAt,
+          ).getTime();
         }
         void fetchAdmins(setAdmins, () =>
           clearSuperAdminSession(() => router.push("/login")),
@@ -213,6 +312,27 @@ export default function SuperAdminDashboard() {
         toastApiError(error, "Failed to load categories.");
       });
   }, [router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const intervalId = window.setInterval(() => {
+      void getSessionMe()
+        .then((session) => {
+          if (session.lastActivityAt) {
+            lastServerActivityRef.current = new Date(
+              session.lastActivityAt,
+            ).getTime();
+          }
+        })
+        .catch(() => {
+          // apiFetch handles session expiry redirect
+        });
+    }, 30000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   const handleCreateAdmin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -245,8 +365,25 @@ export default function SuperAdminDashboard() {
     setIsEditOpen(true);
   };
 
+  const ensureSuperAdminSession = async () => {
+    try {
+      const session = await pingSuperAdminSession();
+      if (session.lastActivityAt) {
+        lastServerActivityRef.current = new Date(
+          session.lastActivityAt,
+        ).getTime();
+      }
+      return true;
+    } catch (error) {
+      toastApiError(error, "Session expired. Please log in again.");
+      clearSuperAdminSession(() => router.push("/login"));
+      return false;
+    }
+  };
+
   const handleUpdateAdmin = async () => {
     if (!selectedAdmin) return;
+    if (!(await ensureSuperAdminSession())) return;
     setReauthAction("edit");
     setReauthTarget(selectedAdmin);
     setReauthPassword("");
@@ -254,7 +391,7 @@ export default function SuperAdminDashboard() {
   };
 
   const handleDisableAdmin = async (admin: Admin) => {
-    if (!window.confirm(`Disable admin access for ${admin.name}?`)) return;
+    if (!(await ensureSuperAdminSession())) return;
     setReauthAction("disable");
     setReauthTarget(admin);
     setReauthPassword("");
@@ -262,7 +399,7 @@ export default function SuperAdminDashboard() {
   };
 
   const handleEnableAdmin = async (admin: Admin) => {
-    if (!window.confirm(`Enable admin access for ${admin.name}?`)) return;
+    if (!(await ensureSuperAdminSession())) return;
     setReauthAction("enable");
     setReauthTarget(admin);
     setReauthPassword("");
@@ -406,6 +543,33 @@ export default function SuperAdminDashboard() {
                 Hidden system control for managing admin accounts across all
                 units.
               </p>
+            </div>
+            <div className="rounded-lg border border-white/15 bg-white/10 px-4 py-3 text-xs text-white/80 sm:text-sm">
+              <p className="text-[10px] uppercase tracking-[0.3em] text-white/60">
+                Inactivity Timer
+              </p>
+              <div className="mt-1 flex items-center gap-2">
+                <p className="text-lg font-semibold text-white">
+                  {formatIdleTime(idleRemainingMs)}
+                </p>
+                {isDev ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-8 border-white/30 bg-white/10 text-white hover:bg-white/20"
+                    onClick={async () => {
+                      try {
+                        await logout();
+                      } finally {
+                        clearSuperAdminSession(() => router.push("/login"));
+                      }
+                    }}
+                  >
+                    Expire now
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
@@ -580,7 +744,12 @@ export default function SuperAdminDashboard() {
                     </p>
                   ) : (
                     <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
-                      {categories.map((category) => (
+                      {categories
+                        .filter((category) => {
+                          const name = category.name.trim().toLowerCase();
+                          return name !== "disabled" && name !== "inactive";
+                        })
+                        .map((category) => (
                         <div
                           key={category.id}
                           className="flex items-center gap-2 rounded-md border p-2"
@@ -668,15 +837,14 @@ export default function SuperAdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border overflow-x-auto">
-                <Table className="min-w-[900px] text-xs sm:text-sm">
+                <Table className="min-w-[780px] text-xs sm:text-sm">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Unit</TableHead>
-                      <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right w-[120px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -712,19 +880,11 @@ export default function SuperAdminDashboard() {
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={getStatusClass(admin.isDisabled)}
-                            >
-                              {admin.isDisabled ? "Disabled" : "Active"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
                             {new Date(admin.createdAt).toLocaleDateString(
                               "en-US",
                             )}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right w-[120px]">
                             <div className="flex flex-wrap justify-end gap-2">
                               <Button
                                 variant="outline"
@@ -732,9 +892,9 @@ export default function SuperAdminDashboard() {
                                 onClick={() => handleOpenEdit(admin)}
                                 disabled={Boolean(admin.isDisabled)}
                                 className="border-transparent bg-transparent text-black hover:bg-amber-600 hover:text-black"
+                                aria-label="Edit admin"
                               >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Edit
+                                <Pencil className="h-4 w-4" />
                               </Button>
                               {admin.isDisabled ? (
                                 <Button
@@ -742,9 +902,9 @@ export default function SuperAdminDashboard() {
                                   size="sm"
                                   onClick={() => handleEnableAdmin(admin)}
                                   className="border-transparent bg-transparent text-black hover:bg-emerald-600 hover:text-black"
+                                  aria-label="Enable admin"
                                 >
-                                  <Ban className="mr-2 h-4 w-4 rotate-180" />
-                                  Enable
+                                  <Ban className="h-4 w-4 rotate-180" />
                                 </Button>
                               ) : (
                                 <Button
@@ -752,9 +912,9 @@ export default function SuperAdminDashboard() {
                                   size="sm"
                                   onClick={() => handleDisableAdmin(admin)}
                                   className="border-transparent bg-transparent text-black hover:bg-red-600 hover:text-black"
+                                  aria-label="Disable admin"
                                 >
-                                  <Ban className="mr-2 h-4 w-4" />
-                                  Disable
+                                  <Ban className="h-4 w-4" />
                                 </Button>
                               )}
                             </div>

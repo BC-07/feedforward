@@ -42,6 +42,7 @@ var validPriorities = map[string]bool{
 }
 
 const disabledCategoryName = "Disabled"
+const inactiveCategoryName = "Inactive"
 
 // Keep table names centralized so SQL changes stay in one place.
 const (
@@ -58,6 +59,7 @@ const (
 	userSessionTTL           = 7 * 24 * time.Hour
 	adminSessionTTL          = 8 * time.Hour
 	adminSessionIdleRotation = 5 * time.Minute
+	superAdminIdleTimeout    = 5 * time.Minute
 	reauthTTL                = 5 * time.Minute
 	sessionRoleUser          = "user"
 	sessionRoleAdmin         = "admin"
@@ -295,6 +297,16 @@ func ensureDisabledCategory() error {
 	).Error
 }
 
+func ensureInactiveCategory() error {
+	if err := ensureCategoryStore(); err != nil {
+		return err
+	}
+	return middleware.DBConn.Exec(
+		`INSERT INTO `+categoryTable+` (name) VALUES (?) ON CONFLICT (name) DO NOTHING`,
+		inactiveCategoryName,
+	).Error
+}
+
 func ensureAdminDisableColumn() error {
 	adminDisableColumnInit.Do(func() {
 		adminDisableColumnErr = middleware.DBConn.Exec(
@@ -475,6 +487,11 @@ func requireSession(c *fiber.Ctx, role string, rotateOnIdle bool) (sessionRecord
 		clearSessionCookie(c)
 		return sessionRecord{}, unauthorized(c, "session expired")
 	}
+	if role == sessionRoleSuperAdmin && now.Sub(session.LastActivityAt) >= superAdminIdleTimeout {
+		deleteSessionByID(session.ID)
+		clearSessionCookie(c)
+		return sessionRecord{}, unauthorized(c, "session expired")
+	}
 
 	if rotateOnIdle && now.Sub(session.LastActivityAt) >= adminSessionIdleRotation {
 		newSession, err := createSession(session.Role, session.UserID, session.AdminID, session.SuperAdminUsername, time.Until(session.ExpiresAt))
@@ -592,7 +609,9 @@ func categoryExists(name string) (bool, error) {
 }
 
 func isDisabledCategory(name string) bool {
-	return strings.EqualFold(strings.TrimSpace(name), disabledCategoryName)
+	trimmed := strings.TrimSpace(name)
+	return strings.EqualFold(trimmed, disabledCategoryName) ||
+		strings.EqualFold(trimmed, inactiveCategoryName)
 }
 
 func categoryInUse(name string) (bool, error) {

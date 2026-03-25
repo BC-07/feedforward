@@ -265,21 +265,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       navigator.sendBeacon(url, body);
     };
 
-    const handleVisibility = () => {
-      if (document.visibilityState === "hidden") {
-        sendLogoutBeacon();
-      }
-    };
-
     const handleBeforeUnload = () => {
       sendLogoutBeacon();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
-    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [effectiveSession.isAdminLoggedIn, effectiveSession.isSuperAdminLoggedIn]);
 

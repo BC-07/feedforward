@@ -80,6 +80,42 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
         ? String(payload.data.message)
         : payload?.message || "Request failed";
 
+    if (
+      typeof window !== "undefined" &&
+      (response.status === 401 || response.status === 403)
+    ) {
+      const lowerMessage = String(errorMessage || "").toLowerCase();
+      const isSessionInvalid =
+        lowerMessage.includes("session") ||
+        lowerMessage.includes("expired") ||
+        lowerMessage.includes("reauthentication required");
+      const isAdminLoggedIn =
+        localStorage.getItem("isAdminLoggedIn") === "true" ||
+        localStorage.getItem("isSuperAdminLoggedIn") === "true";
+      if (isAdminLoggedIn && isSessionInvalid) {
+        localStorage.removeItem("isAdminLoggedIn");
+        localStorage.removeItem("currentAdminId");
+        localStorage.removeItem("currentAdminName");
+        localStorage.removeItem("currentAdminEmail");
+        localStorage.removeItem("currentAdminDepartment");
+        localStorage.removeItem("isSuperAdminLoggedIn");
+        localStorage.removeItem("superAdminName");
+        localStorage.removeItem("superAdminExpiresAt");
+        localStorage.setItem(
+          "sessionExpiredMessage",
+          "You were signed out due to inactivity. Please log in again.",
+        );
+        try {
+          // Lazy import to avoid SSR issues.
+          const { toast } = require("sonner");
+          toast.error("Your session expired due to inactivity. Please log in again.");
+        } catch {
+          // no-op
+        }
+        window.location.href = "/login";
+      }
+    }
+
     throw new Error(errorMessage);
   }
 
@@ -305,8 +341,19 @@ export async function getSessionMe(): Promise<{
   role: string;
   userId?: string | null;
   adminId?: string | null;
+  lastActivityAt?: string;
+  expiresAt?: string;
 }> {
   return apiFetch("/auth/session");
+}
+
+export async function pingSuperAdminSession(): Promise<{
+  role: string;
+  adminId?: string | null;
+  lastActivityAt?: string;
+  expiresAt?: string;
+}> {
+  return apiFetch("/auth/superadmin/ping", { method: "POST" });
 }
 
 export async function updateUserProfile(

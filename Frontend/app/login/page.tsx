@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { loginAdmin, loginUser } from "@/lib/api";
@@ -22,6 +22,16 @@ export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [expiredMessage, setExpiredMessage] = useState("");
+
+  useEffect(() => {
+    const message = localStorage.getItem("sessionExpiredMessage");
+    if (message) {
+      localStorage.removeItem("sessionExpiredMessage");
+      setExpiredMessage(message);
+      toast.error(message);
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -104,6 +114,11 @@ export default function Login() {
           </CardHeader>
 
           <CardContent>
+            {expiredMessage ? (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {expiredMessage}
+              </div>
+            ) : null}
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>

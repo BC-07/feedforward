@@ -499,11 +499,32 @@ func GetSessionInfo(c *fiber.Ctx) error {
 		clearSessionCookie(c)
 		return unauthorized(c, "session expired")
 	}
+	if session.Role == sessionRoleSuperAdmin && utcNow().Sub(session.LastActivityAt) >= superAdminIdleTimeout {
+		deleteSessionByID(session.ID)
+		clearSessionCookie(c)
+		return unauthorized(c, "session expired")
+	}
 
 	return success(c, fiber.StatusOK, map[string]any{
-		"role":    session.Role,
-		"userId":  session.UserID,
-		"adminId": session.AdminID,
+		"role":          session.Role,
+		"userId":        session.UserID,
+		"adminId":       session.AdminID,
+		"lastActivityAt": session.LastActivityAt,
+		"expiresAt":     session.ExpiresAt,
+	})
+}
+
+func PingSuperAdminSession(c *fiber.Ctx) error {
+	session, err := requireSuperAdminSession(c)
+	if err != nil {
+		return err
+	}
+
+	return success(c, fiber.StatusOK, map[string]any{
+		"role":          session.Role,
+		"adminId":       session.AdminID,
+		"lastActivityAt": session.LastActivityAt,
+		"expiresAt":     session.ExpiresAt,
 	})
 }
 

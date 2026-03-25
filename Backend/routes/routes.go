@@ -32,6 +32,7 @@ func AppRoutes(app *fiber.App) {
 	// Auth - Superadmin
 	app.Post("/auth/superadmin/login", controller.LoginSuperAdmin)
 	app.Post("/auth/superadmin/reverify", controller.ReverifySuperAdmin)
+	app.Post("/auth/superadmin/ping", controller.PingSuperAdminSession)
 
 	// Auth - Session
 	app.Get("/auth/session", controller.GetSessionInfo)
