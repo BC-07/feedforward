@@ -34,6 +34,7 @@ func AppRoutes(app *fiber.App) {
 	api.Get("/sessions/current", controller.CurrentSession)
 
 	// Feedback routes — specific paths must be before /:id
+	api.Post("/feedbacks/moderate", controller.ModerateFeedback)
 	api.Post("/feedbacks", controller.SubmitFeedback)
 	api.Get("/feedbacks/user/:userId", controller.GetFeedbacksByUser)
 	api.Get("/feedbacks/unit/:unit", controller.GetFeedbacksByUnit)

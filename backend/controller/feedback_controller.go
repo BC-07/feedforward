@@ -171,6 +171,24 @@ func buildFeedbackEmailHTML(title string, subtitle string, feedback model.Feedba
 	)
 }
 
+func ModerateFeedback(c *fiber.Ctx) error {
+	var req model.FeedbackModerationRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Invalid request body", IsSuccess: false, Error: err},
+		})
+	}
+
+	moderation := analyzeFeedbackLanguage(req.Subject, req.Message)
+	return c.Status(200).JSON(response.ResponseModel{
+		RetCode: "200",
+		Message: "Moderation check completed",
+		Data:    moderation,
+	})
+}
+
 func SubmitFeedback(c *fiber.Ctx) error {
 	db := middleware.DBConn
 
@@ -180,6 +198,15 @@ func SubmitFeedback(c *fiber.Ctx) error {
 			RetCode: "400",
 			Message: status.RetCode400,
 			Data:    errors.ErrorModel{Message: "Invalid request body", IsSuccess: false, Error: err},
+		})
+	}
+
+	moderation := analyzeFeedbackLanguage(req.Subject, req.Message)
+	if moderation.Severity == "offensive" {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: moderation.Reason,
+			Data:    moderation,
 		})
 	}
 

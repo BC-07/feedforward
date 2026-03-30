@@ -27,9 +27,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { ArrowRight, Send } from "lucide-react";
-import { submitFeedback, listCategories, type Category } from "@/frontend/api";
+import { AlertTriangle, ArrowRight, Send } from "lucide-react";
+import { submitFeedback, moderateFeedback, listCategories, type Category } from "@/frontend/api";
 
 interface FormData {
   type: string;
@@ -52,7 +53,12 @@ export default function Submit() {
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingModeration, setIsCheckingModeration] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [moderationNotice, setModerationNotice] = useState<{
+    severity: "warning" | "offensive";
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     listCategories()
@@ -100,6 +106,7 @@ export default function Submit() {
       setIsConfirmOpen(false);
       setTrackingId(res.data.id);
       toast.success("Feedback submitted successfully!");
+      setModerationNotice(null);
       setFormData({ type: "", category: "", priority: "Medium", subject: "", message: "", isAnonymous: false });
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to submit feedback");
@@ -108,8 +115,39 @@ export default function Submit() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    setIsCheckingModeration(true);
+    try {
+      const moderationRes = await moderateFeedback({
+        subject: formData.subject,
+        message: formData.message,
+      });
+
+      const words = moderationRes.data.matched_words.join(", ");
+      const detail = words ? ` Matched words: ${words}.` : "";
+      const message = `${moderationRes.data.reason}${detail}`;
+
+      if (moderationRes.data.severity === "offensive") {
+        setModerationNotice({ severity: "offensive", message });
+        toast.error(moderationRes.data.reason);
+        return;
+      }
+
+      if (moderationRes.data.severity === "warning") {
+        setModerationNotice({ severity: "warning", message });
+        toast.warning(moderationRes.data.reason);
+      } else {
+        setModerationNotice(null);
+      }
+    } catch {
+      setModerationNotice(null);
+      // If moderation pre-check fails, let the user continue.
+    } finally {
+      setIsCheckingModeration(false);
+    }
+
     setIsConfirmOpen(true);
   };
 
@@ -178,6 +216,18 @@ export default function Submit() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
+              {moderationNotice && (
+                <Alert variant={moderationNotice.severity === "offensive" ? "destructive" : "default"}>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>
+                    {moderationNotice.severity === "offensive"
+                      ? "Offensive content detected"
+                      : "Warning: Mild negativity detected"}
+                  </AlertTitle>
+                  <AlertDescription>{moderationNotice.message}</AlertDescription>
+                </Alert>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="type">Feedback Type *</Label>
                 <Select
@@ -259,9 +309,10 @@ export default function Submit() {
                   id="subject"
                   placeholder="Brief summary of your feedback"
                   value={formData.subject}
-                  onChange={(e) =>
-                    setFormData({ ...formData, subject: e.target.value })
-                  }
+                  onChange={(e) => {
+                    if (moderationNotice) setModerationNotice(null);
+                    setFormData({ ...formData, subject: e.target.value });
+                  }}
                   required
                 />
               </div>
@@ -273,9 +324,10 @@ export default function Submit() {
                   placeholder="Provide detailed information about your feedback..."
                   rows={6}
                   value={formData.message}
-                  onChange={(e) =>
-                    setFormData({ ...formData, message: e.target.value })
-                  }
+                  onChange={(e) => {
+                    if (moderationNotice) setModerationNotice(null);
+                    setFormData({ ...formData, message: e.target.value });
+                  }}
                   required
                 />
               </div>
@@ -297,10 +349,10 @@ export default function Submit() {
                 type="submit"
                 className="w-full bg-accent hover:bg-accent/90"
                 size="lg"
-                disabled={isLoading}
+                disabled={isLoading || isCheckingModeration}
               >
                 <Send className="mr-2 h-4 w-4" />
-                {isLoading ? "Submitting..." : "Submit Feedback"}
+                {isLoading ? "Submitting..." : isCheckingModeration ? "Checking content..." : "Submit Feedback"}
               </Button>
             </form>
           </CardContent>

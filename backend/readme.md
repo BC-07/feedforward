@@ -51,12 +51,14 @@ Follow these steps to set up and run the project locally:
    MAIL_USERNAME = your-sender-email@gmail.com
    MAIL_PASSWORD = your-gmail-app-password
    MAIL_FROM = your-sender-email@gmail.com
+   WORD_FILTER_CSV_PATH = ./word_filter.csv
    ```
 
    Notes:
    - `MAIL_USERNAME` and `MAIL_PASSWORD` must be valid SMTP credentials.
    - For Gmail, use an App Password (not your normal account password).
    - For Gmail delivery, keep `MAIL_FROM` the same as `MAIL_USERNAME`.
+   - `WORD_FILTER_CSV_PATH` is optional. If omitted, the backend tries to load `word_filter.csv` from common project paths.
 
 4. Run the application:
    ```bash

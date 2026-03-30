@@ -71,6 +71,13 @@ export interface FeedbackData {
   updatedAt: string;
 }
 
+export interface FeedbackModerationData {
+  is_flagged: boolean;
+  severity: "safe" | "warning" | "offensive";
+  matched_words: string[];
+  reason: string;
+}
+
 async function request<T>(
   path: string,
   options?: RequestInit,
@@ -173,6 +180,11 @@ export const submitFeedback = (data: {
   userName: string;
   isAnonymous: boolean;
 }) => post<FeedbackData>("/feedbacks", data);
+
+export const moderateFeedback = (data: {
+  subject: string;
+  message: string;
+}) => post<FeedbackModerationData>("/feedbacks/moderate", data);
 
 export const getFeedbackById = (id: string) =>
   get<FeedbackData>(`/feedbacks/${id}`);

@@ -88,6 +88,11 @@ type (
 		IsAnonymous bool   `json:"isAnonymous"`
 	}
 
+	FeedbackModerationRequest struct {
+		Subject string `json:"subject"`
+		Message string `json:"message"`
+	}
+
 	ForgotPasswordRequest struct {
 		Email string `json:"email"`
 	}
