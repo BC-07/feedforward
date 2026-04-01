@@ -27,11 +27,13 @@ type verifyResetOTPRequest struct {
 type resetPasswordRequest struct {
 	Email       string `json:"email"`
 	NewPassword string `json:"newPassword"`
+	Role        string `json:"role"`
 }
 
 type passwordResetEntry struct {
 	Email     string
 	ExpiresAt time.Time
+	Role      string
 }
 
 type adminSetPasswordEntry struct {
@@ -48,6 +50,10 @@ var (
 	adminSetPasswordTokens = map[string]adminSetPasswordEntry{}
 	adminSetPasswordMu     sync.Mutex
 )
+
+func resetKey(role string, email string) string {
+	return strings.ToLower(strings.TrimSpace(role)) + ":" + strings.ToLower(strings.TrimSpace(email))
+}
 
 func cleanupExpiredResetTokens(now time.Time) {
 	for token, entry := range passwordResetTokens {
@@ -101,14 +107,12 @@ func buildOTPEmailHTML(otp string) string {
 	content := fmt.Sprintf(
 		`<p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#111827;">We received a request to reset your password.</p>
 <p style="margin:0 0 16px 0;font-size:15px;line-height:22px;color:#111827;">Use this one-time password (OTP) to continue:</p>
-<div style="margin:16px 0;padding:14px 16px;border-radius:12px;background:#fff3e0;display:inline-block;font-size:24px;font-weight:700;letter-spacing:0.3em;color:#111827;">%s</div>
+<div style="margin:20px 0;text-align:center;">
+  <div style="display:inline-block;padding:18px 22px;border-radius:14px;background:#fff3e0;font-size:30px;font-weight:800;letter-spacing:0.35em;color:#111827;">%s</div>
+</div>
 <p style="margin:16px 0 0 0;font-size:13px;line-height:20px;color:#6b7280;">This OTP expires in 5 minutes. If you did not request this, you can ignore this email.</p>`,
 		otp,
 	)
-
-	if url := loginPortalURL(); url != "" {
-		content += primaryButton("Go to login", url)
-	}
 
 	return buildEmailShell("Password reset OTP", content)
 }
@@ -163,9 +167,14 @@ func ForgotPassword(c *fiber.Ctx) error {
 		return invalidRequest(c, "email is required")
 	}
 
+	role := "user"
 	user, err := fetchUserByEmail(email)
 	if err != nil || strings.TrimSpace(user.ID) == "" {
-		return success(c, fiber.StatusOK, map[string]any{"sent": true})
+		admin, adminErr := fetchAdminByEmail(email)
+		if adminErr != nil || strings.TrimSpace(admin.ID) == "" {
+			return success(c, fiber.StatusOK, map[string]any{"sent": true})
+		}
+		role = "admin"
 	}
 
 	otp, err := generateSecureOTP()
@@ -179,6 +188,7 @@ func ForgotPassword(c *fiber.Ctx) error {
 	passwordResetTokens[otp] = passwordResetEntry{
 		Email:     email,
 		ExpiresAt: now.Add(5 * time.Minute),
+		Role:      role,
 	}
 	passwordResetMu.Unlock()
 
@@ -216,25 +226,12 @@ func VerifyResetOTP(c *fiber.Ctx) error {
 
 	verifiedResetMu.Lock()
 	cleanupExpiredVerifiedResetEmails(now)
-	verifiedResetEmails[email] = now.Add(10 * time.Minute)
+	verifiedResetEmails[resetKey(entry.Role, email)] = now.Add(10 * time.Minute)
 	verifiedResetMu.Unlock()
-
-	user, err := fetchUserByEmail(email)
-	if err != nil || strings.TrimSpace(user.ID) == "" {
-		return notFound(c, "user not found", err)
-	}
-
-	session, err := createSession(sessionRoleUser, &user.ID, nil, nil, userSessionTTL)
-	if err != nil {
-		return serverError(c, "failed to create session", err)
-	}
-	setSessionCookie(c, session)
 
 	return success(c, fiber.StatusOK, map[string]any{
 		"verified": true,
-		"id":       user.ID,
-		"name":     strings.TrimSpace(user.Name),
-		"email":    strings.ToLower(strings.TrimSpace(user.Email)),
+		"role":     entry.Role,
 	})
 }
 
@@ -246,6 +243,7 @@ func ResetPassword(c *fiber.Ctx) error {
 
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	newPassword := strings.TrimSpace(req.NewPassword)
+	role := strings.ToLower(strings.TrimSpace(req.Role))
 	if email == "" || newPassword == "" {
 		return invalidRequest(c, "email and new password are required")
 	}
@@ -256,13 +254,34 @@ func ResetPassword(c *fiber.Ctx) error {
 	now := utcNow()
 	verifiedResetMu.Lock()
 	cleanupExpiredVerifiedResetEmails(now)
-	_, verified := verifiedResetEmails[email]
-	if verified {
-		delete(verifiedResetEmails, email)
+	if role == "" {
+		userKey := resetKey("user", email)
+		adminKey := resetKey("admin", email)
+		userVerified := verifiedResetEmails[userKey]
+		adminVerified := verifiedResetEmails[adminKey]
+		if !userVerified.IsZero() && !adminVerified.IsZero() {
+			verifiedResetMu.Unlock()
+			return invalidRequest(c, "ambiguous reset request, please try again")
+		}
+		if !userVerified.IsZero() {
+			role = "user"
+			delete(verifiedResetEmails, userKey)
+		}
+		if !adminVerified.IsZero() {
+			role = "admin"
+			delete(verifiedResetEmails, adminKey)
+		}
+	} else {
+		key := resetKey(role, email)
+		if _, verified := verifiedResetEmails[key]; verified {
+			delete(verifiedResetEmails, key)
+		} else {
+			role = ""
+		}
 	}
 	verifiedResetMu.Unlock()
 
-	if !verified {
+	if role == "" {
 		return invalidRequest(c, "please verify OTP before resetting password")
 	}
 
@@ -271,11 +290,20 @@ func ResetPassword(c *fiber.Ctx) error {
 		return serverError(c, "failed to process password", err)
 	}
 
-	if err := middleware.DBConn.Exec(
-		`UPDATE `+userTable+` SET password = ?, updated_at = ? WHERE LOWER(email) = LOWER(?)`,
-		hashed, utcNow(), email,
-	).Error; err != nil {
-		return serverError(c, "failed to reset password", err)
+	if role == "admin" {
+		if err := middleware.DBConn.Exec(
+			`UPDATE `+adminTable+` SET password = ?, updated_at = ? WHERE LOWER(email) = LOWER(?)`,
+			hashed, utcNow(), email,
+		).Error; err != nil {
+			return serverError(c, "failed to reset password", err)
+		}
+	} else {
+		if err := middleware.DBConn.Exec(
+			`UPDATE `+userTable+` SET password = ?, updated_at = ? WHERE LOWER(email) = LOWER(?)`,
+			hashed, utcNow(), email,
+		).Error; err != nil {
+			return serverError(c, "failed to reset password", err)
+		}
 	}
 
 	return success(c, fiber.StatusOK, map[string]any{"success": true})

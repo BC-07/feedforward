@@ -223,9 +223,7 @@ export async function verifyResetOTP(payload: {
   otp: string;
 }): Promise<{
   verified: boolean;
-  id: string;
-  name: string;
-  email: string;
+  role?: "user" | "admin";
 }> {
   return apiFetch("/auth/users/verify-reset-otp", {
     method: "POST",
@@ -236,6 +234,7 @@ export async function verifyResetOTP(payload: {
 export async function resetPassword(payload: {
   email: string;
   newPassword: string;
+  role?: "user" | "admin";
 }): Promise<{ success: boolean }> {
   return apiFetch<{ success: boolean }>("/auth/users/reset-password", {
     method: "POST",

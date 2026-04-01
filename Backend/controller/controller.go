@@ -157,6 +157,27 @@ func fetchAdminByID(id string) (model.AdminModel, error) {
 	return admin, err
 }
 
+func fetchAdminByEmail(email string) (model.AdminModel, error) {
+	if err := ensureAdminDisableColumn(); err != nil {
+		return model.AdminModel{}, err
+	}
+	if err := ensureAdminSuperAdminColumn(); err != nil {
+		return model.AdminModel{}, err
+	}
+
+	var admin model.AdminModel
+	trimmed := strings.TrimSpace(email)
+	if trimmed == "" {
+		return admin, nil
+	}
+	err := middleware.DBConn.Raw(
+		`SELECT id, first_name, last_name, first_name || ' ' || last_name AS name, email, unit, COALESCE(is_disabled, FALSE) AS is_disabled, COALESCE(is_superadmin, FALSE) AS is_superadmin, created_at, updated_at
+		FROM `+adminTable+` WHERE LOWER(email) = LOWER(?)`,
+		trimmed,
+	).Scan(&admin).Error
+	return admin, err
+}
+
 func normalizeFeedback(feedback *model.FeedbackModel) error {
 	// Normalize whitespace first so validation and inserts behave consistently.
 	feedback.ID = strings.TrimSpace(feedback.ID)
