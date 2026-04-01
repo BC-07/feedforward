@@ -544,33 +544,6 @@ export default function SuperAdminDashboard() {
                 units.
               </p>
             </div>
-            <div className="rounded-lg border border-white/15 bg-white/10 px-4 py-3 text-xs text-white/80 sm:text-sm">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-white/60">
-                Inactivity Timer
-              </p>
-              <div className="mt-1 flex items-center gap-2">
-                <p className="text-lg font-semibold text-white">
-                  {formatIdleTime(idleRemainingMs)}
-                </p>
-                {isDev ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="h-8 border-white/30 bg-white/10 text-white hover:bg-white/20"
-                    onClick={async () => {
-                      try {
-                        await logout();
-                      } finally {
-                        clearSuperAdminSession(() => router.push("/login"));
-                      }
-                    }}
-                  >
-                    Expire now
-                  </Button>
-                ) : null}
-              </div>
-            </div>
           </div>
         </div>
       </div>
