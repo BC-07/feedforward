@@ -5,6 +5,7 @@ import (
     "fmt"
     "os"
     "path/filepath"
+    "sort"
     "strings"
 
     "intern_template_v1/middleware"
@@ -16,27 +17,38 @@ func main() {
         fmt.Printf("failed to load env: %v\n", envErr)
     }
 
-    sqlPath := filepath.Join("migrations", "001_timestamps_utc.sql")
-    sqlBytes, err := os.ReadFile(sqlPath)
-    if err != nil {
-        fmt.Printf("failed to read %s: %v\n", sqlPath, err)
-        os.Exit(1)
-    }
-
     if middleware.ConnectDB() {
         fmt.Println("DB CONNECTION FAILED!")
         os.Exit(1)
     }
 
-    sqlText := string(sqlBytes)
-    statements := splitSQLStatements(sqlText)
-    for _, stmt := range statements {
-        if strings.TrimSpace(stmt) == "" {
-            continue
-        }
-        if err := middleware.DBConn.Exec(stmt).Error; err != nil {
-            fmt.Printf("migration failed: %v\n", err)
+    migrationPaths, err := filepath.Glob(filepath.Join("migrations", "*.sql"))
+    if err != nil {
+        fmt.Printf("failed to list migrations: %v\n", err)
+        os.Exit(1)
+    }
+    if len(migrationPaths) == 0 {
+        fmt.Println("no migration files found")
+        return
+    }
+    sort.Strings(migrationPaths)
+
+    for _, sqlPath := range migrationPaths {
+        sqlBytes, err := os.ReadFile(sqlPath)
+        if err != nil {
+            fmt.Printf("failed to read %s: %v\n", sqlPath, err)
             os.Exit(1)
+        }
+        sqlText := string(sqlBytes)
+        statements := splitSQLStatements(sqlText)
+        for _, stmt := range statements {
+            if strings.TrimSpace(stmt) == "" {
+                continue
+            }
+            if err := middleware.DBConn.Exec(stmt).Error; err != nil {
+                fmt.Printf("migration failed (%s): %v\n", sqlPath, err)
+                os.Exit(1)
+            }
         }
     }
 

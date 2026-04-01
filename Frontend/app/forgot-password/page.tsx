@@ -84,7 +84,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
-      <div className="container mx-auto flex min-h-full max-w-md items-center justify-center">
+      <div className="container mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-6">
         <Card className="w-full shadow-lg">
           <CardHeader className="text-center">
             <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 sm:mb-4">
@@ -122,11 +122,20 @@ export default function ForgotPasswordPage() {
                 {isRequesting ? "Sending OTP..." : "Send OTP"}
               </Button>
             </form>
+          </CardContent>
+        </Card>
 
-            {step === "verify" ? (
-              <form onSubmit={handleVerifyOTP} className="space-y-4">
-                <div className="space-y-2 text-center">
-                  <Label htmlFor="otp">Enter OTP</Label>
+        {step === "verify" ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 sm:px-4">
+            <Card className="w-[92vw] max-w-md border border-muted/60 bg-white shadow-xl sm:w-full">
+              <CardHeader className="text-center pb-3">
+                <CardTitle className="text-lg sm:text-xl">Enter OTP</CardTitle>
+                <CardDescription>
+                  Code sent to {email.trim() || "your email"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form onSubmit={handleVerifyOTP} className="space-y-4">
                   <InputOTP
                     id="otp"
                     maxLength={6}
@@ -134,21 +143,28 @@ export default function ForgotPasswordPage() {
                     onChange={setOtp}
                     containerClassName="justify-center"
                   >
-                    <InputOTPGroup>
-                      {[0, 1, 2, 3, 4, 5].map((index) => (
-                        <InputOTPSlot key={index} index={index} />
-                      ))}
-                    </InputOTPGroup>
-                  </InputOTP>
+                  <InputOTPGroup className="gap-2 sm:gap-3">
+                    {[0, 1, 2, 3, 4, 5].map((index) => (
+                      <InputOTPSlot
+                        key={index}
+                        index={index}
+                        className="h-10 w-10 rounded-md text-sm sm:h-14 sm:w-14 sm:text-lg"
+                      />
+                    ))}
+                  </InputOTPGroup>
+                </InputOTP>
+                  <Button
+                    type="submit"
+                    className="w-full bg-accent hover:bg-accent/90"
+                    size="lg"
+                    disabled={isVerifying}
+                  >
+                    {isVerifying ? "Verifying..." : "Verify"}
+                  </Button>
+                </form>
+                <div className="text-center text-xs text-muted-foreground">
+                  Didn&apos;t receive the code?
                 </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-accent hover:bg-accent/90"
-                  size="lg"
-                  disabled={isVerifying}
-                >
-                  {isVerifying ? "Verifying..." : "Verify OTP"}
-                </Button>
                 <button
                   type="button"
                   className="w-full text-sm text-accent hover:underline font-medium"
@@ -173,10 +189,10 @@ export default function ForgotPasswordPage() {
                 >
                   {isRequesting ? "Sending OTP..." : "Resend OTP"}
                 </button>
-              </form>
-            ) : null}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
       </div>
     </div>
   );
