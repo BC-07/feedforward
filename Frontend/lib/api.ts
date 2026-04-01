@@ -243,6 +243,16 @@ export async function resetPassword(payload: {
   });
 }
 
+export async function setAdminPassword(payload: {
+  token: string;
+  newPassword: string;
+}): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>("/auth/admins/set-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function registerAdmin(payload: {
   firstName: string;
   lastName: string;
@@ -318,7 +328,6 @@ export async function createAdminBySuperAdmin(
     firstName: string;
     lastName: string;
     email: string;
-    password: string;
     unit: string;
   },
 ): Promise<Admin> {

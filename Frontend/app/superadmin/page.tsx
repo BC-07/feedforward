@@ -60,7 +60,6 @@ const emptyCreateForm = {
   firstName: "",
   lastName: "",
   email: "",
-  password: "",
   unit: "",
 };
 
@@ -359,7 +358,6 @@ export default function SuperAdminDashboard() {
       firstName: admin.firstName,
       lastName: admin.lastName,
       email: admin.email,
-      password: "",
       unit: admin.unit,
     });
     setIsEditOpen(true);
@@ -636,21 +634,6 @@ export default function SuperAdminDashboard() {
                         setCreateForm((current) => ({
                           ...current,
                           email: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="create-password">Temporary Password</Label>
-                    <Input
-                      id="create-password"
-                      type="password"
-                      value={createForm.password}
-                      onChange={(event) =>
-                        setCreateForm((current) => ({
-                          ...current,
-                          password: event.target.value,
                         }))
                       }
                       required

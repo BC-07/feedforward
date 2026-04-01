@@ -141,7 +141,9 @@ func findFeedbackCSVPath() string {
 	candidates := []string{
 		"word_filter.csv",
 		filepath.Join("backend", "word_filter.csv"),
+		filepath.Join("Backend", "word_filter.csv"),
 		filepath.Join("..", "backend", "word_filter.csv"),
+		filepath.Join("..", "Backend", "word_filter.csv"),
 		filepath.Join("..", "word_filter.csv"),
 	}
 

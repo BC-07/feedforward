@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"intern_template_v1/middleware"
 	"intern_template_v1/model"
@@ -278,10 +280,9 @@ func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
 	payload.FirstName = strings.TrimSpace(payload.FirstName)
 	payload.LastName = strings.TrimSpace(payload.LastName)
 	payload.Email = strings.TrimSpace(payload.Email)
-	payload.Password = strings.TrimSpace(payload.Password)
 	payload.Unit = strings.TrimSpace(payload.Unit)
 
-	if payload.FirstName == "" || payload.LastName == "" || payload.Email == "" || payload.Password == "" || payload.Unit == "" {
+	if payload.FirstName == "" || payload.LastName == "" || payload.Email == "" || payload.Unit == "" {
 		return invalidRequest(c, "missing required admin fields")
 	}
 	if isDisabledCategory(payload.Unit) {
@@ -313,7 +314,11 @@ func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
 	}
 
 	payload.ID = "ADMIN-" + fmt.Sprintf("%d", time.Now().UnixMilli())
-	hashedPassword, err := hashPassword(payload.Password)
+	tempPassword, err := generateTempPassword()
+	if err != nil {
+		return serverError(c, "failed to generate admin password", err)
+	}
+	hashedPassword, err := hashPassword(tempPassword)
 	if err != nil {
 		return serverError(c, "failed to secure admin password", err)
 	}
@@ -330,7 +335,23 @@ func CreateAdminBySuperAdmin(c *fiber.Ctx) error {
 	if err != nil {
 		return serverError(c, "failed to fetch admin", err)
 	}
+	if token, err := issueAdminSetPasswordToken(admin.ID, admin.Email); err == nil {
+		go func(admin model.AdminModel, token string) {
+			if mailErr := sendAdminSetPasswordEmail(admin, token); mailErr != nil {
+				fmt.Printf("email: failed to send admin set-password link for %s: %v\n", admin.ID, mailErr)
+			}
+		}(admin, token)
+	}
 	return success(c, fiber.StatusCreated, admin)
+}
+
+func generateTempPassword() (string, error) {
+	bytes := make([]byte, 12)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	// URL-safe base64 gives us a strong temporary password, not shown to user.
+	return base64.RawURLEncoding.EncodeToString(bytes), nil
 }
 
 func UpdateAdminBySuperAdmin(c *fiber.Ctx) error {

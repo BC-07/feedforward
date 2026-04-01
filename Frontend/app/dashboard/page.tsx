@@ -57,7 +57,6 @@ import { formatLocalTime } from "@/lib/time";
 import { toastApiError } from "@/lib/errorHandling";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import ExcelJS from "exceljs";
 import {
   MessageSquare,
   TrendingUp,
@@ -664,6 +663,12 @@ export default function AdminDashboard() {
   };
 
   const exportFeedbacksXlsx = async () => {
+    const ExcelJSImport = (await import("exceljs/dist/exceljs.min.js")) as {
+      default?: typeof import("exceljs");
+      ExcelJS?: typeof import("exceljs");
+    };
+    const ExcelJS =
+      ExcelJSImport.default ?? ExcelJSImport.ExcelJS ?? ExcelJSImport;
     const brandOrangeArgb = "FFFF9500";
     const brandDarkArgb = "FF111827";
     const brandMutedArgb = "FF6B7280";

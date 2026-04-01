@@ -27,6 +27,7 @@ func AppRoutes(app *fiber.App) {
 	// Auth - Admins
 	app.Post("/auth/admins/register", controller.RegisterAdmin)
 	app.Post("/auth/admins/login", controller.LoginAdmin)
+	app.Post("/auth/admins/set-password", controller.SetAdminPassword)
 	app.Post("/auth/admins/reverify", controller.ReverifyAdmin)
 	app.Put("/auth/admins/:id/profile", controller.UpdateAdminProfile)
 	app.Put("/auth/admins/:id/password", controller.UpdateAdminPassword)
