@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { loginAdmin, loginUser } from "@/lib/api";
+import { forgotPassword, loginAdmin, loginUser, verifyResetOTP } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,8 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [expiredMessage, setExpiredMessage] = useState("");
+  const [isOtpMode, setIsOtpMode] = useState(false);
+  const [isOtpRequestLoading, setIsOtpRequestLoading] = useState(false);
 
   useEffect(() => {
     const message = localStorage.getItem("sessionExpiredMessage");
@@ -35,10 +37,46 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const normalizedEmail = email.trim();
+    const normalizedPassword = password.trim();
+    if (!normalizedEmail || !normalizedPassword) {
+      toast.error("Email and password are required.");
+      return;
+    }
+
+    if (isOtpMode) {
+      try {
+        const user = await verifyResetOTP({
+          email: normalizedEmail,
+          otp: normalizedPassword,
+        });
+        localStorage.setItem("isUserLoggedIn", "true");
+        localStorage.setItem("currentUserId", user.id);
+        localStorage.setItem("currentUserName", user.name);
+        localStorage.setItem("currentUserEmail", user.email);
+        localStorage.removeItem("isAdminLoggedIn");
+        localStorage.removeItem("currentAdminId");
+        localStorage.removeItem("currentAdminName");
+        localStorage.removeItem("currentAdminEmail");
+        localStorage.removeItem("currentAdminDepartment");
+        localStorage.removeItem("isSuperAdminLoggedIn");
+        localStorage.removeItem("superAdminName");
+        localStorage.removeItem("superAdminExpiresAt");
+        toast.success(`Welcome back, ${user.name}!`);
+        setPassword("");
+        setIsOtpMode(false);
+        router.push("/user");
+        return;
+      } catch (error) {
+        toastApiError(error, "Failed to verify OTP");
+        return;
+      }
+    }
+
     try {
       const user = await loginUser({
-        email,
-        password,
+        email: normalizedEmail,
+        password: normalizedPassword,
       });
       localStorage.setItem("isUserLoggedIn", "true");
       localStorage.setItem("currentUserId", user.id);
@@ -61,8 +99,8 @@ export default function Login() {
 
     try {
       const admin = await loginAdmin({
-        email,
-        password,
+        email: normalizedEmail,
+        password: normalizedPassword,
       });
       if (admin.isSuperAdmin) {
         const superName = admin.name || admin.email || "Superadmin";
@@ -137,16 +175,21 @@ export default function Login() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">
+                  {isOtpMode ? "One-Time Password (OTP)" : "Password"}
+                </Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type="password"
-                    placeholder="Enter your password"
+                    placeholder={
+                      isOtpMode ? "Enter the OTP sent to your email" : "Enter your password"
+                    }
                     className="pl-10"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    autoComplete={isOtpMode ? "one-time-code" : "current-password"}
                     required
                   />
                 </div>
@@ -157,8 +200,39 @@ export default function Login() {
                 className="w-full bg-accent hover:bg-accent/90"
                 size="lg"
               >
-                Log In
+                {isOtpMode ? "Verify OTP" : "Log In"}
               </Button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  className="text-sm text-accent hover:underline font-medium"
+                  onClick={async () => {
+                    const normalized = email.trim();
+                    if (!normalized) {
+                      toast.error("Please enter your email before requesting OTP.");
+                      return;
+                    }
+                    setIsOtpRequestLoading(true);
+                    try {
+                      await forgotPassword({ email: normalized });
+                      toast.success("If your email exists, an OTP was sent.");
+                      setIsOtpMode(true);
+                      setPassword("");
+                    } catch (error) {
+                      toastApiError(error, "Failed to send OTP");
+                    } finally {
+                      setIsOtpRequestLoading(false);
+                    }
+                  }}
+                  disabled={isOtpRequestLoading}
+                >
+                  {isOtpRequestLoading
+                    ? "Sending OTP..."
+                    : isOtpMode
+                      ? "Resend OTP"
+                      : "Forgot Password?"}
+                </button>
+              </div>
               <p className="text-center text-sm text-muted-foreground">
                 Don&apos;t have an account?{" "}
                 <Link

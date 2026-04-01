@@ -17,6 +17,9 @@ func AppRoutes(app *fiber.App) {
 	// Auth - Users
 	app.Post("/auth/users/register", controller.RegisterUser)
 	app.Post("/auth/users/login", controller.LoginUser)
+	app.Post("/auth/users/forgot-password", controller.ForgotPassword)
+	app.Post("/auth/users/verify-reset-otp", controller.VerifyResetOTP)
+	app.Post("/auth/users/reset-password", controller.ResetPassword)
 	app.Put("/auth/users/:id/profile", controller.UpdateUserProfile)
 	app.Put("/auth/users/:id/password", controller.UpdateUserPassword)
 	app.Delete("/auth/users/:id", controller.DeleteUserAccount)
@@ -54,6 +57,7 @@ func AppRoutes(app *fiber.App) {
 	// Feedbacks
 	app.Get("/feedbacks", controller.GetFeedbacks)
 	app.Get("/feedbacks/:id", controller.GetFeedbackByID)
+	app.Post("/feedbacks/moderate", controller.ModerateFeedback)
 	app.Post("/feedbacks", controller.CreateFeedback)
 	app.Put("/feedbacks/:id", controller.UpdateFeedback)
 	app.Delete("/feedbacks/:id", controller.DeleteFeedback)

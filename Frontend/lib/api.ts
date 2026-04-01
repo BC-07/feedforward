@@ -156,6 +156,21 @@ export async function createFeedback(
   });
 }
 
+export async function moderateFeedback(payload: {
+  subject: string;
+  message: string;
+}): Promise<{
+  is_flagged: boolean;
+  severity: "safe" | "warning" | "offensive";
+  matched_words: string[];
+  reason: string;
+}> {
+  return apiFetch("/feedbacks/moderate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function updateFeedback(
   id: string,
   payload: Partial<Feedback>,
@@ -189,6 +204,40 @@ export async function loginUser(payload: {
   password: string;
 }): Promise<User> {
   return apiFetch<User>("/auth/users/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function forgotPassword(payload: {
+  email: string;
+}): Promise<{ sent: boolean }> {
+  return apiFetch<{ sent: boolean }>("/auth/users/forgot-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function verifyResetOTP(payload: {
+  email: string;
+  otp: string;
+}): Promise<{
+  verified: boolean;
+  id: string;
+  name: string;
+  email: string;
+}> {
+  return apiFetch("/auth/users/verify-reset-otp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function resetPassword(payload: {
+  email: string;
+  newPassword: string;
+}): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>("/auth/users/reset-password", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -407,3 +456,4 @@ export async function updateAdminProfile(
     body: JSON.stringify(payload),
   });
 }
+
