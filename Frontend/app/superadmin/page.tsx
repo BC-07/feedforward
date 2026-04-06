@@ -52,18 +52,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Shield, UserCog, UserPlus, Trash2, Pencil, Tag, Save, Ban } from "lucide-react";
+import { Shield, UserCog, UserPlus, Trash2, Pencil, Tag, Save, Ban, UserCheck, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { getErrorMessage, toastApiError } from "@/lib/errorHandling";
 
-const emptyCreateForm = {
+type CreateAdminForm = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  unit: string;
+};
+
+type EditAdminForm = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  unit: string;
+};
+
+const emptyCreateForm: CreateAdminForm = {
   firstName: "",
   lastName: "",
   email: "",
   unit: "",
 };
 
-const emptyEditForm = {
+const emptyEditForm: EditAdminForm = {
   firstName: "",
   lastName: "",
   email: "",
@@ -107,8 +122,8 @@ export default function SuperAdminDashboard() {
   const idleExpiryCheckRef = useRef<number>(0);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [createForm, setCreateForm] = useState(emptyCreateForm);
-  const [editForm, setEditForm] = useState(emptyEditForm);
+  const [createForm, setCreateForm] = useState<CreateAdminForm>(emptyCreateForm);
+  const [editForm, setEditForm] = useState<EditAdminForm>(emptyEditForm);
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -120,6 +135,8 @@ export default function SuperAdminDashboard() {
   );
   const [reauthOpen, setReauthOpen] = useState(false);
   const [reauthPassword, setReauthPassword] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showReauthPassword, setShowReauthPassword] = useState(false);
   const [reauthAction, setReauthAction] = useState<
     "disable" | "enable" | "edit" | null
   >(
@@ -139,37 +156,24 @@ export default function SuperAdminDashboard() {
   };
   */
 
-  const getUnitClass = (unit: string) => {
-    const normalized = unit.trim().toLowerCase();
-    if (normalized.includes("it")) {
-      return "bg-blue-500/10 text-blue-700 border-blue-500/30";
-    }
-    if (normalized.includes("finance") || normalized.includes("registrar")) {
-      return "bg-emerald-500/10 text-emerald-700 border-emerald-500/30";
-    }
-    if (normalized.includes("student")) {
-      return "bg-violet-500/10 text-violet-700 border-violet-500/30";
-    }
-    if (normalized.includes("guidance")) {
-      return "bg-cyan-500/10 text-cyan-700 border-cyan-500/30";
-    }
-    if (normalized.includes("faculty")) {
-      return "bg-amber-500/10 text-amber-700 border-amber-500/30";
-    }
-    return "bg-gray-500/10 text-gray-700 border-gray-500/30";
-  };
-
   const getStatusClass = (isDisabled?: boolean) =>
     isDisabled
       ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
       : "bg-blue-500/10 text-blue-700 border-blue-500/30";
 
-  const visibleAdmins = admins.filter((admin) => {
-    if (adminFilter === "disabled") {
-      return Boolean(admin.isDisabled);
-    }
-    return !admin.isDisabled;
-  });
+  const visibleAdmins = admins
+    .filter((admin) => {
+      if (adminFilter === "disabled") {
+        return Boolean(admin.isDisabled);
+      }
+      return !admin.isDisabled;
+    })
+    .sort((a, b) => {
+      const aInactive = a.unit.trim().toLowerCase() === "inactive";
+      const bInactive = b.unit.trim().toLowerCase() === "inactive";
+      if (aInactive === bInactive) return 0;
+      return aInactive ? 1 : -1;
+    });
 
   const availableCategories = categories.filter((category) => {
     const name = category.name.trim().toLowerCase();
@@ -358,6 +362,7 @@ export default function SuperAdminDashboard() {
       firstName: admin.firstName,
       lastName: admin.lastName,
       email: admin.email,
+      password: "",
       unit: admin.unit,
     });
     setIsEditOpen(true);
@@ -766,7 +771,9 @@ export default function SuperAdminDashboard() {
                     Admin Control
                   </CardTitle>
                   <CardDescription>
-                    Review, modify, and remove admin accounts in the system.
+                    {adminFilter === "disabled"
+                      ? "Reactivate disabled admin accounts when needed."
+                      : "Review, modify, and disable admin accounts in the system."}
                   </CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-2 py-1">
@@ -828,10 +835,7 @@ export default function SuperAdminDashboard() {
                           </TableCell>
                           <TableCell>{admin.email}</TableCell>
                           <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={getUnitClass(admin.unit)}
-                            >
+                            <Badge variant="outline" className="capitalize">
                               {admin.unit}
                             </Badge>
                           </TableCell>
@@ -860,7 +864,7 @@ export default function SuperAdminDashboard() {
                                   className="border-transparent bg-transparent text-black hover:bg-emerald-600 hover:text-black"
                                   aria-label="Enable admin"
                                 >
-                                  <Ban className="h-4 w-4 rotate-180" />
+                                  <UserCheck className="h-4 w-4" />
                                 </Button>
                               ) : (
                                 <Button
@@ -938,18 +942,33 @@ export default function SuperAdminDashboard() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-password">New Password</Label>
-              <Input
-                id="edit-password"
-                type="password"
-                value={editForm.password}
-                onChange={(event) =>
-                  setEditForm((current) => ({
-                    ...current,
-                    password: event.target.value,
-                  }))
-                }
-                placeholder="Leave blank to keep current password"
-              />
+              <div className="relative">
+                <Input
+                  id="edit-password"
+                  type={showEditPassword ? "text" : "password"}
+                  value={editForm.password}
+                  onChange={(event) =>
+                    setEditForm((current) => ({
+                      ...current,
+                      password: event.target.value,
+                    }))
+                  }
+                  placeholder="Leave blank to keep current password"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowEditPassword((prev) => !prev)}
+                  aria-label={showEditPassword ? "Hide password" : "Show password"}
+                >
+                  {showEditPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Unit</Label>
@@ -989,12 +1008,27 @@ export default function SuperAdminDashboard() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="reauth-password">Password</Label>
-              <Input
-                id="reauth-password"
-                type="password"
-                value={reauthPassword}
-                onChange={(event) => setReauthPassword(event.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="reauth-password"
+                  type={showReauthPassword ? "text" : "password"}
+                  value={reauthPassword}
+                  onChange={(event) => setReauthPassword(event.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowReauthPassword((prev) => !prev)}
+                  aria-label={showReauthPassword ? "Hide password" : "Show password"}
+                >
+                  {showReauthPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button

@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { toastApiError } from "@/lib/errorHandling";
-import { UserPlus, Mail, Lock, User } from "lucide-react";
+import { UserPlus, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 
 export default function Signup() {
   const router = useRouter();
@@ -37,6 +37,8 @@ export default function Signup() {
     confirmPassword: "",
   });
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -160,9 +162,9 @@ export default function Signup() {
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Create a password"
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     value={formData.password}
                     onChange={(e) =>
                       setFormData({
@@ -172,6 +174,18 @@ export default function Signup() {
                     }
                     required
                   />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
                 {formData.password.length > 0 && formData.password.length < 6 ? (
                   <p className="text-xs text-muted-foreground">
@@ -187,9 +201,9 @@ export default function Signup() {
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="confirm-password"
-                    type="password"
+                    type={showConfirm ? "text" : "password"}
                     placeholder="Confirm your password"
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     value={formData.confirmPassword}
                     onChange={(e) =>
                       setFormData({
@@ -199,6 +213,18 @@ export default function Signup() {
                     }
                     required
                   />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowConfirm((prev) => !prev)}
+                    aria-label={showConfirm ? "Hide password" : "Show password"}
+                  >
+                    {showConfirm ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
