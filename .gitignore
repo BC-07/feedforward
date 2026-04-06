@@ -6,3 +6,6 @@ Backend/.env
 Backend/migrations/backup/
 .vscode/
 .gocache/
+.npm/
+.npm-cache/
+npm-debug.log*
