@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const SESSION_EVENT = "feedforward:session-change";
+const OPEN_FEEDBACK_EVENT = "feedforward:open-feedback";
 const emailLikePattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 
 function containsEmailLike(value: string): boolean {
@@ -389,6 +390,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       next.add(id);
     }
     saveReadNotificationIds(next);
+  };
+
+  const handleOpenAdminNotification = (feedback: Feedback) => {
+    const next = new Set(readNotificationIds);
+    if (!next.has(feedback.id)) {
+      next.add(feedback.id);
+      saveReadNotificationIds(next);
+    }
+    setIsNotificationsOpen(false);
+    window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent(OPEN_FEEDBACK_EVENT, {
+          detail: { feedbackId: feedback.id },
+        }),
+      );
+    }, 120);
   };
 
   const sortedAdminNotifications = [...adminNotifications].sort(
@@ -787,12 +804,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       )}
                     </Button>
                   </SheetTrigger>
-                <SheetContent className="w-[360px] sm:w-[400px] overflow-hidden rounded-l-3xl">
+                <SheetContent className="w-[360px] sm:w-[400px] overflow-hidden rounded-l-3xl ff-sheet-anim">
                   <SheetHeader className="pb-0 px-3">
                     <div className="w-full rounded-lg bg-white px-4 py-1.5 shadow-sm">
                       <SheetTitle className="text-center text-lg font-semibold">
                         Notifications
                       </SheetTitle>
+                      <SheetDescription className="sr-only">
+                        Recent feedback notifications. Select an item to open it in the dashboard.
+                      </SheetDescription>
                     </div>
                   </SheetHeader>
                   <div className="mt-0.5 flex items-center justify-end px-3">
@@ -820,8 +840,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           const isRead = readNotificationIds.has(feedback.id);
                           return (
                           <div
+                            role="button"
+                            tabIndex={0}
                             key={feedback.id}
-                            className={`rounded-lg border border-border/40 border-l-4 bg-white/80 p-3 shadow-sm hover:bg-muted/50 transition-colors ${
+                            onClick={(event) => {
+                              const target = event.target as HTMLElement | null;
+                              if (target?.closest("[data-notification-action='true']")) {
+                                return;
+                              }
+                              handleOpenAdminNotification(feedback);
+                            }}
+                            onKeyDown={(event) => {
+                              const target = event.target as HTMLElement | null;
+                              if (target?.closest("[data-notification-action='true']")) {
+                                return;
+                              }
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                handleOpenAdminNotification(feedback);
+                              }
+                            }}
+                            className={`w-full text-left rounded-lg border border-border/40 border-l-4 bg-white/80 p-3 shadow-sm cursor-pointer transition-all duration-200 ease-out hover:bg-white hover:border-border/70 hover:shadow-[0_0_0_1px_rgba(255,149,0,0.18),0_8px_20px_-12px_rgba(0,0,0,0.35)] hover:scale-[1.01] active:scale-[0.995] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
                               feedback.priority?.toLowerCase() === "high"
                                 ? "border-l-orange-400"
                                 : feedback.priority?.toLowerCase() === "medium"
@@ -832,7 +871,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             }`}
                           >
                             <div className="flex items-start justify-between gap-3">
-                              <p className="font-semibold text-sm">
+                              <p className="font-semibold text-sm text-left">
                                 {feedback.subject}
                               </p>
                               <div className="flex items-center gap-2">
@@ -850,13 +889,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                       size="icon"
                                       className="h-7 w-7"
                                       aria-label="Notification actions"
+                                      data-notification-action="true"
+                                      onClick={(event) => event.stopPropagation()}
                                     >
                                       <MoreVertical className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
+                                  <DropdownMenuContent
+                                    align="end"
+                                    data-notification-action="true"
+                                  >
                                     <DropdownMenuItem
-                                      onClick={() => toggleNotificationRead(feedback.id)}
+                                      data-notification-action="true"
+                                      onSelect={(event) => {
+                                        event.stopPropagation();
+                                        toggleNotificationRead(feedback.id);
+                                      }}
                                     >
                                       {isRead ? "Mark as unread" : "Mark as read"}
                                     </DropdownMenuItem>

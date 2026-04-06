@@ -263,24 +263,55 @@
   animation: ffSheetOut 180ms ease-in both;
 }
 
-@keyframes ffSheetIn {
+/* Admin edit tabs: directional content transitions */
+.ff-tab-panel-left[data-state="active"] {
+  animation: ffTabPanelInFromLeft 180ms ease-out both;
+}
+
+.ff-tab-panel-right[data-state="active"] {
+  animation: ffTabPanelInFromRight 180ms ease-out both;
+}
+
+@keyframes ffTabPanelInFromLeft {
   from {
     opacity: 0;
-    transform: translateX(12px) scaleX(0.92);
+    transform: translateX(-10px);
   }
   to {
     opacity: 1;
-    transform: translateX(0) scaleX(1);
+    transform: translateX(0);
+  }
+}
+
+@keyframes ffTabPanelInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ffSheetIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 
 @keyframes ffSheetOut {
   from {
     opacity: 1;
-    transform: translateX(0) scaleX(1);
+    transform: translateX(0);
   }
   to {
     opacity: 0;
-    transform: translateX(12px) scaleX(0.92);
+    transform: translateX(100%);
   }
 }

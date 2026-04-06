@@ -11,7 +11,6 @@ import {
   getSessionMe,
   listAdmins,
   listCategories,
-  logout,
   pingSuperAdminSession,
   reverifySuperAdmin,
   updateCategoryBySuperAdmin,
@@ -115,7 +114,6 @@ function clearSuperAdminSession(onRedirect: () => void) {
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
-  const isDev = process.env.NODE_ENV !== "production";
   const idleLimitMs = 5 * 60 * 1000;
   const lastServerActivityRef = useRef<number | null>(null);
   const lastPingAtRef = useRef<number>(0);
@@ -156,11 +154,6 @@ export default function SuperAdminDashboard() {
   };
   */
 
-  const getStatusClass = (isDisabled?: boolean) =>
-    isDisabled
-      ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
-      : "bg-blue-500/10 text-blue-700 border-blue-500/30";
-
   const visibleAdmins = admins
     .filter((admin) => {
       if (adminFilter === "disabled") {
@@ -200,13 +193,6 @@ export default function SuperAdminDashboard() {
         !admin.isDisabled && admin.unit.trim().toLowerCase() === name,
     );
   });
-
-  const formatIdleTime = (remainingMs: number) => {
-    const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;

@@ -45,7 +45,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
@@ -58,8 +57,10 @@ import {
   Clock,
   CheckCircle,
   Circle,
+  Wrench,
   MessageCircle,
   ChevronLeft,
+  X,
 } from "lucide-react";
 
 export default function UserProfile() {
@@ -119,7 +120,6 @@ export default function UserProfile() {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsHydrated(true);
   }, []);
 
@@ -134,7 +134,6 @@ export default function UserProfile() {
       return;
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentUser({
       id: userId,
       fullName: localStorage.getItem("currentUserName") || "",
@@ -251,7 +250,6 @@ export default function UserProfile() {
 
   useEffect(() => {
     if (!isLargeScreen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLeftColumnHeight(null);
       return;
     }
@@ -457,16 +455,42 @@ export default function UserProfile() {
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusIndicatorClass = (status: string) => {
     switch (status.toLowerCase()) {
       case "pending":
-        return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20";
+        return "border-amber-300/80 bg-amber-50 text-amber-700";
       case "in progress":
-        return "bg-purple-500/10 text-purple-700 border-purple-500/20";
+        return "border-orange-300/80 bg-orange-50 text-orange-700";
       case "resolved":
-        return "bg-green-500/10 text-green-700 border-green-500/20";
+        return "border-emerald-300/80 bg-emerald-50 text-emerald-700";
       default:
-        return "bg-gray-500/10 text-gray-700 border-gray-500/20";
+        return "border-slate-300/80 bg-slate-50 text-slate-700";
+    }
+  };
+
+  const getStatusIconTone = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return "text-amber-700";
+      case "in progress":
+        return "text-orange-700";
+      case "resolved":
+        return "text-emerald-700";
+      default:
+        return "text-slate-700";
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return Clock;
+      case "in progress":
+        return Wrench;
+      case "resolved":
+        return CheckCircle;
+      default:
+        return Circle;
     }
   };
 
@@ -492,8 +516,6 @@ export default function UserProfile() {
       minute: "2-digit",
     });
   };
-
-  const formatAdminTime = formatLocalTime;
 
   const getStatusMessage = (status: string) => {
     switch (status.toLowerCase()) {
@@ -968,16 +990,37 @@ export default function UserProfile() {
                             {selectedFeedback.status}
                           </span>
                         </h3>
-                        <Badge
-                          className={getStatusColor(selectedFeedback.status)}
-                          variant="outline"
-                        >
-                          {selectedFeedback.status.toLowerCase()}
-                        </Badge>
+                        {(() => {
+                          const StatusIcon = getStatusIcon(
+                            selectedFeedback.status,
+                          );
+                          return (
+                            <span
+                              aria-label={selectedFeedback.status}
+                              title={selectedFeedback.status}
+                              className={`inline-flex h-8 w-8 items-center justify-center rounded-full border shadow-sm ${getStatusIndicatorClass(
+                                selectedFeedback.status,
+                              )}`}
+                            >
+                              <StatusIcon className="h-[18px] w-[18px]" />
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex items-start gap-3 mb-8 p-4 bg-muted/50 rounded-lg">
-                        <Clock className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                        {(() => {
+                          const StatusMessageIcon = getStatusIcon(
+                            selectedFeedback.status,
+                          );
+                          return (
+                            <StatusMessageIcon
+                              className={`h-5 w-5 mt-0.5 flex-shrink-0 ${getStatusIconTone(
+                                selectedFeedback.status,
+                              )}`}
+                            />
+                          );
+                        })()}
                         <p className="text-sm">
                           {getStatusMessage(selectedFeedback.status)}
                         </p>
@@ -1228,40 +1271,50 @@ export default function UserProfile() {
                   }).map((feedback) => (
                     <div
                       key={feedback.id}
-                      className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                      className="relative p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                       onClick={() => handleViewFeedback(feedback)}
                     >
+                      {feedback.status.toLowerCase() === "pending" && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-2 top-2 h-6 w-6 rounded-full text-rose-600 hover:bg-rose-600 hover:text-white"
+                          aria-label="Delete submission"
+                          title="Delete submission"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setDeleteTarget(feedback);
+                            setIsDeleteOpen(true);
+                          }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <p className="min-w-0 flex-1 font-semibold break-words break-all">
                           {feedback.subject}
                         </p>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <Badge
-                            className={getStatusColor(feedback.status)}
-                            variant="outline"
-                          >
-                            {feedback.status}
-                          </Badge>
-                          {feedback.status.toLowerCase() === "pending" && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-2 text-xs border-destructive text-destructive hover:bg-destructive/10"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setDeleteTarget(feedback);
-                                setIsDeleteOpen(true);
-                              }}
-                            >
-                              Delete
-                            </Button>
-                          )}
+                        <div className="w-14 flex justify-center flex-shrink-0 pt-0.5 mr-6">
+                          {(() => {
+                            const StatusIcon = getStatusIcon(feedback.status);
+                            return (
+                              <span
+                                aria-label={feedback.status}
+                                title={feedback.status}
+                                className={`inline-flex h-8 w-8 items-center justify-center rounded-full border shadow-sm ${getStatusIndicatorClass(
+                                  feedback.status,
+                                )}`}
+                              >
+                                <StatusIcon className="h-[18px] w-[18px]" />
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="font-mono">{feedback.id}</span>
-                        <span>
+                        <span className="w-14 text-center mr-6 inline-block translate-y-1">
                           {new Date(feedback.createdAt).toLocaleDateString(
                             "en-US",
                           )}

@@ -23,16 +23,17 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [expiredMessage, setExpiredMessage] = useState("");
+  const [expiredMessage] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("sessionExpiredMessage") || "";
+  });
 
   useEffect(() => {
-    const message = localStorage.getItem("sessionExpiredMessage");
-    if (message) {
+    if (expiredMessage) {
       localStorage.removeItem("sessionExpiredMessage");
-      setExpiredMessage(message);
-      toast.error(message);
+      toast.error(expiredMessage);
     }
-  }, []);
+  }, [expiredMessage]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

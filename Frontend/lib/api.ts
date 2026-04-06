@@ -117,7 +117,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
         );
         try {
           // Lazy import to avoid SSR issues.
-          const { toast } = require("sonner");
+          const { toast } = await import("sonner");
           toast.error("Your session expired due to inactivity. Please log in again.");
         } catch {
           // no-op

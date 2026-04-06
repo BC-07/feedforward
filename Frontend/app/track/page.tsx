@@ -11,9 +11,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Search, Clock, CheckCircle, Circle, MessageCircle } from "lucide-react";
+import { Search, Clock, CheckCircle, Circle, Wrench, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
@@ -70,7 +70,6 @@ export default function TrackFeedback() {
     const param = searchParams.get("trackingId");
     if (!param) return;
     const normalized = normalizeTrackingId(param);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTrackingId(normalized);
     if (!isValidTrackingId(normalized)) {
       setFeedback(null);
@@ -138,16 +137,42 @@ export default function TrackFeedback() {
       });
   }, [feedback]);
 
-  const getStatusColor = (status: string) => {
+  const getStatusIndicatorClass = (status: string) => {
     switch (status.toLowerCase()) {
       case "pending":
-        return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20";
+        return "border-amber-300/80 bg-amber-50 text-amber-700";
       case "in progress":
-        return "bg-purple-500/10 text-purple-700 border-purple-500/20";
+        return "border-orange-300/80 bg-orange-50 text-orange-700";
       case "resolved":
-        return "bg-green-500/10 text-green-700 border-green-500/20";
+        return "border-emerald-300/80 bg-emerald-50 text-emerald-700";
       default:
-        return "bg-gray-500/10 text-gray-700 border-gray-500/20";
+        return "border-slate-300/80 bg-slate-50 text-slate-700";
+    }
+  };
+
+  const getStatusIconTone = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return "text-amber-700";
+      case "in progress":
+        return "text-orange-700";
+      case "resolved":
+        return "text-emerald-700";
+      default:
+        return "text-slate-700";
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return Clock;
+      case "in progress":
+        return Wrench;
+      case "resolved":
+        return CheckCircle;
+      default:
+        return Circle;
     }
   };
 
@@ -293,13 +318,19 @@ export default function TrackFeedback() {
                       Status: <span className="uppercase">{feedback.status}</span>
                     </h3>
                   </div>
-                  <Badge className={getStatusColor(feedback.status)} variant="outline">
-                    {feedback.status.toLowerCase()}
-                  </Badge>
                 </div>
 
                 <div className="flex items-start gap-3 mb-8 p-4 bg-muted/50 rounded-lg">
-                  <Clock className="h-5 w-5 text-purple-600 mt-0.5 flex-shrink-0" />
+                  {(() => {
+                    const StatusMessageIcon = getStatusIcon(feedback.status);
+                    return (
+                      <StatusMessageIcon
+                        className={`h-5 w-5 mt-0.5 flex-shrink-0 ${getStatusIconTone(
+                          feedback.status,
+                        )}`}
+                      />
+                    );
+                  })()}
                   <p className="text-sm">{getStatusMessage(feedback.status)}</p>
                 </div>
 
@@ -405,8 +436,8 @@ export default function TrackFeedback() {
                       No messages yet. Updates from the admin team will appear here.
                     </p>
                   )}
-                  <div className="space-y-4">
-                  {(() => {
+              <div className="space-y-4">
+                {(() => {
                     let lastDayLabel = "";
                     return messages.map((entry) => {
                       const createdAt = entry.createdAt
@@ -465,10 +496,11 @@ export default function TrackFeedback() {
                         </div>
                       );
                     });
-                  })()}
+                })()}
                 </div>
               </div>
-              <div className="space-y-2">
+              {canReply && (
+                <div className="space-y-2">
                     <Label htmlFor="reply-message">Send a reply</Label>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <Textarea
@@ -494,8 +526,8 @@ export default function TrackFeedback() {
                         {isSendingMessage ? "Sending..." : "Send"}
                       </Button>
                     </div>
-                  </div>
-                )}
+                </div>
+              )}
               </CardContent>
             </Card>
 
@@ -517,5 +549,4 @@ export default function TrackFeedback() {
     </div>
   );
 }
-
 

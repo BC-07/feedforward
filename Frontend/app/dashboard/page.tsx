@@ -85,6 +85,7 @@ interface AdminRecord {
 }
 
 const SESSION_EVENT = "feedforward:session-change";
+const OPEN_FEEDBACK_EVENT = "feedforward:open-feedback";
 
 function markAdminNotificationAsRead(
   adminId: string,
@@ -144,6 +145,7 @@ export default function AdminDashboard() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [newUnit, setNewUnit] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
+  const [pendingOpenFeedbackId, setPendingOpenFeedbackId] = useState("");
   const lastSessionPingRef = useRef(0);
   const applyFeedbackUpdate = useCallback((data: Feedback[]) => {
     setFeedbacks(data);
@@ -175,7 +177,6 @@ export default function AdminDashboard() {
       return;
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentAdmin({
       id: localStorage.getItem("currentAdminId") || "",
       name: localStorage.getItem("currentAdminName") || "",
@@ -236,7 +237,6 @@ export default function AdminDashboard() {
     try {
       const parsed = JSON.parse(cached);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         applyFeedbackUpdate(parsed as Feedback[]);
       }
     } catch {
@@ -257,7 +257,6 @@ export default function AdminDashboard() {
         toastApiError(error, "Failed to load feedbacks.");
       });
   }, [currentAdmin?.unit, applyFeedbackUpdate]);
-
 
   useEffect(() => {
     void listCategories()
@@ -300,6 +299,51 @@ export default function AdminDashboard() {
       setIsSendingMessage(false);
     }
   }, [messageDraft, loadMessages, selectedFeedback]);
+
+  const openFeedbackById = useCallback(
+    (feedbackId: string) => {
+      const target = feedbacks.find((item) => item.id === feedbackId);
+      if (!target) {
+        setPendingOpenFeedbackId(feedbackId);
+        return;
+      }
+      setSelectedFeedback(target);
+      setNewStatus(target.status);
+      setNewPriority(target.priority);
+      setIsEditDialogOpen(true);
+      void loadMessages(target.id);
+      if (currentAdmin?.id && currentAdmin.unit) {
+        markAdminNotificationAsRead(currentAdmin.id, currentAdmin.unit, target.id);
+      }
+      setPendingOpenFeedbackId("");
+    },
+    [feedbacks, loadMessages, currentAdmin?.id, currentAdmin?.unit],
+  );
+
+  useEffect(() => {
+    const handleOpenFeedback = (event: Event) => {
+      const customEvent = event as CustomEvent<{ feedbackId?: string }>;
+      const feedbackId = customEvent.detail?.feedbackId;
+      if (!feedbackId) return;
+      openFeedbackById(feedbackId);
+    };
+
+    window.addEventListener(
+      OPEN_FEEDBACK_EVENT,
+      handleOpenFeedback as EventListener,
+    );
+    return () => {
+      window.removeEventListener(
+        OPEN_FEEDBACK_EVENT,
+        handleOpenFeedback as EventListener,
+      );
+    };
+  }, [openFeedbackById]);
+
+  useEffect(() => {
+    if (!pendingOpenFeedbackId) return;
+    openFeedbackById(pendingOpenFeedbackId);
+  }, [pendingOpenFeedbackId, openFeedbackById]);
 
   const handleUpdateFeedback = async () => {
     if (!selectedFeedback) return;
@@ -1377,7 +1421,7 @@ export default function AdminDashboard() {
                                   </TabsList>
                                   <TabsContent
                                     value="details"
-                                    className="space-y-4"
+                                    className="space-y-4 ff-tab-panel-left"
                                   >
                                     <div className="grid grid-cols-2 gap-4">
                                       <div>
@@ -1485,7 +1529,7 @@ export default function AdminDashboard() {
                                   </TabsContent>
                                   <TabsContent
                                     value="manage"
-                                    className="space-y-4"
+                                    className="space-y-4 ff-tab-panel-right"
                                   >
                                     <div className="space-y-2">
                                       <Label htmlFor="status">
