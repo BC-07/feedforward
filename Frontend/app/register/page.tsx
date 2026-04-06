@@ -173,6 +173,11 @@ export default function Signup() {
                     required
                   />
                 </div>
+                {formData.password.length > 0 && formData.password.length < 6 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Password must be at least 6 characters
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">
@@ -272,11 +277,6 @@ export default function Signup() {
                 </p>
               </div>
             </div>
-
-            <p className="text-xs text-muted-foreground">
-              Password must be at least 6 characters
-            </p>
-
             <Button
               type="submit"
               className="w-full bg-accent hover:bg-accent/90"
