@@ -5,3 +5,4 @@ Backend/.env
 # migration backups (keep local)
 Backend/migrations/backup/
 .vscode/
+.gocache/
