@@ -1,3 +1,9 @@
 {
-  "chatgpt.commentCodeLensEnabled": false
+  "task.allowAutomaticTasks": "on",
+  "task.autoDetect": "off",
+  "tasks.runOnStartup": [
+    {
+      "task": "dev:all"
+    }
+  ]
 }

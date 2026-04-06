@@ -809,6 +809,9 @@ func notFound(c *fiber.Ctx, message string, err error) error {
 }
 
 func serverError(c *fiber.Ctx, message string, err error) error {
+	if msg, ok := foreignKeyViolationMessage(err); ok {
+		return invalidRequest(c, msg)
+	}
 	return c.Status(500).JSON(response.ResponseModel{
 		RetCode: "500",
 		Message: status.Retcode500,
@@ -818,6 +821,20 @@ func serverError(c *fiber.Ctx, message string, err error) error {
 			Error:     err,
 		},
 	})
+}
+
+func foreignKeyViolationMessage(err error) (string, bool) {
+	if err == nil {
+		return "", false
+	}
+	msg := strings.ToLower(err.Error())
+	if !strings.Contains(msg, "violates foreign key constraint") {
+		return "", false
+	}
+	if strings.Contains(msg, "update or delete") {
+		return "cannot delete because this record is still referenced", true
+	}
+	return "invalid reference: related record not found", true
 }
 
 type dbActionError struct {

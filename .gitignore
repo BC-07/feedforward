@@ -2,3 +2,6 @@ node_modules
 
 feedback-timing.log
 Backend/.env
+# migration backups (keep local)
+Backend/migrations/backup/
+.vscode/
