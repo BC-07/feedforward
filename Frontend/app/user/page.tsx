@@ -10,11 +10,14 @@ import {
 import { useRouter } from "next/navigation";
 import {
   createFeedback,
+  createFeedbackMessage,
   deleteFeedback,
   getFeedback,
   listCategories,
+  listFeedbackMessages,
   listFeedbacks,
   type Feedback,
+  type FeedbackMessage,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,6 +98,10 @@ export default function UserProfile() {
   const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
+  const [messages, setMessages] = useState<FeedbackMessage[]>([]);
+  const [messageDraft, setMessageDraft] = useState("");
+  const [isMessagesLoading, setIsMessagesLoading] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const leftColumnRef = useRef<HTMLDivElement | null>(null);
@@ -170,6 +177,64 @@ export default function UserProfile() {
         toastApiError(error, "Failed to load categories.");
       });
   }, []);
+
+  useEffect(() => {
+    if (!selectedFeedback) {
+      setMessages([]);
+      setMessageDraft("");
+      return;
+    }
+
+    setIsMessagesLoading(true);
+    listFeedbackMessages(selectedFeedback.id)
+      .then((data) => {
+        if (data.length > 0) {
+          setMessages(data);
+          return;
+        }
+        if (selectedFeedback.response) {
+          const legacy = parseAdminResponses(selectedFeedback.response).map(
+            (entry, index) => ({
+              id: `legacy-${selectedFeedback.id}-${index}`,
+              feedbackId: selectedFeedback.id,
+              senderRole: "admin" as const,
+              senderId: null,
+              senderName: entry.author || "Admin",
+              message: entry.message,
+              createdAt: entry.time
+                ? new Date(entry.time).toISOString()
+                : selectedFeedback.updatedAt,
+            }),
+          );
+          setMessages(legacy);
+          return;
+        }
+        setMessages([]);
+      })
+      .catch(() => {
+        if (selectedFeedback.response) {
+          const legacy = parseAdminResponses(selectedFeedback.response).map(
+            (entry, index) => ({
+              id: `legacy-${selectedFeedback.id}-${index}`,
+              feedbackId: selectedFeedback.id,
+              senderRole: "admin" as const,
+              senderId: null,
+              senderName: entry.author || "Admin",
+              message: entry.message,
+              createdAt: entry.time
+                ? new Date(entry.time).toISOString()
+                : selectedFeedback.updatedAt,
+            }),
+          );
+          setMessages(legacy);
+          return;
+        }
+        setMessages([]);
+      })
+      .finally(() => {
+        setIsMessagesLoading(false);
+      });
+  }, [selectedFeedback]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -368,6 +433,27 @@ export default function UserProfile() {
       toast.success("Submission deleted.");
     } catch (error) {
       toastApiError(error, "Failed to delete submission.");
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!selectedFeedback) return;
+    const trimmed = messageDraft.trim();
+    if (!trimmed) {
+      toast.error("Please enter a message.");
+      return;
+    }
+    setIsSendingMessage(true);
+    try {
+      const created = await createFeedbackMessage(selectedFeedback.id, {
+        message: trimmed,
+      });
+      setMessages((prev) => [...prev, created]);
+      setMessageDraft("");
+    } catch (error) {
+      toastApiError(error, "Failed to send message.");
+    } finally {
+      setIsSendingMessage(false);
     }
   };
 
@@ -996,38 +1082,118 @@ export default function UserProfile() {
                     </CardContent>
                   </Card>
 
-                  {selectedFeedback.response && (
-                    <Card className="shadow-lg bg-muted/40 border-border">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-foreground">
-                          <MessageCircle className="h-5 w-5" />
-                          Updates from Admin
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3 max-h-[320px] overflow-y-auto">
-                        {parseAdminResponses(selectedFeedback.response).map(
-                          (entry, index) => (
-                            <div key={`${entry.time ?? "note"}-${index}`}>
-                              {entry.time && (
-                                <p className="text-[10px] font-semibold text-muted-foreground">
-                                  {entry.author && (
-                                    <span className="text-[11px] text-foreground">
-                                      {entry.author}
-                                    </span>
-                                  )}
-                                  {entry.author ? " " : ""}
-                                  {formatAdminTime(entry.time)}
-                                </p>
-                              )}
-                              <p className="text-sm text-foreground/90 leading-relaxed">
-                                {entry.message}
-                              </p>
-                            </div>
-                          ),
+                  <Card className="shadow-lg bg-muted/40 border-border">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-foreground">
+                        <MessageCircle className="h-5 w-5" />
+                        Conversation
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="max-h-[320px] overflow-y-auto rounded-lg border border-border bg-white/70 p-4">
+                        {isMessagesLoading && (
+                          <p className="text-sm text-muted-foreground">
+                            Loading conversation...
+                          </p>
                         )}
-                      </CardContent>
-                    </Card>
-                  )}
+                        {!isMessagesLoading && messages.length === 0 && (
+                          <p className="text-sm text-muted-foreground">
+                            No messages yet. Updates from the admin team will appear here.
+                          </p>
+                        )}
+                        <div className="space-y-4">
+                          {(() => {
+                            let lastDayLabel = "";
+                            return messages.map((entry) => {
+                              const createdAt = entry.createdAt
+                                ? new Date(entry.createdAt)
+                                : null;
+                              const today = new Date();
+                              const dayLabel = createdAt
+                                ? createdAt.toDateString() ===
+                                  today.toDateString()
+                                  ? "Today"
+                                  : createdAt.toLocaleDateString(undefined, {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })
+                                : "";
+                              const showDayLabel =
+                                dayLabel && dayLabel !== lastDayLabel;
+                              if (showDayLabel) {
+                                lastDayLabel = dayLabel;
+                              }
+
+                              const isUser = entry.senderRole === "user";
+                              const name = isUser ? "You" : entry.senderName;
+                              return (
+                                <div key={entry.id} className="space-y-3">
+                                  {showDayLabel && (
+                                    <div className="flex justify-center">
+                                      <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                        {dayLabel}
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div
+                                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                                  >
+                                    <div
+                                      className={`max-w-[75%] rounded-lg px-4 py-3 text-sm shadow-sm ${
+                                        isUser
+                                          ? "bg-accent text-white"
+                                          : "bg-white text-foreground border border-border"
+                                      }`}
+                                    >
+                                      <p className="text-[11px] font-semibold opacity-80">
+                                        {name}{" "}
+                                        {entry.createdAt && (
+                                          <span className="font-normal">
+                                            · {formatLocalTime(entry.createdAt)}
+                                          </span>
+                                        )}
+                                      </p>
+                                      <p className="mt-1 whitespace-pre-wrap">
+                                        {entry.message}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="reply-message">Send a reply</Label>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Textarea
+                            id="reply-message"
+                            placeholder="Type your message..."
+                            rows={2}
+                            value={messageDraft}
+                            onChange={(e) => setMessageDraft(e.target.value)}
+                            disabled={isSendingMessage}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" && !event.shiftKey) {
+                                event.preventDefault();
+                                void handleSendMessage();
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            onClick={handleSendMessage}
+                            className="bg-accent hover:bg-accent/90"
+                            disabled={isSendingMessage}
+                          >
+                            {isSendingMessage ? "Sending..." : "Send"}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </CardContent>
               </Card>
             ) : feedbacks.length > 0 ? (
@@ -1127,4 +1293,6 @@ export default function UserProfile() {
   </>
   );
 }
+
+
 

@@ -24,6 +24,16 @@ type (
 		UpdatedAt   time.Time `json:"updatedAt" gorm:"column:updated_at"`
 	}
 
+	FeedbackMessageModel struct {
+		ID         string    `json:"id" gorm:"column:id;primaryKey"`
+		FeedbackID string    `json:"feedbackId" gorm:"column:feedback_id"`
+		SenderRole string    `json:"senderRole" gorm:"column:sender_role"`
+		SenderID   *string   `json:"senderId,omitempty" gorm:"column:sender_id"`
+		SenderName string    `json:"senderName" gorm:"column:sender_name"`
+		Message    string    `json:"message" gorm:"column:message"`
+		CreatedAt  time.Time `json:"createdAt" gorm:"column:created_at"`
+	}
+
 	UserModel struct {
 		ID        string    `json:"id" gorm:"column:id;primaryKey"`
 		FirstName string    `json:"firstName" gorm:"column:first_name"`
@@ -71,4 +81,8 @@ func (AdminModel) TableName() string {
 
 func (CategoryModel) TableName() string {
 	return "public.categories"
+}
+
+func (FeedbackMessageModel) TableName() string {
+	return "public.feedback_messages"
 }

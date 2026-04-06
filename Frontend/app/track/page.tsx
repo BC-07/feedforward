@@ -1,7 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { getFeedback, type Feedback } from "@/lib/api";
+import {
+  createFeedbackMessage,
+  getFeedback,
+  listFeedbackMessages,
+  type Feedback,
+  type FeedbackMessage,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,6 +23,11 @@ export default function TrackFeedback() {
   const [trackingId, setTrackingId] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [messages, setMessages] = useState<FeedbackMessage[]>([]);
+  const [messageDraft, setMessageDraft] = useState("");
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [canReply, setCanReply] = useState(false);
 
   const normalizeTrackingId = (value: string) => value.trim().toUpperCase();
   const isValidTrackingId = (value: string) =>
@@ -72,6 +83,61 @@ export default function TrackFeedback() {
     void searchFeedback(normalized);
   }, [searchParams]);
 
+  useEffect(() => {
+    if (!feedback) {
+      setMessages([]);
+      setMessageDraft("");
+      setCanReply(false);
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      const isLoggedIn =
+        localStorage.getItem("isUserLoggedIn") === "true";
+      const currentUserId = localStorage.getItem("currentUserId") || "";
+      const feedbackUserId = feedback.userId || "";
+      const canReplyLoggedIn =
+        Boolean(isLoggedIn && feedbackUserId && currentUserId) &&
+        feedbackUserId === currentUserId;
+      const canReplyAnonymous =
+        feedback.isAnonymous || !feedbackUserId;
+      setCanReply(canReplyLoggedIn || canReplyAnonymous);
+    }
+
+    setIsLoadingMessages(true);
+    listFeedbackMessages(feedback.id)
+      .then((data) => {
+        if (data.length > 0) {
+          setMessages(data);
+          return;
+        }
+        if (feedback.response) {
+          const legacy = parseAdminResponses(feedback.response).map(
+            (entry, index) => ({
+              id: `legacy-${feedback.id}-${index}`,
+              feedbackId: feedback.id,
+              senderRole: "admin" as const,
+              senderId: null,
+              senderName: entry.author || "Admin",
+              message: entry.message,
+              createdAt: entry.time
+                ? new Date(entry.time).toISOString()
+                : feedback.updatedAt,
+            }),
+          );
+          setMessages(legacy);
+          return;
+        }
+        setMessages([]);
+      })
+      .catch(() => {
+        setMessages([]);
+      })
+      .finally(() => {
+        setIsLoadingMessages(false);
+      });
+  }, [feedback]);
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "pending":
@@ -109,6 +175,27 @@ export default function TrackFeedback() {
   };
 
   const formatAdminTime = formatLocalTime;
+
+  const handleSendMessage = async () => {
+    if (!feedback) return;
+    const trimmed = messageDraft.trim();
+    if (!trimmed) {
+      toast.error("Please enter a message.");
+      return;
+    }
+    setIsSendingMessage(true);
+    try {
+      const created = await createFeedbackMessage(feedback.id, {
+        message: trimmed,
+      });
+      setMessages((prev) => [...prev, created]);
+      setMessageDraft("");
+    } catch {
+      toast.error("Failed to send your message.");
+    } finally {
+      setIsSendingMessage(false);
+    }
+  };
 
   const getStatusMessage = (status: string) => {
     switch (status.toLowerCase()) {
@@ -293,37 +380,124 @@ export default function TrackFeedback() {
               </CardContent>
             </Card>
 
-            {/* Admin Response Card */}
-            {feedback.response && (
-              <Card className="shadow-lg bg-muted/40 border-border">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-foreground">
-                    <MessageCircle className="h-5 w-5" />
-                    Updates from Admin
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 max-h-[320px] overflow-y-auto">
-                  {parseAdminResponses(feedback.response).map((entry, index) => (
-                    <div key={`${entry.time ?? "note"}-${index}`}>
-                      {entry.time && (
-                        <p className="text-[10px] font-semibold text-muted-foreground">
-                          {entry.author && (
-                            <span className="text-[11px] text-foreground">
-                              {entry.author}
-                            </span>
+            {/* Conversation */}
+            <Card className="shadow-lg bg-muted/40 border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <MessageCircle className="h-5 w-5" />
+                  Conversation
+                </CardTitle>
+                <CardDescription>
+                  {canReply
+                    ? "Reply to the admin team about this submission."
+                    : "Log in to reply to this submission."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="max-h-[340px] overflow-y-auto rounded-lg border border-border bg-white/70 p-4">
+                  {isLoadingMessages && (
+                    <p className="text-sm text-muted-foreground">
+                      Loading conversation...
+                    </p>
+                  )}
+                  {!isLoadingMessages && messages.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No messages yet. Updates from the admin team will appear here.
+                    </p>
+                  )}
+                  <div className="space-y-4">
+                  {(() => {
+                    let lastDayLabel = "";
+                    return messages.map((entry) => {
+                      const createdAt = entry.createdAt
+                        ? new Date(entry.createdAt)
+                        : null;
+                      const today = new Date();
+                      const dayLabel = createdAt
+                        ? createdAt.toDateString() === today.toDateString()
+                          ? "Today"
+                          : createdAt.toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                        : "";
+                      const showDayLabel =
+                        dayLabel && dayLabel !== lastDayLabel;
+                      if (showDayLabel) {
+                        lastDayLabel = dayLabel;
+                      }
+
+                      const isUser = entry.senderRole === "user";
+                      const name = isUser ? "You" : entry.senderName || "Admin";
+                      return (
+                        <div key={entry.id} className="space-y-3">
+                          {showDayLabel && (
+                            <div className="flex justify-center">
+                              <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                {dayLabel}
+                              </span>
+                            </div>
                           )}
-                          {entry.author ? " " : ""}
-                          {formatAdminTime(entry.time)}
-                        </p>
-                      )}
-                      <p className="text-sm text-foreground/90 leading-relaxed">
-                        {entry.message}
-                      </p>
+                          <div
+                            className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                          >
+                            <div
+                              className={`max-w-[75%] rounded-lg px-4 py-3 text-sm shadow-sm ${
+                                isUser
+                                  ? "bg-accent text-white"
+                                  : "bg-muted text-foreground"
+                              }`}
+                            >
+                              <p className="text-[11px] font-semibold opacity-80">
+                                {name}{" "}
+                                {entry.createdAt && (
+                                  <span className="font-normal">
+                                    · {formatAdminTime(entry.createdAt)}
+                                  </span>
+                                )}
+                              </p>
+                              <p className="mt-1 whitespace-pre-wrap">
+                                {entry.message}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+              <div className="space-y-2">
+                    <Label htmlFor="reply-message">Send a reply</Label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Textarea
+                        id="reply-message"
+                        placeholder="Type your message..."
+                        rows={2}
+                        value={messageDraft}
+                        onChange={(e) => setMessageDraft(e.target.value)}
+                        disabled={isSendingMessage}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault();
+                            void handleSendMessage();
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleSendMessage}
+                        className="bg-accent hover:bg-accent/90"
+                        disabled={isSendingMessage}
+                      >
+                        {isSendingMessage ? "Sending..." : "Send"}
+                      </Button>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Footer Message */}
             <Card className="shadow-lg bg-muted/30 border-muted">
@@ -343,4 +517,5 @@ export default function TrackFeedback() {
     </div>
   );
 }
+
 

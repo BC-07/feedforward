@@ -15,6 +15,16 @@ export interface Feedback {
   response?: string | null;
 }
 
+export interface FeedbackMessage {
+  id: string;
+  feedbackId: string;
+  senderRole: "user" | "admin" | "superadmin";
+  senderId?: string | null;
+  senderName: string;
+  message: string;
+  createdAt: string;
+}
+
 export interface User {
   id: string;
   firstName: string;
@@ -185,6 +195,28 @@ export async function deleteFeedback(id: string): Promise<void> {
   await apiFetch(`/feedbacks/${encodeURIComponent(id)}`, {
     method: "DELETE",
   });
+}
+
+export async function listFeedbackMessages(
+  feedbackId: string,
+): Promise<FeedbackMessage[]> {
+  const data = await apiFetch<FeedbackMessage[] | null>(
+    `/feedbacks/${encodeURIComponent(feedbackId)}/messages`,
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createFeedbackMessage(
+  feedbackId: string,
+  payload: { message: string },
+): Promise<FeedbackMessage> {
+  return apiFetch<FeedbackMessage>(
+    `/feedbacks/${encodeURIComponent(feedbackId)}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
 export async function registerUser(payload: {

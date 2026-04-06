@@ -1,17 +1,26 @@
 "use client";
 
-import { startTransition, useCallback, useEffect, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   listCategories,
   listFeedbacks,
+  listFeedbackMessages,
+  createFeedbackMessage,
+  getSessionMe,
   updateFeedback,
   type Feedback,
+  type FeedbackMessage,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -119,7 +128,10 @@ export default function AdminDashboard() {
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
-  const [response, setResponse] = useState("");
+  const [messages, setMessages] = useState<FeedbackMessage[]>([]);
+  const [messageDraft, setMessageDraft] = useState("");
+  const [isMessagesLoading, setIsMessagesLoading] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [newStatus, setNewStatus] = useState("");
   const [newPriority, setNewPriority] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -132,6 +144,7 @@ export default function AdminDashboard() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [newUnit, setNewUnit] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
+  const lastSessionPingRef = useRef(0);
   const applyFeedbackUpdate = useCallback((data: Feedback[]) => {
     setFeedbacks(data);
     if (typeof window === "undefined") return;
@@ -170,6 +183,49 @@ export default function AdminDashboard() {
       unit: localStorage.getItem("currentAdminDepartment") || "",
     });
   }, [router]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const pingSession = () => {
+      const now = Date.now();
+      if (now - lastSessionPingRef.current < 4000) return;
+      lastSessionPingRef.current = now;
+      void getSessionMe().catch(() => {
+        // apiFetch handles session expiry redirect
+      });
+    };
+
+    const events: Array<keyof WindowEventMap> = [
+      "mousedown",
+      "keydown",
+      "touchstart",
+      "pointerdown",
+      "focus",
+    ];
+    events.forEach((eventName) =>
+      window.addEventListener(eventName, pingSession, { passive: true }),
+    );
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        pingSession();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    const intervalId = window.setInterval(() => {
+      pingSession();
+    }, 60000);
+
+    return () => {
+      events.forEach((eventName) =>
+        window.removeEventListener(eventName, pingSession),
+      );
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -213,20 +269,46 @@ export default function AdminDashboard() {
       });
   }, []);
 
+  const loadMessages = useCallback(
+    async (feedbackId: string) => {
+      setIsMessagesLoading(true);
+      try {
+        const data = await listFeedbackMessages(feedbackId);
+        setMessages(data);
+      } catch (error) {
+        toastApiError(error, "Failed to load messages.");
+      } finally {
+        setIsMessagesLoading(false);
+      }
+    },
+    [],
+  );
+
+  const handleSendMessage = useCallback(async () => {
+    if (!selectedFeedback) return;
+    const trimmed = messageDraft.trim();
+    if (!trimmed) return;
+
+    setIsSendingMessage(true);
+    try {
+      await createFeedbackMessage(selectedFeedback.id, { message: trimmed });
+      setMessageDraft("");
+      await loadMessages(selectedFeedback.id);
+    } catch (error) {
+      toastApiError(error, "Failed to send message.");
+    } finally {
+      setIsSendingMessage(false);
+    }
+  }, [messageDraft, loadMessages, selectedFeedback]);
+
   const handleUpdateFeedback = async () => {
     if (!selectedFeedback) return;
 
     try {
-      const payload: Partial<Feedback> & { responseAuthorEmail?: string } = {
+      const payload: Partial<Feedback> = {
         status: newStatus || selectedFeedback.status,
         priority: newPriority || selectedFeedback.priority,
       };
-      if (response.trim() !== "") {
-        payload.response = response.trim();
-        if (currentAdmin?.email) {
-          payload.responseAuthorEmail = currentAdmin.email;
-        }
-      }
       await updateFeedback(selectedFeedback.id, payload);
       if (currentAdmin?.id && currentAdmin.unit) {
         markAdminNotificationAsRead(
@@ -240,7 +322,6 @@ export default function AdminDashboard() {
       }
       toast.success("Feedback updated successfully");
       setSelectedFeedback(null);
-      setResponse("");
       setNewStatus("");
       setNewPriority("");
       setIsEditDialogOpen(false);
@@ -663,12 +744,9 @@ export default function AdminDashboard() {
   };
 
   const exportFeedbacksXlsx = async () => {
-    const ExcelJSImport = (await import("exceljs/dist/exceljs.min.js")) as {
-      default?: typeof import("exceljs");
-      ExcelJS?: typeof import("exceljs");
-    };
-    const ExcelJS =
-      ExcelJSImport.default ?? ExcelJSImport.ExcelJS ?? ExcelJSImport;
+    const ExcelJS = (await import(
+      "exceljs/dist/exceljs.min.js"
+    )) as unknown as typeof import("exceljs");
     const brandOrangeArgb = "FFFF9500";
     const brandDarkArgb = "FF111827";
     const brandMutedArgb = "FF6B7280";
@@ -1259,6 +1337,8 @@ export default function AdminDashboard() {
                               if (!open) {
                                 setIsEditDialogOpen(false);
                                 setSelectedFeedback(null);
+                                setMessages([]);
+                                setMessageDraft("");
                               }
                             }}
                           >
@@ -1268,10 +1348,10 @@ export default function AdminDashboard() {
                                 size="sm"
                                 onClick={() => {
                                   setSelectedFeedback(feedback);
-                                  setResponse("");
                                   setNewStatus(feedback.status);
                                   setNewPriority(feedback.priority);
                                   setIsEditDialogOpen(true);
+                                  void loadMessages(feedback.id);
                                 }}
                               >
                                 <Pencil className="h-4 w-4 mr-2" />
@@ -1455,19 +1535,135 @@ export default function AdminDashboard() {
                                         </SelectContent>
                                       </Select>
                                     </div>
-                                    <div className="space-y-2">
-                                      <Label htmlFor="response">
-                                        Add/Update Response
-                                      </Label>
-                                      <Textarea
-                                        id="response"
-                                        placeholder="Enter your response to the user..."
-                                        rows={5}
-                                        value={response}
-                                        onChange={(e) =>
-                                          setResponse(e.target.value)
-                                        }
-                                      />
+                                    <div className="space-y-3">
+                                      <div className="flex items-center gap-2">
+                                        <MessageSquare className="h-5 w-5 text-foreground" />
+                                        <p className="text-base font-semibold">
+                                          Conversation
+                                        </p>
+                                      </div>
+                                      <div className="overflow-hidden rounded-lg border border-border bg-white/70">
+                                        <div className="max-h-[300px] overflow-y-auto p-4">
+                                          {isMessagesLoading && (
+                                            <p className="text-sm text-muted-foreground">
+                                              Loading conversation...
+                                            </p>
+                                          )}
+                                          {!isMessagesLoading &&
+                                            messages.length === 0 && (
+                                              <p className="text-sm text-muted-foreground">
+                                                No messages yet.
+                                              </p>
+                                            )}
+                                          <div className="space-y-4">
+                                            {(() => {
+                                              let lastDayLabel = "";
+                                              return messages.map((entry) => {
+                                                const createdAt = entry.createdAt
+                                                  ? new Date(entry.createdAt)
+                                                  : null;
+                                                const today = new Date();
+                                                const dayLabel = createdAt
+                                                  ? createdAt.toDateString() ===
+                                                    today.toDateString()
+                                                    ? "Today"
+                                                    : createdAt.toLocaleDateString(
+                                                        undefined,
+                                                        {
+                                                          month: "short",
+                                                          day: "numeric",
+                                                          year: "numeric",
+                                                        },
+                                                      )
+                                                  : "";
+                                                const showDayLabel =
+                                                  dayLabel &&
+                                                  dayLabel !== lastDayLabel;
+                                                if (showDayLabel) {
+                                                  lastDayLabel = dayLabel;
+                                                }
+
+                                                const isAdmin =
+                                                  entry.senderRole !== "user";
+                                                const name = isAdmin
+                                                  ? "You"
+                                                  : entry.senderName || "User";
+                                                return (
+                                                  <div
+                                                    key={entry.id}
+                                                    className="space-y-3"
+                                                  >
+                                                    {showDayLabel && (
+                                                      <div className="flex justify-center">
+                                                        <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                                          {dayLabel}
+                                                        </span>
+                                                      </div>
+                                                    )}
+                                                    <div
+                                                      className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}
+                                                    >
+                                                      <div
+                                                        className={`max-w-[75%] rounded-lg px-4 py-3 text-sm shadow-sm ${
+                                                          isAdmin
+                                                            ? "bg-accent text-white"
+                                                            : "bg-muted/60 text-foreground border border-border"
+                                                        }`}
+                                                      >
+                                                        <p className="text-[11px] font-semibold opacity-80">
+                                                          {name}
+                                                          {entry.createdAt && (
+                                                            <span className="font-normal">
+                                                              {" "}
+                                                              · {formatAdminTime(entry.createdAt)}
+                                                            </span>
+                                                          )}
+                                                        </p>
+                                                        <p className="mt-1 whitespace-pre-wrap">
+                                                          {entry.message}
+                                                        </p>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                );
+                                              });
+                                            })()}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label className="text-sm font-semibold">
+                                          Send a reply
+                                        </Label>
+                                        <div className="flex items-center gap-3">
+                                          <Input
+                                            id="message"
+                                            placeholder="Type your message..."
+                                            value={messageDraft}
+                                            onChange={(e) =>
+                                              setMessageDraft(e.target.value)
+                                            }
+                                            onKeyDown={(event) => {
+                                              if (event.key === "Enter") {
+                                                event.preventDefault();
+                                                void handleSendMessage();
+                                              }
+                                            }}
+                                            className="h-11 rounded-lg bg-muted/50"
+                                          />
+                                          <Button
+                                            type="button"
+                                            className="h-11 px-6"
+                                            onClick={() => void handleSendMessage()}
+                                            disabled={
+                                              isSendingMessage ||
+                                              !messageDraft.trim()
+                                            }
+                                          >
+                                            {isSendingMessage ? "Sending..." : "Send"}
+                                          </Button>
+                                        </div>
+                                      </div>
                                     </div>
                                     <p className="text-xs text-muted-foreground">
                                       Marking a submission as Resolved will

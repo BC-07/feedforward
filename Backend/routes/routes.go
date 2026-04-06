@@ -58,9 +58,11 @@ func AppRoutes(app *fiber.App) {
 	// Feedbacks
 	app.Get("/feedbacks", controller.GetFeedbacks)
 	app.Get("/feedbacks/:id", controller.GetFeedbackByID)
+	app.Get("/feedbacks/:id/messages", controller.ListFeedbackMessages)
 	app.Post("/feedbacks/moderate", controller.ModerateFeedback)
 	app.Post("/feedbacks", controller.CreateFeedback)
 	app.Put("/feedbacks/:id", controller.UpdateFeedback)
+	app.Post("/feedbacks/:id/messages", controller.CreateFeedbackMessage)
 	app.Delete("/feedbacks/:id", controller.DeleteFeedback)
 	// --------------------------
 }

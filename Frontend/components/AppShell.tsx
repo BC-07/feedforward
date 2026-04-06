@@ -12,7 +12,7 @@ import {
   updateUserProfile,
   type Feedback,
 } from "@/lib/api";
-import { LogOut, User, UserCircle2, Camera, Bell, MoreVertical } from "lucide-react";
+import { LogOut, User, UserCircle2, Camera, Bell, MoreVertical, Eye, EyeOff, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -217,6 +217,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     next: "",
     confirm: "",
   });
+  const [showAdminCurrentPw, setShowAdminCurrentPw] = useState(false);
+  const [showAdminNewPw, setShowAdminNewPw] = useState(false);
+  const [showAdminConfirmPw, setShowAdminConfirmPw] = useState(false);
   const [adminProfileEdit, setAdminProfileEdit] = useState({
     firstName: "",
     lastName: "",
@@ -230,6 +233,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     newPassword: "",
     confirmPassword: "",
   });
+  const [showUserCurrentPw, setShowUserCurrentPw] = useState(false);
+  const [showUserNewPw, setShowUserNewPw] = useState(false);
+  const [showUserConfirmPw, setShowUserConfirmPw] = useState(false);
   const [adminNotifications, setAdminNotifications] = useState<Feedback[]>([]);
   const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
@@ -711,25 +717,42 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {!isDashboardRoute && !isSuperAdminRoute && (
               <nav className="flex items-center gap-6">
                 {isUserLoggedIn ? (
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setIsUserProfileOpen(true)}
-                      className="flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-                      aria-label="Open profile settings"
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="flex items-center gap-3 rounded-full px-2.5 py-1.5 transition-colors hover:bg-muted/60"
+                        aria-label="Open user menu"
+                      >
+                        <AvatarDisplay src={userAvatar} fallback={<User />} size="sm" accentColor="accent" />
+                        <div className="hidden sm:flex flex-col items-start leading-tight">
+                          <span className="text-sm font-semibold text-foreground">
+                            {session.userName || "User"}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">
+                            User
+                          </span>
+                        </div>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      forceMount
+                      className="w-44 ff-dropdown-anim"
                     >
-                      <AvatarDisplay src={userAvatar} fallback={<User />} size="sm" accentColor="accent" />
-                    </button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleUserLogout}
-                      className="text-sm"
-                      aria-label="Logout"
-                    >
-                      <LogOut className="h-4 w-4 sm:mr-1" />
-                      <span className="hidden sm:inline">Logout</span>
-                    </Button>
-                  </div>
+                      <DropdownMenuItem onClick={() => setIsUserProfileOpen(true)}>
+                        <User className="mr-2 h-4 w-4 text-foreground" />
+                        Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleUserLogout}
+                        className="group text-destructive focus:text-destructive hover:bg-destructive hover:text-destructive-foreground focus:bg-destructive focus:text-destructive-foreground"
+                      >
+                        <LogOut className="mr-2 h-4 w-4 group-hover:text-destructive-foreground group-focus:text-destructive-foreground" />
+                        Logout
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 ) : (
                   <>
                   </>
@@ -740,19 +763,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {/* Admin nav */}
             {isDashboardRoute && isAdminLoggedIn && (
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsProfileOpen(true)}
-                  className="flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-                  aria-label="Open profile settings"
-                >
-                  <AvatarDisplay
-                    src={adminAvatar}
-                    fallback={<UserCircle2 />}
-                    size="sm"
-                    accentColor="primary"
-                  />
-                </button>
-
                 <Sheet
                   open={isNotificationsOpen}
                   onOpenChange={(open) => {
@@ -897,15 +907,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </SheetContent>
                 </Sheet>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleAdminLogout}
-                  className="text-sm"
-                >
-                  <LogOut className="h-4 w-4 mr-1" />
-                  Logout
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="flex items-center gap-3 rounded-full px-2.5 py-1.5 transition-colors hover:bg-muted/60"
+                      aria-label="Open admin menu"
+                    >
+                      <AvatarDisplay
+                        src={adminAvatar}
+                        fallback={<UserCircle2 />}
+                        size="sm"
+                        accentColor="primary"
+                      />
+                      <div className="hidden sm:flex flex-col items-start leading-tight">
+                        <span className="text-sm font-semibold text-foreground">
+                          {session.adminName || "Admin"}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {session.adminUnit || "Admin"}
+                        </span>
+                      </div>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    forceMount
+                    className="w-44 ff-dropdown-anim"
+                  >
+                    <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
+                      <UserCircle2 className="mr-2 h-4 w-4 text-foreground" />
+                      Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleAdminLogout}
+                      className="group text-destructive focus:text-destructive hover:bg-destructive hover:text-destructive-foreground focus:bg-destructive focus:text-destructive-foreground"
+                    >
+                      <LogOut className="mr-2 h-4 w-4 group-hover:text-destructive-foreground group-focus:text-destructive-foreground" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
             {isSuperAdminRoute && isSuperAdminLoggedIn && (
@@ -968,7 +1010,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Admin Profile Sheet */}
       <Sheet open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <SheetContent className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl">
+        <SheetContent className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl ff-sheet-anim">
           <SheetHeader className="px-2 flex items-center justify-center text-center">
             <SheetTitle className="text-center w-full">Admin Profile</SheetTitle>
             <SheetDescription className="text-center w-full">Your account information</SheetDescription>
@@ -1056,33 +1098,78 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <p className="text-sm font-semibold">Change Password</p>
               <div className="space-y-2">
                 <Label htmlFor="adm-curpw" className="text-xs text-muted-foreground">Current Password</Label>
-                <Input
-                  id="adm-curpw"
-                  type="password"
-                  placeholder="Enter current password"
-                  value={passwordEdit.current}
-                  onChange={(e) => setPasswordEdit({ ...passwordEdit, current: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="adm-curpw"
+                    type={showAdminCurrentPw ? "text" : "password"}
+                    placeholder="Enter current password"
+                    value={passwordEdit.current}
+                    onChange={(e) => setPasswordEdit({ ...passwordEdit, current: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowAdminCurrentPw((prev) => !prev)}
+                    aria-label={showAdminCurrentPw ? "Hide password" : "Show password"}
+                  >
+                    {showAdminCurrentPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="adm-newpw" className="text-xs text-muted-foreground">New Password</Label>
-                <Input
-                  id="adm-newpw"
-                  type="password"
-                  placeholder="Enter new password"
-                  value={passwordEdit.next}
-                  onChange={(e) => setPasswordEdit({ ...passwordEdit, next: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="adm-newpw"
+                    type={showAdminNewPw ? "text" : "password"}
+                    placeholder="Enter new password"
+                    value={passwordEdit.next}
+                    onChange={(e) => setPasswordEdit({ ...passwordEdit, next: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowAdminNewPw((prev) => !prev)}
+                    aria-label={showAdminNewPw ? "Hide password" : "Show password"}
+                  >
+                    {showAdminNewPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="adm-confpw" className="text-xs text-muted-foreground">Confirm New Password</Label>
-                <Input
-                  id="adm-confpw"
-                  type="password"
-                  placeholder="Confirm new password"
-                  value={passwordEdit.confirm}
-                  onChange={(e) => setPasswordEdit({ ...passwordEdit, confirm: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="adm-confpw"
+                    type={showAdminConfirmPw ? "text" : "password"}
+                    placeholder="Confirm new password"
+                    value={passwordEdit.confirm}
+                    onChange={(e) => setPasswordEdit({ ...passwordEdit, confirm: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowAdminConfirmPw((prev) => !prev)}
+                    aria-label={showAdminConfirmPw ? "Hide password" : "Show password"}
+                  >
+                    {showAdminConfirmPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <Button className="w-full" variant="outline" onClick={handlePasswordChange}>
                 Update Password
@@ -1095,7 +1182,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* ── User Profile Sheet ──────────────────────────────────────────── */}
       <Sheet open={isUserProfileOpen} onOpenChange={setIsUserProfileOpen}>
-        <SheetContent className="mobile-profile-sheet w-[360px] max-w-[92vw] sm:w-[400px] overflow-y-auto rounded-l-3xl data-[state=open]:duration-1500 data-[state=closed]:duration-1000 data-[state=open]:ease-out data-[state=closed]:ease-in sm:data-[state=open]:duration-500 sm:data-[state=closed]:duration-300">
+        <SheetContent className="mobile-profile-sheet w-[360px] max-w-[92vw] sm:w-[400px] overflow-y-auto rounded-l-3xl data-[state=open]:duration-1500 data-[state=closed]:duration-1000 data-[state=open]:ease-out data-[state=closed]:ease-in sm:data-[state=open]:duration-500 sm:data-[state=closed]:duration-300 ff-sheet-anim">
           <SheetHeader className="px-2 flex items-center justify-center text-center">
             <SheetTitle className="text-center w-full">My Profile</SheetTitle>
             <SheetDescription className="text-center w-full">View and update your account</SheetDescription>
@@ -1176,33 +1263,78 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <p className="text-sm font-semibold">Change Password</p>
               <div className="space-y-2">
                 <Label htmlFor="u-curpw" className="text-xs text-muted-foreground">Current Password</Label>
-                <Input
-                  id="u-curpw"
-                  type="password"
-                  placeholder="Enter current password"
-                  value={userProfileEdit.currentPassword}
-                  onChange={(e) => setUserProfileEdit({ ...userProfileEdit, currentPassword: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="u-curpw"
+                    type={showUserCurrentPw ? "text" : "password"}
+                    placeholder="Enter current password"
+                    value={userProfileEdit.currentPassword}
+                    onChange={(e) => setUserProfileEdit({ ...userProfileEdit, currentPassword: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowUserCurrentPw((prev) => !prev)}
+                    aria-label={showUserCurrentPw ? "Hide password" : "Show password"}
+                  >
+                    {showUserCurrentPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="u-newpw" className="text-xs text-muted-foreground">New Password</Label>
-                <Input
-                  id="u-newpw"
-                  type="password"
-                  placeholder="Enter new password"
-                  value={userProfileEdit.newPassword}
-                  onChange={(e) => setUserProfileEdit({ ...userProfileEdit, newPassword: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="u-newpw"
+                    type={showUserNewPw ? "text" : "password"}
+                    placeholder="Enter new password"
+                    value={userProfileEdit.newPassword}
+                    onChange={(e) => setUserProfileEdit({ ...userProfileEdit, newPassword: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowUserNewPw((prev) => !prev)}
+                    aria-label={showUserNewPw ? "Hide password" : "Show password"}
+                  >
+                    {showUserNewPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="u-confpw" className="text-xs text-muted-foreground">Confirm New Password</Label>
-                <Input
-                  id="u-confpw"
-                  type="password"
-                  placeholder="Confirm new password"
-                  value={userProfileEdit.confirmPassword}
-                  onChange={(e) => setUserProfileEdit({ ...userProfileEdit, confirmPassword: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="u-confpw"
+                    type={showUserConfirmPw ? "text" : "password"}
+                    placeholder="Confirm new password"
+                    value={userProfileEdit.confirmPassword}
+                    onChange={(e) => setUserProfileEdit({ ...userProfileEdit, confirmPassword: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowUserConfirmPw((prev) => !prev)}
+                    aria-label={showUserConfirmPw ? "Hide password" : "Show password"}
+                  >
+                    {showUserConfirmPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 

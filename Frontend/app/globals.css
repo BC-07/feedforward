@@ -211,3 +211,76 @@
     opacity: 1;
   }
 }
+/* Dropdown animation (works without Tailwind data-state variants) */
+.ff-dropdown-anim {
+  transform-origin: top right;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+.ff-dropdown-anim[data-state="open"] {
+  animation: ffDropdownExpand 200ms ease-out both;
+  pointer-events: auto;
+}
+
+.ff-dropdown-anim[data-state="closed"] {
+  animation: ffDropdownCollapse 160ms ease-in both;
+}
+
+@keyframes ffDropdownExpand {
+  from {
+    opacity: 0;
+    transform: scaleY(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes ffDropdownCollapse {
+  from {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  to {
+    opacity: 0;
+    transform: scaleY(0.9);
+  }
+}
+
+/* Profile sheet: collapse from right to left */
+.ff-sheet-anim {
+  transform-origin: right center;
+  will-change: transform, opacity;
+}
+
+.ff-sheet-anim[data-state="open"] {
+  animation: ffSheetIn 220ms ease-out both;
+}
+
+.ff-sheet-anim[data-state="closed"] {
+  animation: ffSheetOut 180ms ease-in both;
+}
+
+@keyframes ffSheetIn {
+  from {
+    opacity: 0;
+    transform: translateX(12px) scaleX(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+  }
+}
+
+@keyframes ffSheetOut {
+  from {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(12px) scaleX(0.92);
+  }
+}

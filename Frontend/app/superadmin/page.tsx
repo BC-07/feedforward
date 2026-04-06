@@ -543,7 +543,7 @@ export default function SuperAdminDashboard() {
                 Superadmin Dashboard
               </h1>
               <p className="mt-2 max-w-2xl text-sm text-white/70 sm:text-base">
-                Hidden system control for managing admin accounts across all
+                System control for managing & creating admin accounts across all
                 units.
               </p>
             </div>
