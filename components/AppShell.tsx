@@ -2,20 +2,169 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, LogOut, User, UserCircle2, Camera } from "lucide-react";
+import {
+  deleteUserAccount,
+  logout,
+  listFeedbacks,
+  updateAdminProfile,
+  updateAdminPassword,
+  updateUserPassword,
+  updateUserProfile,
+  type Feedback,
+} from "@/lib/api";
+import { LogOut, User, UserCircle2, Camera, Bell, MoreVertical, Eye, EyeOff, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
+  SheetTrigger,
 } from "@/components/ui/sheet";
-import { changeUserPassword, logoutAdmin, logoutSuperAdmin, logoutUser } from "@/frontend/api";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+const SESSION_EVENT = "feedforward:session-change";
+const OPEN_FEEDBACK_EVENT = "feedforward:open-feedback";
+const emailLikePattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+
+function containsEmailLike(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (trimmed.includes("@")) return true;
+  return emailLikePattern.test(trimmed);
+}
+
+type SessionSnapshot = {
+  isUserLoggedIn: boolean;
+  isAdminLoggedIn: boolean;
+  isSuperAdminLoggedIn: boolean;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userAvatar: string;
+  adminId: string;
+  adminName: string;
+  adminEmail: string;
+  adminUnit: string;
+  adminAvatar: string;
+  superAdminName: string;
+};
+
+type LogoutRole = "user" | "admin" | "superadmin";
+
+const emptySessionSnapshot: SessionSnapshot = {
+  isUserLoggedIn: false,
+  isAdminLoggedIn: false,
+  isSuperAdminLoggedIn: false,
+  userId: "",
+  userName: "",
+  userEmail: "",
+  userAvatar: "",
+  adminId: "",
+  adminName: "",
+  adminEmail: "",
+  adminUnit: "",
+  adminAvatar: "",
+  superAdminName: "superadmin",
+};
+
+let cachedSessionSnapshot: SessionSnapshot | null = null;
+
+function readSessionSnapshotFromStorage(): SessionSnapshot {
+  const userId = localStorage.getItem("currentUserId") || "";
+  const adminId = localStorage.getItem("currentAdminId") || "";
+
+  return {
+    isUserLoggedIn: localStorage.getItem("isUserLoggedIn") === "true",
+    isAdminLoggedIn: localStorage.getItem("isAdminLoggedIn") === "true",
+    isSuperAdminLoggedIn: localStorage.getItem("isSuperAdminLoggedIn") === "true",
+    userId,
+    userName: localStorage.getItem("currentUserName") || "",
+    userEmail: localStorage.getItem("currentUserEmail") || "",
+    userAvatar: userId ? localStorage.getItem(`userAvatar_${userId}`) || "" : "",
+    adminId,
+    adminName: localStorage.getItem("currentAdminName") || "",
+    adminEmail: localStorage.getItem("currentAdminEmail") || "",
+    adminUnit: localStorage.getItem("currentAdminDepartment") || "",
+    adminAvatar: adminId
+      ? localStorage.getItem(`adminAvatar_${adminId}`) || ""
+      : "",
+    superAdminName: localStorage.getItem("superAdminName") || "superadmin",
+  };
+}
+
+function isSameSnapshot(a: SessionSnapshot, b: SessionSnapshot): boolean {
+  return (
+    a.isUserLoggedIn === b.isUserLoggedIn &&
+    a.isAdminLoggedIn === b.isAdminLoggedIn &&
+    a.isSuperAdminLoggedIn === b.isSuperAdminLoggedIn &&
+    a.userId === b.userId &&
+    a.userName === b.userName &&
+    a.userEmail === b.userEmail &&
+    a.userAvatar === b.userAvatar &&
+    a.adminId === b.adminId &&
+    a.adminName === b.adminName &&
+    a.adminEmail === b.adminEmail &&
+    a.adminUnit === b.adminUnit &&
+    a.adminAvatar === b.adminAvatar &&
+    a.superAdminName === b.superAdminName
+  );
+}
+
+function getSessionSnapshot(): SessionSnapshot {
+  if (typeof window === "undefined") {
+    return emptySessionSnapshot;
+  }
+
+  const nextSnapshot = readSessionSnapshotFromStorage();
+  if (cachedSessionSnapshot && isSameSnapshot(cachedSessionSnapshot, nextSnapshot)) {
+    return cachedSessionSnapshot;
+  }
+
+  cachedSessionSnapshot = nextSnapshot;
+  return nextSnapshot;
+}
+
+function subscribeSessionSnapshot(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  const handler = () => onStoreChange();
+  window.addEventListener("storage", handler);
+  window.addEventListener(SESSION_EVENT, handler);
+  return () => {
+    window.removeEventListener("storage", handler);
+    window.removeEventListener(SESSION_EVENT, handler);
+  };
+}
+
+function announceSessionChange() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SESSION_EVENT));
+  }
+}
 
 // ── Reusable Avatar component ──────────────────────────────────────────────
 const AvatarDisplay = ({
@@ -36,6 +185,7 @@ const AvatarDisplay = ({
 
   if (src) {
     return (
+      /* eslint-disable-next-line @next/next/no-img-element */
       <img
         src={src}
         alt="Profile"
@@ -58,31 +208,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isDashboardRoute = pathname.startsWith("/dashboard");
-  const previousPathRef = useRef(pathname);
-
-  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [userName, setUserName] = useState("");
-  const [adminName, setAdminName] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
-  const [adminUnit, setAdminUnit] = useState("");
-  const [adminId, setAdminId] = useState("");
-
-  const [adminAvatar, setAdminAvatar] = useState<string>("");
-  const [userAvatar, setUserAvatar] = useState<string>("");
+  const isSuperAdminRoute = pathname.startsWith("/superadmin");
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
   const userAvatarInputRef = useRef<HTMLInputElement>(null);
-
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [passwordEdit, setPasswordEdit] = useState({
     current: "",
     next: "",
     confirm: "",
   });
+  const [showAdminCurrentPw, setShowAdminCurrentPw] = useState(false);
+  const [showAdminNewPw, setShowAdminNewPw] = useState(false);
+  const [showAdminConfirmPw, setShowAdminConfirmPw] = useState(false);
+  const [adminProfileEdit, setAdminProfileEdit] = useState({
+    firstName: "",
+    lastName: "",
+  });
 
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
-  const [userId, setUserId] = useState("");
-  const [userEmail, setUserEmail] = useState("");
   const [userProfileEdit, setUserProfileEdit] = useState({
     firstName: "",
     lastName: "",
@@ -90,46 +234,255 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     newPassword: "",
     confirmPassword: "",
   });
+  const [showUserCurrentPw, setShowUserCurrentPw] = useState(false);
+  const [showUserNewPw, setShowUserNewPw] = useState(false);
+  const [showUserConfirmPw, setShowUserConfirmPw] = useState(false);
+  const [adminNotifications, setAdminNotifications] = useState<Feedback[]>([]);
+  const [isNotificationsLoading, setIsNotificationsLoading] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [logoutConfirmRole, setLogoutConfirmRole] = useState<LogoutRole | null>(null);
+  const [isLogoutPending, setIsLogoutPending] = useState(false);
+  const session = useSyncExternalStore(
+    subscribeSessionSnapshot,
+    getSessionSnapshot,
+    () => emptySessionSnapshot,
+  );
+  const effectiveSession = isHydrated ? session : emptySessionSnapshot;
 
   useEffect(() => {
-    const previousPath = previousPathRef.current;
-    const leftSuperAdminRoute =
-      previousPath.startsWith("/superadmin") &&
-      !pathname.startsWith("/superadmin");
+    const apiBase =
+      process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+      "http://localhost:5566";
 
-    if (leftSuperAdminRoute) {
-      void logoutSuperAdmin();
-      localStorage.removeItem("isSuperAdminLoggedIn");
-      localStorage.removeItem("superAdminId");
-      localStorage.removeItem("superAdminName");
-      localStorage.removeItem("superAdminToken");
-      localStorage.removeItem("superAdminExpiresAt");
+    const sendLogoutBeacon = () => {
+      if (
+        !effectiveSession.isAdminLoggedIn &&
+        !effectiveSession.isSuperAdminLoggedIn
+      ) {
+        return;
+      }
+      if (typeof navigator === "undefined" || !navigator.sendBeacon) {
+        return;
+      }
+      const url = `${apiBase}/auth/logout`;
+      const body = new Blob([], { type: "application/json" });
+      navigator.sendBeacon(url, body);
+    };
+
+    const handleBeforeUnload = () => {
+      sendLogoutBeacon();
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [effectiveSession.isAdminLoggedIn, effectiveSession.isSuperAdminLoggedIn]);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  const {
+    isUserLoggedIn,
+    isAdminLoggedIn,
+    isSuperAdminLoggedIn,
+    userId,
+    userName,
+    userEmail,
+    userAvatar,
+    adminId,
+    adminName,
+    adminEmail,
+    adminUnit,
+    adminAvatar,
+  } = effectiveSession;
+
+  const saveReadNotificationIds = useCallback(
+    (nextSet: Set<string>) => {
+      if (typeof window === "undefined") return;
+      if (!isAdminLoggedIn || !adminId || !adminUnit) return;
+      const key = `adminNotificationsRead:${adminId}:${adminUnit}`;
+      localStorage.setItem(key, JSON.stringify(Array.from(nextSet)));
+      setReadNotificationIds(new Set(nextSet));
+    },
+    [adminId, adminUnit, isAdminLoggedIn],
+  );
+
+  const refreshAdminNotifications = useCallback(async () => {
+    if (!isAdminLoggedIn || !adminUnit) return;
+    setIsNotificationsLoading(true);
+    try {
+      const data = await listFeedbacks({ category: adminUnit });
+      const now = Date.now();
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      const recent = data
+        .filter(
+          (feedback) => now - new Date(feedback.createdAt).getTime() <= sevenDaysMs,
+        )
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
+        .slice(0, 10);
+      setAdminNotifications(recent);
+      if (readNotificationIds.size > 0) {
+        const allowedIds = new Set(recent.map((item) => item.id));
+        const nextRead = new Set(
+          Array.from(readNotificationIds).filter((id) => allowedIds.has(id)),
+        );
+        if (nextRead.size !== readNotificationIds.size) {
+          saveReadNotificationIds(nextRead);
+        }
+      }
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to load notifications.",
+      );
+    } finally {
+      setIsNotificationsLoading(false);
+    }
+  }, [adminUnit, isAdminLoggedIn, readNotificationIds, saveReadNotificationIds]);
+
+  const handleNotificationsClearAll = () => {
+    if (!window.confirm("Mark all notifications as read?")) return;
+    const next = new Set(sortedAdminNotifications.map((item) => item.id));
+    saveReadNotificationIds(next);
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isAdminLoggedIn || !adminId || !adminUnit) return;
+    const key = `adminNotificationsRead:${adminId}:${adminUnit}`;
+    const stored = localStorage.getItem(key);
+    if (!stored) {
+      setReadNotificationIds(new Set());
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        const ids = parsed.filter((id) => typeof id === "string");
+        setReadNotificationIds(new Set(ids));
+      } else {
+        setReadNotificationIds(new Set());
+      }
+    } catch {
+      setReadNotificationIds(new Set());
+    }
+  }, [isAdminLoggedIn, adminId, adminUnit]);
+
+  useEffect(() => {
+    if (!isAdminLoggedIn || !adminUnit) return;
+    void refreshAdminNotifications();
+  }, [isAdminLoggedIn, adminUnit, refreshAdminNotifications]);
+
+  const toggleNotificationRead = (id: string) => {
+    const next = new Set(readNotificationIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    saveReadNotificationIds(next);
+  };
+
+  const handleOpenAdminNotification = (feedback: Feedback) => {
+    const next = new Set(readNotificationIds);
+    if (!next.has(feedback.id)) {
+      next.add(feedback.id);
+      saveReadNotificationIds(next);
+    }
+    setIsNotificationsOpen(false);
+    window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent(OPEN_FEEDBACK_EVENT, {
+          detail: { feedbackId: feedback.id },
+        }),
+      );
+    }, 120);
+  };
+
+  const sortedAdminNotifications = [...adminNotifications].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+  const unreadAdminNotifications = sortedAdminNotifications.filter(
+    (feedback) => !readNotificationIds.has(feedback.id),
+  );
+  const adminNotificationCount = unreadAdminNotifications.length;
+
+  const clearSessionForRole = (role: LogoutRole) => {
+    if (role === "user") {
+      localStorage.removeItem("isUserLoggedIn");
+      localStorage.removeItem("currentUserId");
+      localStorage.removeItem("currentUserName");
+      localStorage.removeItem("currentUserEmail");
+      return;
     }
 
-    const userLoggedIn = localStorage.getItem("isUserLoggedIn") === "true";
-    const adminLoggedIn = localStorage.getItem("isAdminLoggedIn") === "true";
-
-    setIsUserLoggedIn(userLoggedIn);
-    setIsAdminLoggedIn(adminLoggedIn);
-
-    if (userLoggedIn) {
-      const uid = localStorage.getItem("currentUserId") || "";
-      setUserName(localStorage.getItem("currentUserName") || "");
-      setUserId(uid);
-      setUserEmail(localStorage.getItem("currentUserEmail") || "");
-      setUserAvatar(localStorage.getItem(`userAvatar_${uid}`) || "");
-    }
-    if (adminLoggedIn) {
-      const aid = localStorage.getItem("currentAdminId") || "";
-      setAdminName(localStorage.getItem("currentAdminName") || "");
-      setAdminEmail(localStorage.getItem("currentAdminEmail") || "");
-      setAdminUnit(localStorage.getItem("currentAdminDepartment") || "");
-      setAdminId(aid);
-      setAdminAvatar(localStorage.getItem(`adminAvatar_${aid}`) || "");
+    if (role === "admin") {
+      localStorage.removeItem("isAdminLoggedIn");
+      localStorage.removeItem("currentAdminId");
+      localStorage.removeItem("currentAdminName");
+      localStorage.removeItem("currentAdminEmail");
+      localStorage.removeItem("currentAdminDepartment");
+      return;
     }
 
-    previousPathRef.current = pathname;
-  }, [pathname]);
+    localStorage.removeItem("isSuperAdminLoggedIn");
+    localStorage.removeItem("superAdminName");
+    localStorage.removeItem("superAdminExpiresAt");
+  };
+
+  const getLogoutSuccessMessage = (role: LogoutRole) => {
+    if (role === "user") return "Logged out successfully";
+    if (role === "admin") return "Admin logged out successfully";
+    return "Superadmin logged out successfully";
+  };
+
+  const getLogoutRedirect = (role: LogoutRole) => {
+    if (role === "superadmin") return "/login";
+    return "/";
+  };
+
+  const getLogoutDialogCopy = (role: LogoutRole) => {
+    if (role === "user") {
+      return {
+        title: "Logout your account?",
+        description: "You will need to log in again to access your user account.",
+      };
+    }
+
+    if (role === "admin") {
+      return {
+        title: "Logout as admin?",
+        description: "You will be signed out of the admin dashboard and returned to the homepage.",
+      };
+    }
+
+    return {
+      title: "Logout as superadmin?",
+      description: "You will be signed out of the superadmin panel and sent back to the login page.",
+    };
+  };
+
+  const performLogout = async (role: LogoutRole) => {
+    try {
+      await logout();
+    } catch {
+      // Best-effort logout
+    }
+
+    clearSessionForRole(role);
+    announceSessionChange();
+    toast.success(getLogoutSuccessMessage(role));
+    router.push(getLogoutRedirect(role));
+  };
 
   // ── Avatar upload handlers ───────────────────────────────────────────────
   const handleAdminAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,7 +496,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     reader.onload = () => {
       const base64 = reader.result as string;
       localStorage.setItem(`adminAvatar_${adminId}`, base64);
-      setAdminAvatar(base64);
+      announceSessionChange();
       toast.success("Profile photo updated!");
     };
     reader.readAsDataURL(file);
@@ -160,57 +513,61 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     reader.onload = () => {
       const base64 = reader.result as string;
       localStorage.setItem(`userAvatar_${userId}`, base64);
-      setUserAvatar(base64);
+      announceSessionChange();
       toast.success("Profile photo updated!");
     };
     reader.readAsDataURL(file);
   };
 
   // ── Auth / profile handlers ──────────────────────────────────────────────
-  const handleUserLogout = async () => {
-    try {
-      await logoutUser();
-    } catch {
-      // no-op
-    }
-
-    localStorage.removeItem("isUserLoggedIn");
-    localStorage.removeItem("currentUserId");
-    localStorage.removeItem("currentUserName");
-    localStorage.removeItem("currentUserEmail");
-    setIsUserLoggedIn(false);
-    setUserName("");
-    toast.success("Logged out successfully");
-    router.push("/");
+  const handleUserLogout = () => {
+    setLogoutConfirmRole("user");
   };
 
-  const handleAdminLogout = async () => {
-    try {
-      await logoutAdmin();
-    } catch {
-      // no-op
-    }
-
-    localStorage.removeItem("isAdminLoggedIn");
-    localStorage.removeItem("currentAdminId");
-    localStorage.removeItem("currentAdminName");
-    localStorage.removeItem("currentAdminEmail");
-    localStorage.removeItem("currentAdminDepartment");
-    setIsAdminLoggedIn(false);
-    setAdminName("");
-    toast.success("Admin logged out successfully");
-    router.push("/");
+  const handleAdminLogout = () => {
+    setLogoutConfirmRole("admin");
   };
 
-  const handlePasswordChange = () => {
-    if (!passwordEdit.current || !passwordEdit.next || !passwordEdit.confirm) {
-      toast.error("Please fill in all password fields");
+  const handleSuperAdminLogout = () => {
+    setLogoutConfirmRole("superadmin");
+  };
+
+  const handleLogoutConfirm = async () => {
+    if (!logoutConfirmRole || isLogoutPending) return;
+
+    const role = logoutConfirmRole;
+    setIsLogoutPending(true);
+    try {
+      await performLogout(role);
+      setLogoutConfirmRole(null);
+    } finally {
+      setIsLogoutPending(false);
+    }
+  };
+
+  const handleLogoClick = async (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!effectiveSession.isAdminLoggedIn && !effectiveSession.isSuperAdminLoggedIn) {
       return;
     }
-    const admins = JSON.parse(localStorage.getItem("admins") || "[]");
-    const admin = admins.find((a: any) => a.id === adminId);
-    if (!admin || admin.password !== passwordEdit.current) {
-      toast.error("Current password is incorrect");
+    event.preventDefault();
+    try {
+      await logout();
+    } catch {
+      // Best-effort logout
+    }
+    if (effectiveSession.isAdminLoggedIn) {
+      clearSessionForRole("admin");
+    }
+    if (effectiveSession.isSuperAdminLoggedIn) {
+      clearSessionForRole("superadmin");
+    }
+    announceSessionChange();
+    router.push("/");
+  };
+
+  const handlePasswordChange = async () => {
+    if (!passwordEdit.current || !passwordEdit.next || !passwordEdit.confirm) {
+      toast.error("Please fill in all password fields");
       return;
     }
     if (passwordEdit.next.length < 6) {
@@ -221,29 +578,68 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       toast.error("New passwords do not match");
       return;
     }
-    const updatedAdmins = admins.map((a: any) =>
-      a.id === adminId ? { ...a, password: passwordEdit.next } : a,
-    );
-    localStorage.setItem("admins", JSON.stringify(updatedAdmins));
-    setPasswordEdit({ current: "", next: "", confirm: "" });
-    toast.success("Password updated successfully!");
+
+    try {
+      await updateAdminPassword(adminId, {
+        currentPassword: passwordEdit.current,
+        newPassword: passwordEdit.next,
+      });
+      setPasswordEdit({ current: "", next: "", confirm: "" });
+      toast.success("Password updated successfully!");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update password.",
+      );
+    }
   };
 
-  const handleDeleteUserAccount = () => {
+  const handleAdminProfileSave = async () => {
+    try {
+      const currentNameParts = adminName.trim().split(/\s+/);
+      const firstName =
+        adminProfileEdit.firstName.trim() || currentNameParts[0] || "";
+      const lastName =
+        adminProfileEdit.lastName.trim() ||
+        currentNameParts.slice(1).join(" ") ||
+        "";
+      if (containsEmailLike(lastName)) {
+        toast.error("Last name must not contain an email");
+        return;
+      }
+
+      const updatedAdmin = await updateAdminProfile(adminId, {
+        firstName,
+        lastName,
+      });
+
+      localStorage.setItem("currentAdminName", updatedAdmin.name);
+      setAdminProfileEdit({
+        firstName: "",
+        lastName: "",
+      });
+      announceSessionChange();
+      toast.success("Admin profile updated!");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update profile.",
+      );
+    }
+  };
+
+  const handleDeleteUserAccount = async () => {
     if (!window.confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const updated = users.filter((u: any) => u.id !== userId);
-    localStorage.setItem("users", JSON.stringify(updated));
-    handleUserLogout();
+    try {
+      await deleteUserAccount(userId);
+      await performLogout("user");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete account.",
+      );
+    }
   };
 
   const handleUserProfileSave = async () => {
     if (userProfileEdit.newPassword || userProfileEdit.currentPassword) {
-      if (!userProfileEdit.currentPassword || !userProfileEdit.newPassword || !userProfileEdit.confirmPassword) {
-        toast.error("Please fill in all password fields");
-        return;
-      }
-
       if (userProfileEdit.newPassword.length < 6) {
         toast.error("New password must be at least 6 characters");
         return;
@@ -252,45 +648,82 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         toast.error("New passwords do not match");
         return;
       }
+    }
 
-      try {
-        await changeUserPassword({
-          email: userEmail,
+    try {
+      const currentNameParts = userName.trim().split(/\s+/);
+      const firstName =
+        userProfileEdit.firstName.trim() || currentNameParts[0] || "";
+      const lastName =
+        userProfileEdit.lastName.trim() ||
+        currentNameParts.slice(1).join(" ") ||
+        "";
+      if (containsEmailLike(lastName)) {
+        toast.error("Last name must not contain an email");
+        return;
+      }
+
+      const updatedUser = await updateUserProfile(userId, {
+        firstName,
+        lastName,
+      });
+
+      if (userProfileEdit.newPassword) {
+        await updateUserPassword(userId, {
           currentPassword: userProfileEdit.currentPassword,
           newPassword: userProfileEdit.newPassword,
         });
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Failed to update password");
-        return;
       }
+
+      localStorage.setItem("currentUserName", updatedUser.name);
+      setUserProfileEdit({
+        firstName: "",
+        lastName: "",
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      announceSessionChange();
+      toast.success("Profile updated!");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to update profile.",
+      );
     }
-
-    const existingName = localStorage.getItem("currentUserName") || userName || "";
-    const parts = existingName.split(" ");
-    const firstName = userProfileEdit.firstName.trim() || parts[0] || "";
-    const lastName = userProfileEdit.lastName.trim() || parts.slice(1).join(" ") || "";
-    const fullName = `${firstName} ${lastName}`.trim();
-
-    localStorage.setItem("currentUserName", fullName);
-    setUserName(fullName);
-    setUserProfileEdit({
-      firstName: "",
-      lastName: "",
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    toast.success("Profile updated!");
   };
 
+  const logoutDialogCopy = logoutConfirmRole
+    ? getLogoutDialogCopy(logoutConfirmRole)
+    : null;
+
+  const AppFooter = () => (
+    <footer className="border-t border-muted bg-white mt-auto">
+      <div className="container mx-auto px-4 py-6">
+        <div className="text-center text-sm text-muted-foreground">
+          <p>&copy; {new Date().getFullYear()} FeedForward. All rights reserved.</p>
+          <p className="mt-1">Making feedback management smart, fast, and safe.</p>
+        </div>
+      </div>
+    </footer>
+  );
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-[100svh] flex flex-col bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-white">
-        <div className="container mx-auto px-4 py-4">
+      <header className="sticky top-0 z-50 border-b border-border bg-white">
+        <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <ArrowRight className="h-8 w-8 text-accent" />
+            <Link
+              href="/"
+              className="flex items-center gap-2"
+              onClick={handleLogoClick}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/favicon.ico"
+                alt="FeedForward logo"
+                className="h-8 w-8"
+              />
               <div>
                 <h1 className="text-xl font-bold text-primary tracking-tight">FEED FORWARD</h1>
                 <p className="text-xs text-muted-foreground">SMART. FAST. SAFE.</p>
@@ -298,59 +731,334 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
 
             {/* Public nav */}
-            {!isDashboardRoute && (
+            {!isDashboardRoute && !isSuperAdminRoute && (
               <nav className="flex items-center gap-6">
                 {isUserLoggedIn ? (
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setIsUserProfileOpen(true)}
-                      className="flex items-center gap-2 text-sm hover:text-accent transition-colors"
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="flex items-center gap-3 rounded-full px-2.5 py-1.5 transition-colors hover:bg-muted/60"
+                        aria-label="Open user menu"
+                      >
+                        <AvatarDisplay src={userAvatar} fallback={<User />} size="sm" accentColor="accent" />
+                        <div className="hidden sm:flex flex-col items-start leading-tight">
+                          <span className="text-sm font-semibold text-foreground">
+                            {session.userName || "User"}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">
+                            User
+                          </span>
+                        </div>
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      forceMount
+                      className="w-44 ff-dropdown-anim"
                     >
-                      <AvatarDisplay src={userAvatar} fallback={<User />} size="sm" accentColor="accent" />
-                      <span className="font-medium">{userName}</span>
-                    </button>
-                    <Button variant="ghost" size="sm" onClick={handleUserLogout} className="text-sm">
-                      <LogOut className="h-4 w-4 mr-1" />
-                      Logout
-                    </Button>
-                  </div>
+                      <DropdownMenuItem onClick={() => setIsUserProfileOpen(true)}>
+                        <User className="mr-2 h-4 w-4 text-foreground" />
+                        Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={handleUserLogout}
+                        className="group text-destructive focus:text-destructive hover:bg-destructive hover:text-destructive-foreground focus:bg-destructive focus:text-destructive-foreground"
+                      >
+                        <LogOut className="mr-2 h-4 w-4 group-hover:text-destructive-foreground group-focus:text-destructive-foreground" />
+                        Logout
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 ) : (
-                  null
+                  <>
+                  </>
                 )}
               </nav>
             )}
 
             {/* Admin nav */}
-{isDashboardRoute && isAdminLoggedIn && (
-  <div className="flex items-center gap-3">
-    <button
-      onClick={() => setIsProfileOpen(true)}
-      className="flex items-center gap-2 text-sm hover:text-accent transition-colors"
-    >
-      <AvatarDisplay src={adminAvatar} fallback={<UserCircle2 />} size="sm" accentColor="primary" />
-      <span className="font-medium">{adminName}</span>
-    </button>
-  </div>
-)}
+            {isDashboardRoute && isAdminLoggedIn && (
+              <div className="flex items-center gap-2">
+                <Sheet
+                  open={isNotificationsOpen}
+                  onOpenChange={(open) => {
+                    setIsNotificationsOpen(open);
+                    if (open) {
+                      void refreshAdminNotifications();
+                    }
+                  }}
+                >
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="relative"
+                      aria-label="Open notifications"
+                    >
+                      <Bell className="h-5 w-5" />
+                      {adminNotificationCount > 0 && (
+                        <span className="absolute -top-1 -right-1 h-5 min-w-[20px] rounded-full bg-destructive text-destructive-foreground text-[11px] font-semibold flex items-center justify-center px-1">
+                          {adminNotificationCount > 99 ? "99+" : adminNotificationCount}
+                        </span>
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                <SheetContent className="w-[360px] sm:w-[400px] overflow-hidden rounded-l-3xl ff-sheet-anim">
+                  <SheetHeader className="pb-0 px-3">
+                    <div className="w-full rounded-lg bg-white px-4 py-1.5 shadow-sm">
+                      <SheetTitle className="text-center text-lg font-semibold">
+                        Notifications
+                      </SheetTitle>
+                      <SheetDescription className="sr-only">
+                        Recent feedback notifications. Select an item to open it in the dashboard.
+                      </SheetDescription>
+                    </div>
+                  </SheetHeader>
+                  <div className="mt-0.5 flex items-center justify-end px-3">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleNotificationsClearAll}
+                      disabled={sortedAdminNotifications.length === 0}
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex-1 min-h-0 space-y-3 overflow-y-auto px-3 pr-4 pb-3">
+                    {isNotificationsLoading ? (
+                      <div className="text-sm text-muted-foreground">
+                        Loading notifications...
+                      </div>
+                      ) : sortedAdminNotifications.length === 0 ? (
+                        <div className="text-sm text-muted-foreground">
+                          You&apos;re all caught up. No new feedback yet.
+                        </div>
+                      ) : (
+                        sortedAdminNotifications.slice(0, 12).map((feedback) => {
+                          const isRead = readNotificationIds.has(feedback.id);
+                          return (
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            key={feedback.id}
+                            onClick={(event) => {
+                              const target = event.target as HTMLElement | null;
+                              if (target?.closest("[data-notification-action='true']")) {
+                                return;
+                              }
+                              handleOpenAdminNotification(feedback);
+                            }}
+                            onKeyDown={(event) => {
+                              const target = event.target as HTMLElement | null;
+                              if (target?.closest("[data-notification-action='true']")) {
+                                return;
+                              }
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                handleOpenAdminNotification(feedback);
+                              }
+                            }}
+                            className={`w-full text-left rounded-lg border border-border/40 border-l-4 bg-white/80 p-3 shadow-sm cursor-pointer transition-all duration-200 ease-out hover:bg-white hover:border-border/70 hover:shadow-[0_0_0_1px_rgba(255,149,0,0.18),0_8px_20px_-12px_rgba(0,0,0,0.35)] hover:scale-[1.01] active:scale-[0.995] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+                              feedback.priority?.toLowerCase() === "high"
+                                ? "border-l-orange-400"
+                                : feedback.priority?.toLowerCase() === "medium"
+                                  ? "border-l-amber-400"
+                                  : feedback.priority?.toLowerCase() === "low"
+                                    ? "border-l-slate-300"
+                                    : "border-l-muted-foreground/40"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="font-semibold text-sm text-left">
+                                {feedback.subject}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={isRead ? "secondary" : "default"}
+                                  className="whitespace-nowrap"
+                                >
+                                  {isRead ? "Read" : "Unread"}
+                                </Badge>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      aria-label="Notification actions"
+                                      data-notification-action="true"
+                                      onClick={(event) => event.stopPropagation()}
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    data-notification-action="true"
+                                  >
+                                    <DropdownMenuItem
+                                      data-notification-action="true"
+                                      onSelect={(event) => {
+                                        event.stopPropagation();
+                                        toggleNotificationRead(feedback.id);
+                                      }}
+                                    >
+                                      {isRead ? "Mark as unread" : "Mark as read"}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
+                            <div className="mt-0.5 flex items-center justify-between gap-3">
+                              <p className="text-xs text-muted-foreground">
+                                {feedback.category} • {feedback.type}
+                              </p>
+                              <div className="flex items-center justify-end gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className="h-6 px-2 text-xs capitalize whitespace-nowrap"
+                                >
+                                  {feedback.status}
+                                </Badge>
+                                {feedback.priority && (
+                                  <Badge
+                                    variant="outline"
+                                    className={`h-6 px-2 text-xs whitespace-nowrap border ${
+                                      feedback.priority.toLowerCase() === "high"
+                                        ? "bg-orange-50 text-orange-700 border-orange-200"
+                                        : feedback.priority.toLowerCase() === "medium"
+                                          ? "bg-amber-50 text-amber-700 border-amber-200"
+                                          : "bg-slate-50 text-slate-700 border-slate-200"
+                                    }`}
+                                  >
+                                    {feedback.priority} Priority
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-2 text-xs text-muted-foreground">
+                              {new Date(feedback.createdAt).toLocaleString("en-US")}
+                            </div>
+                          </div>
+                          );
+                        })
+                      )}
+                      {sortedAdminNotifications.length > 12 && (
+                        <p className="text-xs text-muted-foreground">
+                          Showing 12 most recent feedback items.
+                        </p>
+                      )}
+                    </div>
+                  </SheetContent>
+                </Sheet>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="flex items-center gap-3 rounded-full px-2.5 py-1.5 transition-colors hover:bg-muted/60"
+                      aria-label="Open admin menu"
+                    >
+                      <AvatarDisplay
+                        src={adminAvatar}
+                        fallback={<UserCircle2 />}
+                        size="sm"
+                        accentColor="primary"
+                      />
+                      <div className="hidden sm:flex flex-col items-start leading-tight">
+                        <span className="text-sm font-semibold text-foreground">
+                          {session.adminName || "Admin"}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {session.adminUnit || "Admin"}
+                        </span>
+                      </div>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    forceMount
+                    className="w-44 ff-dropdown-anim"
+                  >
+                    <DropdownMenuItem onClick={() => setIsProfileOpen(true)}>
+                      <UserCircle2 className="mr-2 h-4 w-4 text-foreground" />
+                      Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleAdminLogout}
+                      className="group text-destructive focus:text-destructive hover:bg-destructive hover:text-destructive-foreground focus:bg-destructive focus:text-destructive-foreground"
+                    >
+                      <LogOut className="mr-2 h-4 w-4 group-hover:text-destructive-foreground group-focus:text-destructive-foreground" />
+                      Logout
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+            {isSuperAdminRoute && isSuperAdminLoggedIn && (
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSuperAdminLogout}
+                  className="text-sm"
+                >
+                  <LogOut className="h-4 w-4 mr-1" />
+                  Logout
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </header>
 
-      <main>{children}</main>
+      <main className="flex-1 flex flex-col">
+        <div key={pathname} className="page-fade">
+          {children}
+        </div>
+      </main>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-white mt-auto">
-        <div className="container mx-auto px-4 py-6">
-          <div className="text-center text-sm text-muted-foreground">
-            <p>&copy; {new Date().getFullYear()} FeedForward. All rights reserved.</p>
-            <p className="mt-1">Making feedback management smart, fast, and safe.</p>
-          </div>
-        </div>
-      </footer>
+      <AppFooter />
 
-      {/* ── Admin Profile Sheet ─────────────────────────────────────────── */}
+      {/* Logout Confirmation */}
+      <AlertDialog
+        open={logoutConfirmRole !== null}
+        onOpenChange={(open) => {
+          if (!open && !isLogoutPending) {
+            setLogoutConfirmRole(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{logoutDialogCopy?.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {logoutDialogCopy?.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLogoutPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isLogoutPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                void handleLogoutConfirm();
+              }}
+            >
+              {isLogoutPending ? "Logging out..." : "Logout"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Admin Profile Sheet */}
       <Sheet open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <SheetContent className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl">
+        <SheetContent className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl ff-sheet-anim">
           <SheetHeader className="px-2 flex items-center justify-center text-center">
             <SheetTitle className="text-center w-full">Admin Profile</SheetTitle>
             <SheetDescription className="text-center w-full">Your account information</SheetDescription>
@@ -399,55 +1107,130 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="space-y-3 border rounded-2xl p-4">
+              <p className="text-sm font-semibold">Change Name</p>
+              <div className="space-y-2">
+                <Label htmlFor="adm-fname" className="text-xs text-muted-foreground">First Name</Label>
+                <Input
+                  id="adm-fname"
+                  name="firstName"
+                  autoComplete="given-name"
+                  placeholder="Enter first name"
+                  value={adminProfileEdit.firstName}
+                  onChange={(e) => setAdminProfileEdit({ ...adminProfileEdit, firstName: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="adm-lname" className="text-xs text-muted-foreground">Last Name</Label>
+                <Input
+                  id="adm-lname"
+                  name="lastName"
+                  autoComplete="family-name"
+                  placeholder="Enter last name"
+                  value={adminProfileEdit.lastName}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (containsEmailLike(next)) {
+                      toast.error("Last name must not contain an email");
+                      return;
+                    }
+                    setAdminProfileEdit({ ...adminProfileEdit, lastName: next });
+                  }}
+                />
+              </div>
+              <Button className="w-full" variant="outline" onClick={handleAdminProfileSave}>
+                Save Name
+              </Button>
+            </div>
+
+            <div className="space-y-3 border rounded-2xl p-4">
               <p className="text-sm font-semibold">Change Password</p>
               <div className="space-y-2">
                 <Label htmlFor="adm-curpw" className="text-xs text-muted-foreground">Current Password</Label>
-                <Input
-                  id="adm-curpw"
-                  type="password"
-                  placeholder="Enter current password"
-                  value={passwordEdit.current}
-                  onChange={(e) => setPasswordEdit({ ...passwordEdit, current: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="adm-curpw"
+                    type={showAdminCurrentPw ? "text" : "password"}
+                    placeholder="Enter current password"
+                    value={passwordEdit.current}
+                    onChange={(e) => setPasswordEdit({ ...passwordEdit, current: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowAdminCurrentPw((prev) => !prev)}
+                    aria-label={showAdminCurrentPw ? "Hide password" : "Show password"}
+                  >
+                    {showAdminCurrentPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="adm-newpw" className="text-xs text-muted-foreground">New Password</Label>
-                <Input
-                  id="adm-newpw"
-                  type="password"
-                  placeholder="Enter new password"
-                  value={passwordEdit.next}
-                  onChange={(e) => setPasswordEdit({ ...passwordEdit, next: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="adm-newpw"
+                    type={showAdminNewPw ? "text" : "password"}
+                    placeholder="Enter new password"
+                    value={passwordEdit.next}
+                    onChange={(e) => setPasswordEdit({ ...passwordEdit, next: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowAdminNewPw((prev) => !prev)}
+                    aria-label={showAdminNewPw ? "Hide password" : "Show password"}
+                  >
+                    {showAdminNewPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="adm-confpw" className="text-xs text-muted-foreground">Confirm New Password</Label>
-                <Input
-                  id="adm-confpw"
-                  type="password"
-                  placeholder="Confirm new password"
-                  value={passwordEdit.confirm}
-                  onChange={(e) => setPasswordEdit({ ...passwordEdit, confirm: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="adm-confpw"
+                    type={showAdminConfirmPw ? "text" : "password"}
+                    placeholder="Confirm new password"
+                    value={passwordEdit.confirm}
+                    onChange={(e) => setPasswordEdit({ ...passwordEdit, confirm: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowAdminConfirmPw((prev) => !prev)}
+                    aria-label={showAdminConfirmPw ? "Hide password" : "Show password"}
+                  >
+                    {showAdminConfirmPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <Button className="w-full" variant="outline" onClick={handlePasswordChange}>
                 Update Password
               </Button>
             </div>
 
-            <div className="pt-2 border-t pb-6">
-              <Button variant="outline" className="w-full mb-3" onClick={handleAdminLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </div>
           </div>
         </SheetContent>
       </Sheet>
 
       {/* ── User Profile Sheet ──────────────────────────────────────────── */}
       <Sheet open={isUserProfileOpen} onOpenChange={setIsUserProfileOpen}>
-        <SheetContent className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl">
+        <SheetContent className="mobile-profile-sheet w-[360px] max-w-[92vw] sm:w-[400px] overflow-y-auto rounded-l-3xl data-[state=open]:duration-1500 data-[state=closed]:duration-1000 data-[state=open]:ease-out data-[state=closed]:ease-in sm:data-[state=open]:duration-500 sm:data-[state=closed]:duration-300 ff-sheet-anim">
           <SheetHeader className="px-2 flex items-center justify-center text-center">
             <SheetTitle className="text-center w-full">My Profile</SheetTitle>
             <SheetDescription className="text-center w-full">View and update your account</SheetDescription>
@@ -497,6 +1280,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Label htmlFor="u-fname" className="text-xs text-muted-foreground">First Name</Label>
                 <Input
                   id="u-fname"
+                  name="firstName"
+                  autoComplete="given-name"
                   placeholder="Enter first name"
                   value={userProfileEdit.firstName}
                   onChange={(e) => setUserProfileEdit({ ...userProfileEdit, firstName: e.target.value })}
@@ -506,9 +1291,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Label htmlFor="u-lname" className="text-xs text-muted-foreground">Last Name</Label>
                 <Input
                   id="u-lname"
+                  name="lastName"
+                  autoComplete="family-name"
                   placeholder="Enter last name"
                   value={userProfileEdit.lastName}
-                  onChange={(e) => setUserProfileEdit({ ...userProfileEdit, lastName: e.target.value })}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    if (containsEmailLike(next)) {
+                      toast.error("Last name must not contain an email");
+                      return;
+                    }
+                    setUserProfileEdit({ ...userProfileEdit, lastName: next });
+                  }}
                 />
               </div>
             </div>
@@ -517,33 +1311,78 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <p className="text-sm font-semibold">Change Password</p>
               <div className="space-y-2">
                 <Label htmlFor="u-curpw" className="text-xs text-muted-foreground">Current Password</Label>
-                <Input
-                  id="u-curpw"
-                  type="password"
-                  placeholder="Enter current password"
-                  value={userProfileEdit.currentPassword}
-                  onChange={(e) => setUserProfileEdit({ ...userProfileEdit, currentPassword: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="u-curpw"
+                    type={showUserCurrentPw ? "text" : "password"}
+                    placeholder="Enter current password"
+                    value={userProfileEdit.currentPassword}
+                    onChange={(e) => setUserProfileEdit({ ...userProfileEdit, currentPassword: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowUserCurrentPw((prev) => !prev)}
+                    aria-label={showUserCurrentPw ? "Hide password" : "Show password"}
+                  >
+                    {showUserCurrentPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="u-newpw" className="text-xs text-muted-foreground">New Password</Label>
-                <Input
-                  id="u-newpw"
-                  type="password"
-                  placeholder="Enter new password"
-                  value={userProfileEdit.newPassword}
-                  onChange={(e) => setUserProfileEdit({ ...userProfileEdit, newPassword: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="u-newpw"
+                    type={showUserNewPw ? "text" : "password"}
+                    placeholder="Enter new password"
+                    value={userProfileEdit.newPassword}
+                    onChange={(e) => setUserProfileEdit({ ...userProfileEdit, newPassword: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowUserNewPw((prev) => !prev)}
+                    aria-label={showUserNewPw ? "Hide password" : "Show password"}
+                  >
+                    {showUserNewPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="u-confpw" className="text-xs text-muted-foreground">Confirm New Password</Label>
-                <Input
-                  id="u-confpw"
-                  type="password"
-                  placeholder="Confirm new password"
-                  value={userProfileEdit.confirmPassword}
-                  onChange={(e) => setUserProfileEdit({ ...userProfileEdit, confirmPassword: e.target.value })}
-                />
+                <div className="relative">
+                  <Input
+                    id="u-confpw"
+                    type={showUserConfirmPw ? "text" : "password"}
+                    placeholder="Confirm new password"
+                    value={userProfileEdit.confirmPassword}
+                    onChange={(e) => setUserProfileEdit({ ...userProfileEdit, confirmPassword: e.target.value })}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowUserConfirmPw((prev) => !prev)}
+                    aria-label={showUserConfirmPw ? "Hide password" : "Show password"}
+                  >
+                    {showUserConfirmPw ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
 

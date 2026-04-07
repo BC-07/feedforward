@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { loginAdmin, loginUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,153 +15,119 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { LogIn, Mail, Lock } from "lucide-react";
-import {
-  loginUser,
-  loginAdmin,
-  forgotPassword,
-  verifyResetOTP,
-} from "@/frontend/api";
+import { LogIn, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { toastApiError } from "@/lib/errorHandling";
 
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [isOtpMode, setIsOtpMode] = useState(false);
-  const [isOtpRequestLoading, setIsOtpRequestLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [expiredMessage] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("sessionExpiredMessage") || "";
+  });
 
   useEffect(() => {
-    const isUserLoggedIn = localStorage.getItem("isUserLoggedIn") === "true";
-    const currentUserId = localStorage.getItem("currentUserId");
-    if (isUserLoggedIn && currentUserId) {
-      router.replace("/user");
+    if (expiredMessage) {
+      localStorage.removeItem("sessionExpiredMessage");
+      toast.error(expiredMessage);
     }
-  }, [router]);
+  }, [expiredMessage]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
     const normalizedEmail = email.trim();
     const normalizedPassword = password.trim();
-    const normalizedOtp = password.replace(/[\s-]/g, "").trim();
     if (!normalizedEmail || !normalizedPassword) {
       toast.error("Email and password are required.");
       return;
     }
 
-    setIsLoading(true);
-
-    if (isOtpMode) {
-      try {
-        const res = await verifyResetOTP({ email: normalizedEmail, otp: normalizedOtp });
-        const user = res.data;
-        localStorage.setItem("isUserLoggedIn", "true");
-        localStorage.setItem("currentUserId", user.id);
-        localStorage.setItem("currentUserName", user.name);
-        localStorage.setItem("currentUserEmail", user.email);
-        toast.success(`Welcome back, ${user.name}!`);
-        setPassword("");
-        setIsOtpMode(false);
-        router.push("/user");
-        return;
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Failed to verify OTP");
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-
     try {
-      const userRes = await loginUser({ email: normalizedEmail, password: normalizedPassword });
-      const user = userRes.data;
+      const user = await loginUser({
+        email: normalizedEmail,
+        password: normalizedPassword,
+      });
       localStorage.setItem("isUserLoggedIn", "true");
       localStorage.setItem("currentUserId", user.id);
       localStorage.setItem("currentUserName", user.name);
       localStorage.setItem("currentUserEmail", user.email);
+      localStorage.removeItem("isAdminLoggedIn");
+      localStorage.removeItem("currentAdminId");
+      localStorage.removeItem("currentAdminName");
+      localStorage.removeItem("currentAdminEmail");
+      localStorage.removeItem("currentAdminDepartment");
+      localStorage.removeItem("isSuperAdminLoggedIn");
+      localStorage.removeItem("superAdminName");
+      localStorage.removeItem("superAdminExpiresAt");
       toast.success(`Welcome back, ${user.name}!`);
       router.push("/user");
       return;
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Request failed";
-      if (message !== "Invalid email or password") {
-        toast.error(message);
-        setIsLoading(false);
-        return;
-      }
+    } catch {
+      // Try admin login with the same form credentials.
     }
 
     try {
-      const adminRes = await loginAdmin({ email: normalizedEmail, password: normalizedPassword });
-      const admin = adminRes.data;
+      const admin = await loginAdmin({
+        email: normalizedEmail,
+        password: normalizedPassword,
+      });
       if (admin.isSuperAdmin) {
+        const superName = admin.name || admin.email || "Superadmin";
         localStorage.setItem("isSuperAdminLoggedIn", "true");
-        localStorage.setItem("superAdminId", admin.id);
-        localStorage.setItem("superAdminName", admin.name);
-        toast.success(`Welcome back, ${admin.name}!`);
+        localStorage.setItem("superAdminName", superName);
+        localStorage.removeItem("superAdminExpiresAt");
+        localStorage.removeItem("isAdminLoggedIn");
+        localStorage.removeItem("currentAdminId");
+        localStorage.removeItem("currentAdminName");
+        localStorage.removeItem("currentAdminEmail");
+        localStorage.removeItem("currentAdminDepartment");
+        localStorage.removeItem("isUserLoggedIn");
+        localStorage.removeItem("currentUserId");
+        localStorage.removeItem("currentUserName");
+        localStorage.removeItem("currentUserEmail");
+        toast.success(`Welcome back, ${superName}!`);
         router.push("/superadmin");
         return;
       }
-
       localStorage.setItem("isAdminLoggedIn", "true");
       localStorage.setItem("currentAdminId", admin.id);
       localStorage.setItem("currentAdminName", admin.name);
       localStorage.setItem("currentAdminEmail", admin.email);
       localStorage.setItem("currentAdminDepartment", admin.unit);
+      localStorage.removeItem("isUserLoggedIn");
+      localStorage.removeItem("currentUserId");
+      localStorage.removeItem("currentUserName");
+      localStorage.removeItem("currentUserEmail");
+      localStorage.removeItem("isSuperAdminLoggedIn");
+      localStorage.removeItem("superAdminName");
+      localStorage.removeItem("superAdminExpiresAt");
       toast.success(`Welcome back, ${admin.name}!`);
       router.push("/dashboard");
-    } catch {
-      toast.error("Invalid email or password");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleForgotPasswordClick = async () => {
-    const normalizedEmail = email.trim();
-    if (!normalizedEmail) {
-      toast.error("Please enter your email before requesting OTP.");
-      return;
-    }
-
-    setIsOtpRequestLoading(true);
-    try {
-      await forgotPassword({ email: normalizedEmail });
-      toast.success("If your email exists, an OTP was sent.");
-      setIsOtpMode(true);
-      setPassword("");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to send OTP");
-    } finally {
-      setIsOtpRequestLoading(false);
+    } catch (error) {
+      toastApiError(error, "Invalid email or password");
     }
   };
 
   return (
-    <div
-      className="relative min-h-screen overflow-hidden bg-cover bg-center bg-no-repeat"
-      style={{ backgroundImage: "url('/login-bg.svg')" }}
-    >
-      <div className="absolute inset-0 bg-black/5" />
-
-      <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
-        <div className="relative w-full max-w-md">
-          <div className="pointer-events-none absolute -left-6 -top-6 h-16 w-16 rounded-full bg-accent/90 shadow-lg" />
-          <div className="pointer-events-none absolute -bottom-5 -right-5 h-10 w-10 rounded-full bg-accent/80 shadow-md" />
-
-          <Card className="relative w-full border-0 bg-card shadow-2xl rounded-3xl">
+    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
+      <div className="container mx-auto flex min-h-full max-w-md items-center justify-center">
+        <Card className="w-full shadow-lg">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
+            <div className="mx-auto mb-3 sm:mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
               <LogIn className="h-8 w-8 text-accent" />
             </div>
-            <CardTitle>Login to FeedForward</CardTitle>
-            <CardDescription>
-              Enter your credentials to continue
-            </CardDescription>
+            <CardTitle className="text-2xl sm:text-3xl">Login to FeedForward</CardTitle>
+            <CardDescription>Sign in with your account credentials</CardDescription>
           </CardHeader>
 
           <CardContent>
+            {expiredMessage ? (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {expiredMessage}
+              </div>
+            ) : null}
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
@@ -168,67 +135,72 @@ export default function Login() {
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
-                    name="email"
                     type="email"
                     placeholder="Enter your email"
                     className="pl-10"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    autoCapitalize="none"
-                    spellCheck={false}
                     required
                   />
                 </div>
               </div>
+
               <div className="space-y-2">
-                <Label htmlFor="password">{isOtpMode ? "One-Time Password (OTP)" : "Password"}</Label>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
-                    name="password"
-                    type="password"
-                    placeholder={isOtpMode ? "Enter the OTP sent to your email" : "Enter your password"}
-                    className="pl-10"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    className="pl-10 pr-10"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    autoComplete={isOtpMode ? "one-time-code" : "current-password"}
+                    autoComplete="current-password"
                     required
                   />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
               </div>
+
               <Button
                 type="submit"
                 className="w-full bg-accent hover:bg-accent/90"
                 size="lg"
-                disabled={isLoading}
               >
-                {isLoading ? (isOtpMode ? "Verifying OTP..." : "Logging in...") : (isOtpMode ? "Verify OTP" : "Log In")}
+                Log In
               </Button>
               <div className="text-center">
-                <button
-                  type="button"
+                <Link
+                  href="/forgot-password"
                   className="text-sm text-accent hover:underline font-medium"
-                  onClick={handleForgotPasswordClick}
-                  disabled={isOtpRequestLoading || isLoading}
                 >
-                  {isOtpRequestLoading ? "Sending OTP..." : isOtpMode ? "Resend OTP" : "Forgot Password?"}
-                </button>
+                  Forgot Password?
+                </Link>
               </div>
               <p className="text-center text-sm text-muted-foreground">
                 Don&apos;t have an account?{" "}
                 <Link
                   href="/register"
-                  className="text-accent hover:underline font-medium"
+                  className="font-medium text-accent hover:underline"
                 >
                   Sign up
                 </Link>
               </p>
             </form>
           </CardContent>
-          </Card>
-        </div>
+        </Card>
       </div>
     </div>
   );

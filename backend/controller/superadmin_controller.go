@@ -485,3 +485,149 @@ func SuperAdminDisableAdmin(c *fiber.Ctx) error {
 		Data:    admin,
 	})
 }
+
+func SuperAdminEnableAdmin(c *fiber.Ctx) error {
+	if !superAdminAuth(c) {
+		return c.Status(401).JSON(response.ResponseModel{
+			RetCode: "401",
+			Message: "Unauthorized superadmin access",
+			Data:    errors.ErrorModel{Message: "Invalid or missing superadmin token", IsSuccess: false},
+		})
+	}
+
+	db := middleware.DBConn
+	id := c.Params("id")
+
+	updates := map[string]any{
+		"is_disabled": false,
+		"updated_at":  time.Now().Format(time.RFC3339),
+	}
+
+	result := db.Table("public.admins").Where("id = ?", id).Updates(updates)
+	if result.Error != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to enable admin", IsSuccess: false, Error: result.Error},
+		})
+	}
+
+	if result.RowsAffected == 0 {
+		return c.Status(404).JSON(response.ResponseModel{
+			RetCode: "404",
+			Message: "Admin not found",
+			Data:    errors.ErrorModel{Message: "No admin found with id: " + id, IsSuccess: false},
+		})
+	}
+
+	var admin model.Admin
+	if err := db.Table("public.admins").Where("id = ?", id).First(&admin).Error; err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to load admin after enable", IsSuccess: false, Error: err},
+		})
+	}
+
+	return c.Status(200).JSON(response.ResponseModel{
+		RetCode: "200",
+		Message: "Admin enabled successfully",
+		Data:    admin,
+	})
+}
+
+func SuperAdminReverify(c *fiber.Ctx) error {
+	if !superAdminAuth(c) {
+		return c.Status(401).JSON(response.ResponseModel{
+			RetCode: "401",
+			Message: "Unauthorized superadmin access",
+			Data:    errors.ErrorModel{Message: "Invalid or missing superadmin token", IsSuccess: false},
+		})
+	}
+
+	var req struct {
+		Password string `json:"password"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Invalid request body", IsSuccess: false, Error: err},
+		})
+	}
+
+	password := strings.TrimSpace(req.Password)
+	if password == "" {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Password is required", IsSuccess: false},
+		})
+	}
+
+	sessionID := middleware.GetSessionIDFromCookies(c, middleware.SessionRoleSuperAdmin)
+	if sessionID == "" {
+		return c.Status(401).JSON(response.ResponseModel{
+			RetCode: "401",
+			Message: "Unauthorized superadmin access",
+			Data:    errors.ErrorModel{Message: "Session not found", IsSuccess: false},
+		})
+	}
+
+	session, err := middleware.GetActiveSessionByIDAndRole(sessionID, middleware.SessionRoleSuperAdmin)
+	if err != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to fetch session", IsSuccess: false, Error: err},
+		})
+	}
+	if session == nil || session.AdminID == nil || strings.TrimSpace(*session.AdminID) == "" {
+		return c.Status(401).JSON(response.ResponseModel{
+			RetCode: "401",
+			Message: "Unauthorized superadmin access",
+			Data:    errors.ErrorModel{Message: "Session expired", IsSuccess: false},
+		})
+	}
+
+	adminID := strings.TrimSpace(*session.AdminID)
+	db := middleware.DBConn
+	var admin model.Admin
+	result := db.Table("public.admins").Where("id = ?", adminID).Limit(1).Find(&admin)
+	if result.Error != nil {
+		return c.Status(500).JSON(response.ResponseModel{
+			RetCode: "500",
+			Message: status.RetCode500,
+			Data:    errors.ErrorModel{Message: "Failed to query admin account", IsSuccess: false, Error: result.Error},
+		})
+	}
+	if result.RowsAffected == 0 || !admin.IsSuperAdmin || admin.IsDisabled {
+		return c.Status(401).JSON(response.ResponseModel{
+			RetCode: "401",
+			Message: "Unauthorized superadmin access",
+			Data:    errors.ErrorModel{Message: "Superadmin account not available", IsSuccess: false},
+		})
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(admin.Password), []byte(password)); err != nil {
+		if strings.TrimSpace(admin.Password) != password {
+			return c.Status(401).JSON(response.ResponseModel{
+				RetCode: "401",
+				Message: "Invalid password",
+				Data:    errors.ErrorModel{Message: "Incorrect password", IsSuccess: false},
+			})
+		}
+
+		hashedPassword, hashErr := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if hashErr == nil {
+			_ = db.Table("public.admins").Where("id = ?", admin.ID).Update("password", string(hashedPassword)).Error
+		}
+	}
+
+	middleware.TouchSession(sessionID)
+	return c.Status(200).JSON(response.ResponseModel{
+		RetCode: "200",
+		Message: "Superadmin re-verified",
+		Data:    map[string]any{"verified": true},
+	})
+}
