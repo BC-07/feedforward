@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"FeedForward/backend/middleware"
 	"FeedForward/backend/model"
@@ -55,38 +56,54 @@ func cleanupExpiredResetTokens(now time.Time) {
 	}
 }
 
-func formatOTPDisplay(otp string) string {
-	parts := make([]string, 0, len(otp))
-	for _, char := range otp {
-		parts = append(parts, string(char))
-	}
-	return strings.Join(parts, "&nbsp;&nbsp;&nbsp;")
+func normalizeOTP(raw string) string {
+	clean := strings.Map(func(r rune) rune {
+		if unicode.IsDigit(r) || unicode.IsLetter(r) {
+			return r
+		}
+		return -1
+	}, raw)
+
+	return strings.TrimSpace(clean)
 }
 
 func buildOTPEmailHTML(title string, greetingName string, intro string, buttonText string, buttonURL string, otp string, note string) string {
-	greeting := "Hello,"
+	greeting := "Hello"
 	name := strings.TrimSpace(greetingName)
 	if name != "" {
-		greeting = fmt.Sprintf("Hello %s,", html.EscapeString(name))
+		greeting = fmt.Sprintf("Hello %s", html.EscapeString(name))
 	}
 
 	return fmt.Sprintf(`
 	<div style="background:#f3f4f6;padding:24px;font-family:Arial,Helvetica,sans-serif;">
-	  <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:10px;border:1px solid #e5e7eb;overflow:hidden;">
-	    <div style="padding:26px 24px 22px;text-align:center;">
-	      <div style="font-size:42px;line-height:1;color:#f59e0b;">&#128274;</div>
-	      <div style="margin-top:14px;font-size:32px;font-weight:300;color:#1f2937;">%s</div>
-	      <div style="margin-top:18px;font-size:22px;color:#374151;">%s</div>
-	      <div style="margin-top:8px;font-size:17px;color:#4b5563;line-height:1.5;">%s</div>
+	  <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
+	    <div style="background:#f59e0b;padding:18px 20px;color:#111827;">
+	      <div style="font-size:15px;font-weight:800;letter-spacing:.04em;">FEED FORWARD</div>
+	      <div style="font-size:11px;margin-top:2px;">SMART. FAST. SAFE.</div>
+	    </div>
 
-	      <div style="margin-top:20px;">
-	        <a href="%s" style="display:inline-block;background:#c9474d;color:#ffffff;text-decoration:none;font-size:30px;font-weight:700;padding:16px 38px;border-radius:6px;">%s</a>
+	    <div style="padding:18px 20px;">
+	      <div style="font-size:22px;font-weight:700;color:#111827;">%s</div>
+	      <div style="font-size:13px;color:#4b5563;margin-top:8px;">%s.</div>
+	      <div style="font-size:13px;color:#4b5563;margin-top:8px;line-height:1.6;">%s</div>
+
+	      <table style="width:100%%;margin-top:18px;border-collapse:collapse;">
+	        <tr>
+	          <td style="width:36%%;padding:8px 0;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;">One-time password</td>
+	          <td style="padding:8px 0;font-size:22px;color:#111827;font-weight:800;letter-spacing:.08em;">%s</td>
+	        </tr>
+	        <tr>
+	          <td style="padding:8px 0;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;">Expires</td>
+	          <td style="padding:8px 0;font-size:13px;color:#111827;">5 minutes</td>
+	        </tr>
+	      </table>
+
+	      <div style="margin-top:18px;">
+	        <a href="%s" style="display:inline-block;background:#f59e0b;color:#111827;text-decoration:none;font-size:12px;font-weight:700;padding:10px 14px;border-radius:6px;">%s</a>
 	      </div>
 
-	      <div style="margin-top:26px;font-size:18px;color:#4b5563;line-height:1.5;">Or, copy and paste this OTP in FeedForward.</div>
-	      <div style="margin-top:16px;font-size:42px;font-weight:700;letter-spacing:.32em;color:#111827;">%s</div>
-
-	      <div style="margin-top:24px;font-size:16px;color:#6b7280;line-height:1.5;">%s</div>
+	      <div style="margin-top:16px;font-size:11px;color:#6b7280;">%s</div>
+	      <div style="margin-top:16px;font-size:11px;color:#9ca3af;">Thank you,<br/>FeedForward</div>
 	    </div>
 	  </div>
 	</div>
@@ -94,9 +111,9 @@ func buildOTPEmailHTML(title string, greetingName string, intro string, buttonTe
 		html.EscapeString(title),
 		greeting,
 		html.EscapeString(intro),
+		html.EscapeString(otp),
 		html.EscapeString(buttonURL),
 		html.EscapeString(buttonText),
-		formatOTPDisplay(html.EscapeString(otp)),
 		html.EscapeString(note),
 	)
 }
@@ -192,7 +209,7 @@ func VerifyResetOTP(c *fiber.Ctx) error {
 	}
 
 	email := strings.ToLower(strings.TrimSpace(req.Email))
-	otp := strings.TrimSpace(req.OTP)
+	otp := normalizeOTP(req.OTP)
 
 	if email == "" || otp == "" {
 		return c.Status(400).JSON(response.ResponseModel{

@@ -43,6 +43,7 @@ export default function Login() {
 
     const normalizedEmail = email.trim();
     const normalizedPassword = password.trim();
+    const normalizedOtp = password.replace(/[\s-]/g, "").trim();
     if (!normalizedEmail || !normalizedPassword) {
       toast.error("Email and password are required.");
       return;
@@ -52,7 +53,7 @@ export default function Login() {
 
     if (isOtpMode) {
       try {
-        const res = await verifyResetOTP({ email: normalizedEmail, otp: normalizedPassword });
+        const res = await verifyResetOTP({ email: normalizedEmail, otp: normalizedOtp });
         const user = res.data;
         localStorage.setItem("isUserLoggedIn", "true");
         localStorage.setItem("currentUserId", user.id);

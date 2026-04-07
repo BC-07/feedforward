@@ -214,15 +214,41 @@ func SuperAdminCreateAdmin(c *fiber.Ctx) error {
 
 	setupURL := fmt.Sprintf("%s/dashboard/change-password?token=%s", frontendBase, setupToken)
 	mailBody := fmt.Sprintf(`
-	<div style="font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#111827;">
-	  <h2 style="margin:0 0 10px;">Your FeedForward admin account is ready</h2>
-	  <p style="margin:0 0 8px;">Hello %s,</p>
-	  <p style="margin:0 0 12px;">Your admin account for <strong>%s</strong> has been created.</p>
-	  <p style="margin:0 0 8px;">Temporary password (6 characters):</p>
-	  <div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;font-size:18px;font-weight:700;letter-spacing:.04em;word-break:break-all;">%s</div>
-	  <p style="margin:12px 0 8px;">Use this link to directly set your new password:</p>
-	  <p style="margin:0 0 12px;"><a href="%s" style="display:inline-block;padding:10px 14px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px;">Go to Change Password</a></p>
-	  <p style="margin:0;font-size:12px;color:#6b7280;">This setup link expires in 24 hours.</p>
+	<div style="background:#f3f4f6;padding:24px;font-family:Arial,Helvetica,sans-serif;">
+	  <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;">
+	    <div style="background:#f59e0b;padding:18px 20px;color:#111827;">
+	      <div style="font-size:15px;font-weight:800;letter-spacing:.04em;">FEED FORWARD</div>
+	      <div style="font-size:11px;margin-top:2px;">SMART. FAST. SAFE.</div>
+	    </div>
+
+	    <div style="padding:18px 20px;">
+	      <div style="font-size:22px;font-weight:700;color:#111827;">Admin account created</div>
+	      <div style="font-size:13px;color:#4b5563;margin-top:8px;">Hello %s.</div>
+	      <div style="font-size:13px;color:#4b5563;margin-top:8px;line-height:1.6;">Your admin account is ready. Use the temporary password below, then set your new password.</div>
+
+	      <table style="width:100%%;margin-top:18px;border-collapse:collapse;">
+	        <tr>
+	          <td style="width:36%%;padding:8px 0;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;">Unit</td>
+	          <td style="padding:8px 0;font-size:13px;color:#111827;">%s</td>
+	        </tr>
+	        <tr>
+	          <td style="padding:8px 0;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;">Temporary password</td>
+	          <td style="padding:8px 0;font-size:18px;color:#111827;font-weight:700;letter-spacing:.04em;word-break:break-all;">%s</td>
+	        </tr>
+	        <tr>
+	          <td style="padding:8px 0;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;">Setup link expires</td>
+	          <td style="padding:8px 0;font-size:13px;color:#111827;">24 hours</td>
+	        </tr>
+	      </table>
+
+	      <div style="margin-top:18px;">
+	        <a href="%s" style="display:inline-block;background:#f59e0b;color:#111827;text-decoration:none;font-size:12px;font-weight:700;padding:10px 14px;border-radius:6px;">Go to Change Password</a>
+	      </div>
+
+	      <div style="margin-top:16px;font-size:11px;color:#6b7280;">If you did not expect this email, contact your super admin.</div>
+	      <div style="margin-top:16px;font-size:11px;color:#9ca3af;">Thank you,<br/>FeedForward</div>
+	    </div>
+	  </div>
 	</div>
 	`, strings.TrimSpace(admin.FirstName), strings.TrimSpace(admin.Unit), tempPassword, setupURL)
 

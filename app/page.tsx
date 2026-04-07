@@ -40,6 +40,12 @@ export default function Home() {
                 {isUserLoggedIn ? "Go to Dashboard" : "Login / Sign Up"}
               </Link>
             </div>
+
+            <div className="mt-4 text-center">
+              <Link href="/track" className="text-sm text-gray-700 hover:text-orange-600 transition-colors">
+                Want to track your feedback
+              </Link>
+            </div>
           </div>
         </div>
       </section>

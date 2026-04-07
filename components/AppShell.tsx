@@ -315,17 +315,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </Button>
                   </div>
                 ) : (
-                  <>
-                    <Link href="/track" className="text-sm hover:text-accent transition-colors">
-                      Track Submission
-                    </Link>
-                    <Link
-                      href="/login"
-                      className="text-sm bg-accent text-white px-4 py-2 rounded-lg hover:bg-accent/90 transition-colors"
-                    >
-                      LogIn
-                    </Link>
-                  </>
+                  null
                 )}
               </nav>
             )}
