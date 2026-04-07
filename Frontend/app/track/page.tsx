@@ -470,7 +470,7 @@ export default function TrackFeedback() {
                             className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                           >
                             <div
-                              className={`max-w-[75%] rounded-lg px-4 py-3 text-sm shadow-sm ${
+                              className={`min-w-0 max-w-[75%] rounded-lg px-4 py-3 text-sm shadow-sm ${
                                 isUser
                                   ? "bg-accent text-white"
                                   : "bg-muted text-foreground"
@@ -484,7 +484,7 @@ export default function TrackFeedback() {
                                   </span>
                                 )}
                               </p>
-                              <p className="mt-1 whitespace-pre-wrap">
+                              <p className="mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                                 {entry.message}
                               </p>
                             </div>
