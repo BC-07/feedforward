@@ -1583,7 +1583,7 @@ export default function AdminDashboard() {
                                       <div className="flex items-center gap-2">
                                         <MessageSquare className="h-5 w-5 text-foreground" />
                                         <p className="text-base font-semibold">
-                                          Conversation
+                                          Message
                                         </p>
                                       </div>
                                       <div className="overflow-hidden rounded-lg border border-border bg-white/70">
@@ -1677,7 +1677,6 @@ export default function AdminDashboard() {
                                       </div>
                                       <div className="space-y-2">
                                         <Label className="text-sm font-semibold">
-                                          Send a reply
                                         </Label>
                                         <div className="flex items-center gap-3">
                                           <Input

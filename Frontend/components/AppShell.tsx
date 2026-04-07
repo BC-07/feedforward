@@ -245,6 +245,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [logoutConfirmRole, setLogoutConfirmRole] = useState<LogoutRole | null>(null);
   const [isLogoutPending, setIsLogoutPending] = useState(false);
+  const [isDeleteAccountDialogOpen, setIsDeleteAccountDialogOpen] = useState(false);
+  const [isDeleteAccountPending, setIsDeleteAccountPending] = useState(false);
   const session = useSyncExternalStore(
     subscribeSessionSnapshot,
     getSessionSnapshot,
@@ -627,14 +629,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const handleDeleteUserAccount = async () => {
-    if (!window.confirm("Are you sure you want to delete your account? This cannot be undone.")) return;
+    if (isDeleteAccountPending) return;
+    setIsDeleteAccountPending(true);
     try {
       await deleteUserAccount(userId);
+      setIsDeleteAccountDialogOpen(false);
       await performLogout("user");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete account.",
       );
+    } finally {
+      setIsDeleteAccountPending(false);
     }
   };
 
@@ -1056,6 +1062,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={isDeleteAccountDialogOpen}
+        onOpenChange={(open) => {
+          if (!isDeleteAccountPending) {
+            setIsDeleteAccountDialogOpen(open);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action is permanent and cannot be undone. Your account and related access will be removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleteAccountPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleteAccountPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                void handleDeleteUserAccount();
+              }}
+            >
+              {isDeleteAccountPending ? "Deleting..." : "Delete Account"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Admin Profile Sheet */}
       <Sheet open={isProfileOpen} onOpenChange={setIsProfileOpen}>
         <SheetContent className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl ff-sheet-anim">
@@ -1391,7 +1430,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Button>
 
             <div className="pt-2 border-t pb-6">
-              <Button variant="destructive" className="w-full" onClick={handleDeleteUserAccount}>
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={() => setIsDeleteAccountDialogOpen(true)}
+              >
                 Delete Account
               </Button>
             </div>
