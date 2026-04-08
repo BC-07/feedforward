@@ -35,33 +35,46 @@ interface FormData {
 
 export default function Submit() {
   const router = useRouter();
-  const {
-    value: formData,
-    setValue: setFormData,
-    clear: clearDraft,
-  } = useDraftStorage<FormData>("ff:submitDraft", {
+  const draftKey = "ff:submitDraft";
+  const emptyFormData: FormData = {
     type: "",
     category: "",
     subject: "",
     message: "",
-  });
-  const userEmail =
-    typeof window !== "undefined"
-      ? localStorage.getItem("currentUserEmail") || ""
-      : "";
+  };
+  const {
+    value: formData,
+    setValue: setFormData,
+    clear: clearDraft,
+  } = useDraftStorage<FormData>(draftKey, emptyFormData);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsHydrated(true);
+    if (typeof window !== "undefined") {
+      setUserEmail(localStorage.getItem("currentUserEmail") || "");
+    }
+  }, []);
 
   useEffect(() => {
     void listCategories()
       .then((data) =>
         setCategories(
-          data
-            .map((category) => category.name)
-            .filter((name) => {
-              const normalized = name.toLowerCase();
-              return normalized !== "disabled" && normalized !== "inactive";
-            }),
+          Array.from(
+            new Set(
+              data
+                .map((category) => category.name.trim())
+                .filter((name) => {
+                  if (!name) return false;
+                  const normalized = name.toLowerCase();
+                  return normalized !== "disabled" && normalized !== "inactive";
+                }),
+            ),
+          ),
         ),
       )
       .catch((error) => {
@@ -70,6 +83,25 @@ export default function Submit() {
   }, []);
 
   // Draft storage handled by useDraftStorage.
+
+  const validateForm = () => {
+    if (!formData.type || !formData.category) {
+      toast.error("Please select both a feedback type and a category.");
+      return false;
+    }
+
+    if (!formData.subject.trim() || !formData.message.trim()) {
+      toast.error("Please complete the subject and message fields.");
+      return false;
+    }
+
+    if (!categories.includes(formData.category)) {
+      toast.error("Please choose a valid active category.");
+      return false;
+    }
+
+    return true;
+  };
 
   const copyToClipboard = (text: string) => {
     const textArea = document.createElement("textarea");
@@ -92,7 +124,21 @@ export default function Submit() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    if (!validateForm()) {
+      return;
+    }
+
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
+    const trimmedFormData = {
+      ...formData,
+      category: formData.category.trim(),
+      subject: formData.subject.trim(),
+      message: formData.message.trim(),
+    };
+    const latestUserEmail =
+      typeof window !== "undefined"
+        ? localStorage.getItem("currentUserEmail") || ""
+        : "";
 
     try {
       const userId =
@@ -106,19 +152,20 @@ export default function Submit() {
 
       await createFeedback({
         id: newTrackingId,
-        ...formData,
+        ...trimmedFormData,
         userId,
         userName,
-        userEmail: userEmail || undefined,
+        userEmail: latestUserEmail || undefined,
         status: "Pending",
         priority: "Medium",
         isAnonymous: true,
         response: "",
       });
 
+      setUserEmail(latestUserEmail);
       setTrackingId(newTrackingId);
       toast.success("Feedback submitted successfully!");
-      setFormData({ type: "", category: "", subject: "", message: "" });
+      setFormData(emptyFormData);
       clearDraft();
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(draftKey);
@@ -135,9 +182,7 @@ export default function Submit() {
         router.push("/login");
         return;
       }
-      toast.error(
-        message,
-      );
+      toast.error(message);
     }
   };
 
@@ -225,14 +270,15 @@ export default function Submit() {
             <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="type">Feedback Type *</Label>
-                <Select
-                  value={formData.type}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, type: value })
-                  }
-                  required
-                >
-                  <SelectTrigger id="type">
+                {isHydrated ? (
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, type: value })
+                    }
+                    required
+                  >
+                    <SelectTrigger id="type">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -243,28 +289,41 @@ export default function Submit() {
                       <SelectItem value="compliment">Compliment</SelectItem>
                     </SelectContent>
                   </Select>
+                ) : (
+                  <div
+                    className="h-10 rounded-md border bg-muted/30"
+                    aria-hidden="true"
+                  />
+                )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="category">Category *</Label>
-                <Select
-                  value={formData.category}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, category: value })
-                  }
-                  required
-                >
-                  <SelectTrigger id="category">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category}>
-                        {category}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isHydrated ? (
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) =>
+                      setFormData({ ...formData, category: value })
+                    }
+                    required
+                  >
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div
+                    className="h-10 rounded-md border bg-muted/30"
+                    aria-hidden="true"
+                  />
+                )}
               </div>
 
               <div className="space-y-2">
