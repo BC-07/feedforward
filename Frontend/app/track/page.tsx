@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  createFeedbackMessage,
+  createFeedbackMessagePublic,
   getFeedback,
   listFeedbackMessages,
   type Feedback,
@@ -90,18 +90,9 @@ export default function TrackFeedback() {
       return;
     }
 
-    if (typeof window !== "undefined") {
-      const isLoggedIn =
-        localStorage.getItem("isUserLoggedIn") === "true";
-      const currentUserId = localStorage.getItem("currentUserId") || "";
-      const feedbackUserId = feedback.userId || "";
-      const canReplyLoggedIn =
-        Boolean(isLoggedIn && feedbackUserId && currentUserId) &&
-        feedbackUserId === currentUserId;
-      const canReplyAnonymous =
-        feedback.isAnonymous || !feedbackUserId;
-      setCanReply(canReplyLoggedIn || canReplyAnonymous);
-    }
+    // Track page is intentionally "ID-based": anyone with a valid tracking ID
+    // can continue the conversation, even without an active account session.
+    setCanReply(true);
 
     setIsLoadingMessages(true);
     listFeedbackMessages(feedback.id)
@@ -210,7 +201,7 @@ export default function TrackFeedback() {
     }
     setIsSendingMessage(true);
     try {
-      const created = await createFeedbackMessage(feedback.id, {
+      const created = await createFeedbackMessagePublic(feedback.id, {
         message: trimmed,
       });
       setMessages((prev) => [...prev, created]);
@@ -253,7 +244,7 @@ export default function TrackFeedback() {
 
   return (
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
-      <div className="container mx-auto max-w-3xl">
+      <div className="container mx-auto max-w-4xl">
         <div className="text-center mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3">Track Your Submission</h1>
           <p className="text-muted-foreground">
@@ -309,107 +300,112 @@ export default function TrackFeedback() {
 
         {feedback && (
           <div className="space-y-6">
-            {/* Status Card */}
-            <Card className="shadow-lg">
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between mb-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-1">
-                      Status: <span className="uppercase">{feedback.status}</span>
-                    </h3>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              {/* Status Card */}
+              <Card className="shadow-lg lg:col-span-6">
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between mb-6">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-1">
+                        Status: <span className="uppercase">{feedback.status}</span>
+                      </h3>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex items-start gap-3 mb-8 p-4 bg-muted/50 rounded-lg">
-                  {(() => {
-                    const StatusMessageIcon = getStatusIcon(feedback.status);
-                    return (
-                      <StatusMessageIcon
-                        className={`h-5 w-5 mt-0.5 flex-shrink-0 ${getStatusIconTone(
-                          feedback.status,
-                        )}`}
-                      />
-                    );
-                  })()}
-                  <p className="text-sm">{getStatusMessage(feedback.status)}</p>
-                </div>
-
-                {/* Status Timeline */}
-                <div className="space-y-4">
-                  {getStatusSteps(feedback.status).map((step, index) => (
-                    <div key={index} className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div
-                          className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                            step.completed ? "bg-green-500/20" : "bg-gray-200"
-                          }`}
-                        >
-                          {step.completed ? (
-                            <CheckCircle className="h-5 w-5 text-green-700" />
-                          ) : (
-                            <Circle className="h-5 w-5 text-gray-400" />
+                  {/* Status Timeline */}
+                  <div className="space-y-4">
+                    {getStatusSteps(feedback.status).map((step, index) => (
+                      <div key={index} className="flex gap-4">
+                        <div className="flex flex-col items-center">
+                          <div
+                            className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                              step.completed ? "bg-green-500/20" : "bg-gray-200"
+                            }`}
+                          >
+                            {step.completed ? (
+                              <CheckCircle className="h-5 w-5 text-green-700" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-gray-400" />
+                            )}
+                          </div>
+                          {index < getStatusSteps(feedback.status).length - 1 && (
+                            <div className="h-12 w-px bg-border"></div>
                           )}
                         </div>
-                        {index < getStatusSteps(feedback.status).length - 1 && (
-                          <div className="h-12 w-px bg-border"></div>
-                        )}
+                        <div className="pb-4 flex-1">
+                          <p className="font-semibold">{step.name}</p>
+                          {step.name === "Submitted" && (
+                            <p className="text-sm text-muted-foreground">
+                              {formatDate(feedback.createdAt)}
+                            </p>
+                          )}
+                          {step.description && (
+                            <p className="text-sm text-muted-foreground">{step.description}</p>
+                          )}
+                        </div>
                       </div>
-                      <div className="pb-4 flex-1">
-                        <p className="font-semibold">{step.name}</p>
-                        {step.name === "Submitted" && (
-                          <p className="text-sm text-muted-foreground">
-                            {formatDate(feedback.createdAt)}
-                          </p>
-                        )}
-                        {step.description && (
-                          <p className="text-sm text-muted-foreground">{step.description}</p>
-                        )}
+                    ))}
+                  </div>
+
+                  <div className="mt-6 flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
+                    {(() => {
+                      const StatusMessageIcon = getStatusIcon(feedback.status);
+                      return (
+                        <StatusMessageIcon
+                          className={`h-5 w-5 mt-0.5 flex-shrink-0 ${getStatusIconTone(
+                            feedback.status,
+                          )}`}
+                        />
+                      );
+                    })()}
+                    <p className="text-sm">{getStatusMessage(feedback.status)}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Feedback Details Card */}
+              <Card className="shadow-lg lg:col-span-6">
+                <CardHeader>
+                  <CardTitle>Your Feedback Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="mx-auto w-full max-w-xl space-y-4">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="text-sm font-semibold text-muted-foreground">Type</p>
+                        <p className="mt-1 text-base font-medium capitalize">{feedback.type}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-muted-foreground">Category</p>
+                        <p className="mt-1 text-base font-medium">{feedback.category}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-muted-foreground">Priority</p>
+                        <p className={`mt-1 text-base font-medium capitalize ${getPriorityColor(feedback.priority)}`}>
+                          {feedback.priority}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-muted-foreground">Last Updated</p>
+                        <p className="mt-1 text-base font-medium">{formatDate(feedback.updatedAt)}</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
 
-            {/* Feedback Details Card */}
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle>Your Feedback Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Type</p>
-                  <p className="capitalize">{feedback.type}</p>
-                </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-muted-foreground">Subject</p>
+                      <p className="text-base font-semibold break-words">{feedback.subject}</p>
+                    </div>
 
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Category</p>
-                  <p>{feedback.category}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Priority</p>
-                  <p className={`capitalize ${getPriorityColor(feedback.priority)}`}>
-                    {feedback.priority}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Subject</p>
-                  <p className="font-semibold">{feedback.subject}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Message</p>
-                  <p className="text-sm leading-relaxed">{feedback.message}</p>
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-muted-foreground mb-1">Last Updated</p>
-                  <p className="text-sm">{formatDate(feedback.updatedAt)}</p>
-                </div>
-              </CardContent>
-            </Card>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-muted-foreground">Message</p>
+                      <p className="text-sm leading-relaxed break-words">
+                        {feedback.message}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Conversation */}
             <Card className="shadow-lg bg-muted/40 border-border">
@@ -474,7 +470,7 @@ export default function TrackFeedback() {
                             className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                           >
                             <div
-                              className={`max-w-[75%] rounded-lg px-4 py-3 text-sm shadow-sm ${
+                              className={`min-w-0 max-w-[75%] rounded-lg px-4 py-3 text-sm shadow-sm ${
                                 isUser
                                   ? "bg-accent text-white"
                                   : "bg-muted text-foreground"
@@ -488,7 +484,7 @@ export default function TrackFeedback() {
                                   </span>
                                 )}
                               </p>
-                              <p className="mt-1 whitespace-pre-wrap">
+                              <p className="mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                                 {entry.message}
                               </p>
                             </div>
@@ -549,4 +545,3 @@ export default function TrackFeedback() {
     </div>
   );
 }
-

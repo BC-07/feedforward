@@ -1,4 +1,3 @@
-word,severity
 idiot,offensive
 stupid,offensive
 dumb,warning
@@ -6,39 +5,26 @@ moron,offensive
 fool,warning
 loser,warning
 trash,warning
-useless,offensive
 pathetic,offensive
 annoying,warning
 lame,warning
 jerk,warning
-nonsense,warning
 shut up,warning
 hate,warning
-rude,warning
 disgusting,offensive
 worthless,offensive
 ignorant,warning
 clown,warning
-weird,warning
-lazy,warning
 crazy,warning
-toxic,warning
-garbage,offensive
-sucks,warning
-terrible,warning
-awful,warning
-horrible,warning
+garbage, warning
 stupidest,offensive
 dumbest,offensive
 idiotic,offensive
 foolish,warning
-nasty,warning
 mean,warning
 ugly,offensive
 ridiculous,warning
 absurd,warning
-failure,offensive
-weak,warning
 bobo,offensive
 tanga,offensive
 gago,offensive
@@ -209,6 +195,7 @@ go to hell,offensive
 screw you,offensive
 screw off,offensive
 kiss my,offensive
+bitch, offensive
 bite me,offensive
 shove it,offensive
 up yours,offensive
@@ -220,7 +207,6 @@ dream on,warning
 keep dreaming,warning
 fat chance,warning
 no way loser,warning
-as if,warning
 whatever loser,warning
 cry about it,warning
 go cry,warning
@@ -273,7 +259,6 @@ wimp,warning
 wuss,warning
 pushover,warning
 doormat,warning
-follower,warning
 sheep,warning
 lemming,warning
 conformist,warning
@@ -334,7 +319,6 @@ thorn,warning
 eyesore,warning
 embarrassment,offensive
 disgrace,offensive
-shame,offensive
 humiliation,offensive
 abomination,offensive
 abhorrent,offensive
@@ -673,12 +657,8 @@ chronic loser,offensive
 serial failure,offensive
 perpetual screw-up,offensive
 constant embarrassment,offensive
-always wrong,offensive
-never right,offensive
 always the problem,offensive
 never the solution,offensive
-part of the problem,warning
-making things worse,warning
 ruining everything,offensive
 destroying everything,offensive
 messing everything up,offensive
@@ -734,9 +714,6 @@ bad to the bone,offensive
 evil inside,warning
 dark inside,warning
 rotten inside,offensive
-hollow inside,warning
-empty inside,warning
-nothing inside,warning
 no substance,warning
 no depth,warning
 no intelligence,offensive
@@ -754,7 +731,6 @@ no future,offensive
 no prospects,offensive
 no hope,offensive
 no chance,offensive
-zero chance,offensive
 slim to none,warning
 not a shot,warning
 not a hope,offensive
@@ -1046,14 +1022,8 @@ negligible person,offensive
 trivial person,offensive
 unimportant person,offensive
 invisible loser,offensive
-nonentity,offensive
-zero,offensive
 cipher,offensive
-null,offensive
 void,offensive
-blank,warning
-empty,warning
-hollow,warning
 vapid,warning
 vacuous,offensive
 inane,warning
@@ -1069,16 +1039,9 @@ wearisome,warning
 humdrum,warning
 pedestrian,warning
 mediocre,warning
-subpar,warning
-substandard,warning
-below par,warning
-not up to par,warning
 not good enough,warning
 never good enough,offensive
 will never be good enough,offensive
 always falling short,offensive
 perpetually inadequate,offensive
 chronically insufficient,offensive
-consistently subpar,offensive
-reliably mediocre,offensive
-dependably awful,offensive

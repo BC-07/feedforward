@@ -1,9 +1,6 @@
 {
   "task.allowAutomaticTasks": "on",
   "task.autoDetect": "off",
-  "tasks.runOnStartup": [
-    {
-      "task": "dev:all"
-    }
-  ]
+  "terminal.integrated.enablePersistentSessions": true,
+  "terminal.integrated.persistentSessionReviveProcess": "onExitAndWindowClose"
 }

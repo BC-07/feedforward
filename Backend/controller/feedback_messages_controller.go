@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"intern_template_v1/middleware"
 	"intern_template_v1/model"
 	"strings"
@@ -70,84 +71,93 @@ func CreateFeedbackMessage(c *fiber.Ctx) error {
 	senderName := ""
 
 	if sessionID == "" {
-		if feedback.UserID != nil && strings.TrimSpace(*feedback.UserID) != "" && !feedback.IsAnonymous {
-			return unauthorized(c, "session is required to reply to this feedback")
-		}
+		// Track page supports ID-based follow-up messages even without an
+		// authenticated session.
 		senderName = "Anonymous"
 	} else {
 		session, err := loadMessageSession(c)
 		if err != nil {
-			return err
+			var fiberErr *fiber.Error
+			// If the browser has a stale/expired cookie, gracefully fall back
+			// to tracking-ID based anonymous reply instead of hard failing.
+			if errors.As(err, &fiberErr) && (fiberErr.Code == fiber.StatusUnauthorized || fiberErr.Code == fiber.StatusForbidden) {
+				clearSessionCookie(c)
+				senderName = "Anonymous"
+			} else {
+				return err
+			}
 		}
-		senderRole = session.Role
+		if senderName == "" {
+			senderRole = session.Role
 
-		switch session.Role {
-		case sessionRoleUser:
-			if feedback.UserID == nil || strings.TrimSpace(*feedback.UserID) == "" {
-				return unauthorized(c, "feedback ownership is required")
-			}
-			if session.UserID == nil || strings.TrimSpace(*session.UserID) != strings.TrimSpace(*feedback.UserID) {
-				return unauthorized(c, "you can only reply to your own feedback")
-			}
-			senderID = session.UserID
-			user, err := fetchUserByID(strings.TrimSpace(*session.UserID))
-			if err != nil {
-				return serverError(c, "failed to load user", err)
-			}
-			senderName = strings.TrimSpace(user.FirstName)
-			if senderName == "" {
-				senderName = strings.TrimSpace(user.Name)
-			}
-			if senderName == "" {
-				senderName = "User"
-			}
-		case sessionRoleAdmin:
-			if session.AdminID == nil || strings.TrimSpace(*session.AdminID) == "" {
-				return unauthorized(c, "invalid admin session")
-			}
-			senderID = session.AdminID
-			admin, err := fetchAdminByID(strings.TrimSpace(*session.AdminID))
-			if err != nil {
-				return serverError(c, "failed to load admin", err)
-			}
-			if admin.ID == "" {
-				return unauthorized(c, "invalid admin session")
-			}
-			if admin.IsDisabled {
-				return unauthorized(c, "admin account is disabled")
-			}
-			if !strings.EqualFold(strings.TrimSpace(admin.Unit), strings.TrimSpace(feedback.Category)) {
-				return unauthorized(c, "admin is not assigned to this feedback category")
-			}
-			senderName = strings.TrimSpace(admin.FirstName)
-			if senderName == "" {
-				senderName = strings.TrimSpace(admin.Name)
-			}
-			if senderName == "" {
-				senderName = "Admin"
-			}
-		case sessionRoleSuperAdmin:
-			senderID = session.AdminID
-			if session.AdminID != nil && strings.TrimSpace(*session.AdminID) != "" {
+			switch session.Role {
+			case sessionRoleUser:
+				if feedback.UserID == nil || strings.TrimSpace(*feedback.UserID) == "" {
+					return unauthorized(c, "feedback ownership is required")
+				}
+				if session.UserID == nil || strings.TrimSpace(*session.UserID) != strings.TrimSpace(*feedback.UserID) {
+					return unauthorized(c, "you can only reply to your own feedback")
+				}
+				senderID = session.UserID
+				user, err := fetchUserByID(strings.TrimSpace(*session.UserID))
+				if err != nil {
+					return serverError(c, "failed to load user", err)
+				}
+				senderName = strings.TrimSpace(user.FirstName)
+				if senderName == "" {
+					senderName = strings.TrimSpace(user.Name)
+				}
+				if senderName == "" {
+					senderName = "User"
+				}
+			case sessionRoleAdmin:
+				if session.AdminID == nil || strings.TrimSpace(*session.AdminID) == "" {
+					return unauthorized(c, "invalid admin session")
+				}
+				senderID = session.AdminID
 				admin, err := fetchAdminByID(strings.TrimSpace(*session.AdminID))
 				if err != nil {
-					return serverError(c, "failed to load superadmin", err)
+					return serverError(c, "failed to load admin", err)
 				}
-				if admin.ID != "" {
-					senderName = strings.TrimSpace(admin.FirstName)
-					if senderName == "" {
-						senderName = strings.TrimSpace(admin.Name)
+				if admin.ID == "" {
+					return unauthorized(c, "invalid admin session")
+				}
+				if admin.IsDisabled {
+					return unauthorized(c, "admin account is disabled")
+				}
+				if !strings.EqualFold(strings.TrimSpace(admin.Unit), strings.TrimSpace(feedback.Category)) {
+					return unauthorized(c, "admin is not assigned to this feedback category")
+				}
+				senderName = strings.TrimSpace(admin.FirstName)
+				if senderName == "" {
+					senderName = strings.TrimSpace(admin.Name)
+				}
+				if senderName == "" {
+					senderName = "Admin"
+				}
+			case sessionRoleSuperAdmin:
+				senderID = session.AdminID
+				if session.AdminID != nil && strings.TrimSpace(*session.AdminID) != "" {
+					admin, err := fetchAdminByID(strings.TrimSpace(*session.AdminID))
+					if err != nil {
+						return serverError(c, "failed to load superadmin", err)
+					}
+					if admin.ID != "" {
+						senderName = strings.TrimSpace(admin.FirstName)
+						if senderName == "" {
+							senderName = strings.TrimSpace(admin.Name)
+						}
 					}
 				}
+				if senderName == "" && session.SuperAdminUsername != nil {
+					senderName = strings.TrimSpace(*session.SuperAdminUsername)
+				}
+				if senderName == "" {
+					senderName = "Superadmin"
+				}
+			default:
+				return unauthorized(c, "invalid session")
 			}
-			if senderName == "" && session.SuperAdminUsername != nil {
-				senderName = strings.TrimSpace(*session.SuperAdminUsername)
-			}
-			if senderName == "" {
-				senderName = "Superadmin"
-			}
-		default:
-			return unauthorized(c, "invalid session")
 		}
 	}
 

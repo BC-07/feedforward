@@ -219,6 +219,30 @@ export async function createFeedbackMessage(
   );
 }
 
+export async function createFeedbackMessagePublic(
+  feedbackId: string,
+  payload: { message: string },
+): Promise<FeedbackMessage> {
+  const response = await fetch(
+    `${API_BASE_URL}/feedbacks/${encodeURIComponent(feedbackId)}/messages`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "omit",
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const payloadResponse = (await response.json()) as ApiResponse<FeedbackMessage>;
+  if (!response.ok) {
+    throw new Error(payloadResponse?.message || "Request failed");
+  }
+
+  return payloadResponse.data;
+}
+
 export async function registerUser(payload: {
   firstName: string;
   lastName: string;

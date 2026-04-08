@@ -59,8 +59,8 @@ import {
   Circle,
   Wrench,
   MessageCircle,
-  ChevronLeft,
   X,
+  Copy,
 } from "lucide-react";
 
 export default function UserProfile() {
@@ -561,9 +561,35 @@ export default function UserProfile() {
     <>
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
       {trackingId && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-8 animate-in fade-in-0">
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-8 animate-in fade-in-0"
+          onClick={() => {
+            setTrackingId(null);
+            setSelectedFeedback(null);
+            setTimeout(() => {
+              restoreSubmissionsScroll(true);
+            }, 200);
+          }}
+        >
           <div className="w-full max-w-lg -translate-y-[10%]">
-            <Card className="shadow-lg animate-in zoom-in-95 fade-in-0">
+            <Card
+              className="relative shadow-lg animate-in zoom-in-95 fade-in-0"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Close"
+                onClick={() => {
+                  setTrackingId(null);
+                  setSelectedFeedback(null);
+                  setTimeout(() => {
+                    restoreSubmissionsScroll(true);
+                  }, 200);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </button>
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
                   <ArrowRight className="h-8 w-8 text-accent" />
@@ -574,13 +600,22 @@ export default function UserProfile() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="bg-muted rounded-lg p-4 text-center">
+                <div className="w-full bg-muted rounded-lg p-4 text-center relative">
                   <p className="text-sm text-muted-foreground mb-2">
                     Your Tracking ID
                   </p>
                   <p className="text-2xl font-bold text-primary">
                     {trackingId}
                   </p>
+                  <button
+                    type="button"
+                    className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-white/80 text-muted-foreground hover:bg-white hover:text-foreground"
+                    onClick={() => copyToClipboard(trackingId)}
+                    aria-label="Copy tracking ID"
+                    title="Copy tracking ID"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
                 </div>
                 <p className="text-sm text-muted-foreground text-center">
                   Please save this tracking ID to check the status of your
@@ -591,27 +626,6 @@ export default function UserProfile() {
                     A copy of this tracking ID was sent to {currentUser.email}.
                   </p>
                 )}
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => copyToClipboard(trackingId)}
-                  >
-                    Copy ID
-                  </Button>
-                  <Button
-                    className="flex-1 bg-accent hover:bg-accent/90"
-                    onClick={() => {
-                      setTrackingId(null);
-                      setSelectedFeedback(null);
-                      setTimeout(() => {
-                        restoreSubmissionsScroll(true);
-                      }, 200);
-                    }}
-                  >
-                    Back to Dashboard
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           </div>
@@ -961,27 +975,37 @@ export default function UserProfile() {
             style={leftColumnHeight ? { height: leftColumnHeight } : undefined}
           >
             {selectedFeedback ? (
-              <Card className="shadow-lg h-full min-h-0 flex flex-col overflow-hidden">
-                <CardHeader className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <CardTitle>Feedback Details</CardTitle>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedFeedback(null);
-                        setSearchTrackingId("");
-                      }}
-                    >
-                      <ChevronLeft className="mr-1 h-4 w-4" />
-                      Back to My Submissions
-                    </Button>
-                  </div>
-                  <CardDescription className="font-mono">
-                    {selectedFeedback.id}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6 flex-1 min-h-0 overflow-y-auto">
-                  <Card className="shadow-lg">
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <button
+                  type="button"
+                  aria-label="Close feedback details"
+                  className="ff-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+                  onClick={() => {
+                    setSelectedFeedback(null);
+                    setSearchTrackingId("");
+                  }}
+                />
+                <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
+                  <CardHeader className="space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <CardTitle>Feedback Details</CardTitle>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedFeedback(null);
+                          setSearchTrackingId("");
+                        }}
+                      >
+                        Close
+                      </Button>
+                    </div>
+                    <CardDescription className="font-mono">
+                      {selectedFeedback.id}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-6">
+                  <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+                  <Card className="shadow-lg xl:col-span-6">
                     <CardContent className="pt-6">
                       <div className="flex items-start justify-between mb-6">
                         <h3 className="text-lg font-semibold mb-1">
@@ -1071,32 +1095,42 @@ export default function UserProfile() {
                     </CardContent>
                   </Card>
 
-                  <Card className="shadow-lg">
+                  <Card className="shadow-lg xl:col-span-6">
                     <CardHeader>
                       <CardTitle>Feedback Details</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground mb-1">
-                          Type
-                        </p>
-                        <p className="capitalize">{selectedFeedback.type}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground mb-1">
-                          Category
-                        </p>
-                        <p>{selectedFeedback.category}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground mb-1">
-                          Priority
-                        </p>
-                        <p
-                          className={`capitalize ${getPriorityColor(selectedFeedback.priority)}`}
-                        >
-                          {selectedFeedback.priority}
-                        </p>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground mb-1">
+                            Type
+                          </p>
+                          <p className="capitalize">{selectedFeedback.type}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground mb-1">
+                            Category
+                          </p>
+                          <p>{selectedFeedback.category}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground mb-1">
+                            Priority
+                          </p>
+                          <p
+                            className={`capitalize ${getPriorityColor(selectedFeedback.priority)}`}
+                          >
+                            {selectedFeedback.priority}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-muted-foreground mb-1">
+                            Last Updated
+                          </p>
+                          <p className="text-sm">
+                            {formatDate(selectedFeedback.updatedAt)}
+                          </p>
+                        </div>
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-muted-foreground mb-1">
@@ -1110,20 +1144,13 @@ export default function UserProfile() {
                         <p className="text-sm font-semibold text-muted-foreground mb-1">
                           Message
                         </p>
-                        <p className="text-sm leading-relaxed break-all">
+                        <p className="text-sm leading-relaxed break-words">
                           {selectedFeedback.message}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground mb-1">
-                          Last Updated
-                        </p>
-                        <p className="text-sm">
-                          {formatDate(selectedFeedback.updatedAt)}
                         </p>
                       </div>
                     </CardContent>
                   </Card>
+                  </div>
 
                   <Card className="shadow-lg bg-muted/40 border-border">
                     <CardHeader>
@@ -1237,8 +1264,9 @@ export default function UserProfile() {
                       </div>
                     </CardContent>
                   </Card>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </div>
             ) : feedbacks.length > 0 ? (
               <Card className="shadow-lg h-full min-h-0 flex flex-col overflow-hidden">
                 <CardHeader>
