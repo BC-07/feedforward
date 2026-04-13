@@ -32,17 +32,6 @@ const renderStatusIcon = (status: string, className: string) => {
   }
 };
 
-const getStatusIndicatorClass = (status: string) => {
-  switch (status.trim().toLowerCase()) {
-    case "resolved":
-      return "border-green-400 bg-green-500/10 text-green-700";
-    case "in progress":
-      return "border-orange-400 bg-orange-500/10 text-orange-700";
-    default:
-      return "border-yellow-400 bg-yellow-500/10 text-yellow-700";
-  }
-};
-
 const getStatusMessage = (status: string) => {
   switch (status.trim().toLowerCase()) {
     case "resolved":
@@ -83,7 +72,6 @@ export function FeedbackStatusCard({
   className,
 }: FeedbackStatusCardProps) {
   const steps = getStatusSteps(feedback.status);
-  const isPending = feedback.status.trim().toLowerCase() === "pending";
 
   return (
     <Card className={["shadow-lg", className].filter(Boolean).join(" ")}>
@@ -92,17 +80,6 @@ export function FeedbackStatusCard({
           <h3 className="mb-1 text-lg font-semibold">
             Status: <span className="uppercase">{feedback.status}</span>
           </h3>
-          {!isPending && (
-            <span
-              aria-label={feedback.status}
-              title={feedback.status}
-              className={`inline-flex h-8 w-8 items-center justify-center rounded-full border shadow-sm ${getStatusIndicatorClass(
-                feedback.status,
-              )}`}
-            >
-              {renderStatusIcon(feedback.status, "h-[18px] w-[18px]")}
-            </span>
-          )}
         </div>
 
         <div className="space-y-4">

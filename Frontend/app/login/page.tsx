@@ -23,14 +23,23 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [expiredMessage] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem("sessionExpiredMessage") || "";
-  });
+  const [isMounted, setIsMounted] = useState(false);
+  const [expiredMessage, setExpiredMessage] = useState("");
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const storedMessage = localStorage.getItem("sessionExpiredMessage") || "";
+    if (storedMessage) {
+      setExpiredMessage(storedMessage);
+      localStorage.removeItem("sessionExpiredMessage");
+    }
+  }, []);
 
   useEffect(() => {
     if (expiredMessage) {
-      localStorage.removeItem("sessionExpiredMessage");
       toast.error(expiredMessage);
     }
   }, [expiredMessage]);
@@ -123,7 +132,7 @@ export default function Login() {
           </CardHeader>
 
           <CardContent>
-            {expiredMessage ? (
+            {isMounted && expiredMessage ? (
               <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 {expiredMessage}
               </div>

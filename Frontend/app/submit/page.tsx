@@ -22,7 +22,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowRight, Copy, Send } from "lucide-react";
+import { ArrowRight, Send } from "lucide-react";
 import { useDraftStorage } from "@/lib/useDraftStorage";
 import { toastApiError } from "@/lib/errorHandling";
 
@@ -101,24 +101,6 @@ export default function Submit() {
     }
 
     return true;
-  };
-
-  const copyToClipboard = (text: string) => {
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    textArea.style.position = "fixed";
-    textArea.style.left = "-999999px";
-    textArea.style.top = "-999999px";
-    document.body.appendChild(textArea);
-    textArea.focus();
-    textArea.select();
-    try {
-      document.execCommand("copy");
-      toast.success("Tracking ID copied!");
-    } catch {
-      toast.error("Failed to copy. Please copy manually.");
-    }
-    document.body.removeChild(textArea);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -202,15 +184,6 @@ export default function Submit() {
                 Your Tracking ID
               </p>
               <p className="text-2xl font-bold text-primary">{trackingId}</p>
-              <button
-                type="button"
-                className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-white/80 text-muted-foreground hover:bg-white hover:text-foreground"
-                onClick={() => copyToClipboard(trackingId)}
-                aria-label="Copy tracking ID"
-                title="Copy tracking ID"
-              >
-                <Copy className="h-4 w-4" />
-              </button>
             </div>
             <p className="text-sm text-muted-foreground text-center">
               Please save this tracking ID to check the status of your
