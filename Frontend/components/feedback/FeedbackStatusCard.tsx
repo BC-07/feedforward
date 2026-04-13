@@ -1,0 +1,152 @@
+"use client";
+
+import { Card, CardContent } from "@/components/ui/card";
+import type { Feedback } from "@/lib/api";
+import { CheckCircle, Circle, Clock, Wrench } from "lucide-react";
+
+type FeedbackStatusCardProps = {
+  feedback: Feedback;
+  formatDate: (value: string) => string;
+  className?: string;
+};
+
+const getStatusIconTone = (status: string) => {
+  switch (status.trim().toLowerCase()) {
+    case "resolved":
+      return "text-green-700";
+    case "in progress":
+      return "text-orange-700";
+    default:
+      return "text-orange-700";
+  }
+};
+
+const renderStatusIcon = (status: string, className: string) => {
+  switch (status.trim().toLowerCase()) {
+    case "resolved":
+      return <CheckCircle className={className} />;
+    case "in progress":
+      return <Wrench className={className} />;
+    default:
+      return <Clock className={className} />;
+  }
+};
+
+const getStatusIndicatorClass = (status: string) => {
+  switch (status.trim().toLowerCase()) {
+    case "resolved":
+      return "border-green-400 bg-green-500/10 text-green-700";
+    case "in progress":
+      return "border-orange-400 bg-orange-500/10 text-orange-700";
+    default:
+      return "border-yellow-400 bg-yellow-500/10 text-yellow-700";
+  }
+};
+
+const getStatusMessage = (status: string) => {
+  switch (status.trim().toLowerCase()) {
+    case "resolved":
+      return "Your feedback has been addressed and resolved.";
+    case "in progress":
+      return "We are actively working on addressing your feedback.";
+    default:
+      return "Your feedback has been received and is awaiting review.";
+  }
+};
+
+const getStatusSteps = (currentStatus: string) => {
+  const order = ["pending", "in progress", "resolved"];
+  const normalized = currentStatus.trim().toLowerCase();
+  const currentIndex = order.indexOf(normalized);
+  return [
+    {
+      name: "Submitted",
+      completed: true,
+      description: "",
+    },
+    {
+      name: "In Progress",
+      completed: currentIndex >= 1,
+      description: "Actions being taken",
+    },
+    {
+      name: "Resolved",
+      completed: currentIndex >= 2,
+      description: "Issue addressed",
+    },
+  ];
+};
+
+export function FeedbackStatusCard({
+  feedback,
+  formatDate,
+  className,
+}: FeedbackStatusCardProps) {
+  const steps = getStatusSteps(feedback.status);
+  const isPending = feedback.status.trim().toLowerCase() === "pending";
+
+  return (
+    <Card className={["shadow-lg", className].filter(Boolean).join(" ")}>
+      <CardContent className="pt-6">
+        <div className="mb-6 flex items-start justify-between">
+          <h3 className="mb-1 text-lg font-semibold">
+            Status: <span className="uppercase">{feedback.status}</span>
+          </h3>
+          {!isPending && (
+            <span
+              aria-label={feedback.status}
+              title={feedback.status}
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-full border shadow-sm ${getStatusIndicatorClass(
+                feedback.status,
+              )}`}
+            >
+              {renderStatusIcon(feedback.status, "h-[18px] w-[18px]")}
+            </span>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          {steps.map((step, index) => (
+            <div key={index} className="flex gap-4">
+              <div className="flex flex-col items-center">
+                <div
+                  className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    step.completed ? "bg-green-500/20" : "bg-gray-200"
+                  }`}
+                >
+                  {step.completed ? (
+                    <CheckCircle className="h-5 w-5 text-green-700" />
+                  ) : (
+                    <Circle className="h-5 w-5 text-gray-400" />
+                  )}
+                </div>
+                {index < steps.length - 1 && <div className="h-16 w-px bg-border"></div>}
+              </div>
+              <div className="pb-4 flex-1">
+                <p className="font-semibold">{step.name}</p>
+                {step.name === "Submitted" && (
+                  <p className="text-sm text-muted-foreground">
+                    {formatDate(feedback.createdAt)}
+                  </p>
+                )}
+                {step.description && (
+                  <p className="text-sm text-muted-foreground">{step.description}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 flex items-start gap-3 rounded-lg bg-muted/50 p-4">
+          {renderStatusIcon(
+            feedback.status,
+            `mt-0.5 h-5 w-5 flex-shrink-0 ${getStatusIconTone(
+              feedback.status,
+            )}`,
+          )}
+          <p className="text-sm">{getStatusMessage(feedback.status)}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

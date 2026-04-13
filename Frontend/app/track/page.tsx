@@ -13,10 +13,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Clock, CheckCircle, Circle, Wrench, MessageCircle } from "lucide-react";
+import { Search, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
+import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
+import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
 
 export default function TrackFeedback() {
   const searchParams = useSearchParams();
@@ -128,58 +130,6 @@ export default function TrackFeedback() {
       });
   }, [feedback]);
 
-  const getStatusIndicatorClass = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "pending":
-        return "border-amber-300/80 bg-amber-50 text-amber-700";
-      case "in progress":
-        return "border-orange-300/80 bg-orange-50 text-orange-700";
-      case "resolved":
-        return "border-emerald-300/80 bg-emerald-50 text-emerald-700";
-      default:
-        return "border-slate-300/80 bg-slate-50 text-slate-700";
-    }
-  };
-
-  const getStatusIconTone = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "pending":
-        return "text-amber-700";
-      case "in progress":
-        return "text-orange-700";
-      case "resolved":
-        return "text-emerald-700";
-      default:
-        return "text-slate-700";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "pending":
-        return Clock;
-      case "in progress":
-        return Wrench;
-      case "resolved":
-        return CheckCircle;
-      default:
-        return Circle;
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority.toLowerCase()) {
-      case "low":
-        return "text-gray-600";
-      case "medium":
-        return "text-yellow-600";
-      case "high":
-        return "text-orange-600";
-      default:
-        return "text-gray-600";
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       year: "numeric",
@@ -211,35 +161,6 @@ export default function TrackFeedback() {
     } finally {
       setIsSendingMessage(false);
     }
-  };
-
-  const getStatusMessage = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "pending":
-        return "Your feedback has been received and is awaiting review.";
-      case "in progress":
-        return "We are actively working on addressing your feedback.";
-      case "resolved":
-        return "Your feedback has been addressed and resolved.";
-      default:
-        return "Your feedback is being processed.";
-    }
-  };
-
-  const getStatusSteps = (currentStatus: string) => {
-    const steps = [
-      { name: "Submitted", description: "", completed: true },
-      { name: "In Progress", description: "Actions being taken", completed: false },
-      { name: "Resolved", description: "Issue addressed", completed: false },
-    ];
-
-    const statusOrder = ["pending", "in progress", "resolved"];
-    const currentIndex = statusOrder.indexOf(currentStatus.toLowerCase());
-
-    return steps.map((step, index) => ({
-      ...step,
-      completed: index <= currentIndex,
-    }));
   };
 
   return (
@@ -301,110 +222,21 @@ export default function TrackFeedback() {
         {feedback && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-              {/* Status Card */}
-              <Card className="shadow-lg lg:col-span-6">
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between mb-6">
-                    <div>
-                      <h3 className="text-lg font-semibold mb-1">
-                        Status: <span className="uppercase">{feedback.status}</span>
-                      </h3>
-                    </div>
-                  </div>
-
-                  {/* Status Timeline */}
-                  <div className="space-y-4">
-                    {getStatusSteps(feedback.status).map((step, index) => (
-                      <div key={index} className="flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div
-                            className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                              step.completed ? "bg-green-500/20" : "bg-gray-200"
-                            }`}
-                          >
-                            {step.completed ? (
-                              <CheckCircle className="h-5 w-5 text-green-700" />
-                            ) : (
-                              <Circle className="h-5 w-5 text-gray-400" />
-                            )}
-                          </div>
-                          {index < getStatusSteps(feedback.status).length - 1 && (
-                            <div className="h-12 w-px bg-border"></div>
-                          )}
-                        </div>
-                        <div className="pb-4 flex-1">
-                          <p className="font-semibold">{step.name}</p>
-                          {step.name === "Submitted" && (
-                            <p className="text-sm text-muted-foreground">
-                              {formatDate(feedback.createdAt)}
-                            </p>
-                          )}
-                          {step.description && (
-                            <p className="text-sm text-muted-foreground">{step.description}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-6 flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
-                    {(() => {
-                      const StatusMessageIcon = getStatusIcon(feedback.status);
-                      return (
-                        <StatusMessageIcon
-                          className={`h-5 w-5 mt-0.5 flex-shrink-0 ${getStatusIconTone(
-                            feedback.status,
-                          )}`}
-                        />
-                      );
-                    })()}
-                    <p className="text-sm">{getStatusMessage(feedback.status)}</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <FeedbackStatusCard
+                feedback={feedback}
+                formatDate={formatDate}
+                className="lg:col-span-6 h-full"
+              />
 
               {/* Feedback Details Card */}
-              <Card className="shadow-lg lg:col-span-6">
-                <CardHeader>
-                  <CardTitle>Your Feedback Details</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="mx-auto w-full max-w-xl space-y-4">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground">Type</p>
-                        <p className="mt-1 text-base font-medium capitalize">{feedback.type}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground">Category</p>
-                        <p className="mt-1 text-base font-medium">{feedback.category}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground">Priority</p>
-                        <p className={`mt-1 text-base font-medium capitalize ${getPriorityColor(feedback.priority)}`}>
-                          {feedback.priority}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground">Last Updated</p>
-                        <p className="mt-1 text-base font-medium">{formatDate(feedback.updatedAt)}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-muted-foreground">Subject</p>
-                      <p className="text-base font-semibold break-words">{feedback.subject}</p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-muted-foreground">Message</p>
-                      <p className="text-sm leading-relaxed break-words">
-                        {feedback.message}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="lg:col-span-6">
+                <FeedbackDetailsCard
+                  feedback={feedback}
+                  title="Your Feedback Details"
+                  formatDate={formatDate}
+                  className="h-full"
+                />
+              </div>
             </div>
 
             {/* Conversation */}
@@ -435,7 +267,7 @@ export default function TrackFeedback() {
               <div className="space-y-4">
                 {(() => {
                     let lastDayLabel = "";
-                    return messages.map((entry) => {
+                    return messages.map((entry, index, allMessages) => {
                       const createdAt = entry.createdAt
                         ? new Date(entry.createdAt)
                         : null;
@@ -457,6 +289,22 @@ export default function TrackFeedback() {
 
                       const isUser = entry.senderRole === "user";
                       const name = isUser ? "You" : entry.senderName || "Admin";
+                      const prev = index > 0 ? allMessages[index - 1] : null;
+                      const prevIsUser = prev ? prev.senderRole === "user" : false;
+                      const prevName = prev
+                        ? prevIsUser
+                          ? "You"
+                          : prev.senderName || "Admin"
+                        : "";
+                      const showName =
+                        !prev ||
+                        showDayLabel ||
+                        prev.senderRole !== entry.senderRole ||
+                        prevName !== name;
+                      const hasVeryLongToken = /\S{24,}/.test(entry.message || "");
+                      const isLikelyMultiLine =
+                        (entry.message || "").includes("\n") ||
+                        (entry.message || "").length > 60;
                       return (
                         <div key={entry.id} className="space-y-3">
                           {showDayLabel && (
@@ -470,23 +318,49 @@ export default function TrackFeedback() {
                             className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                           >
                             <div
-                              className={`min-w-0 max-w-[75%] rounded-lg px-4 py-3 text-sm shadow-sm ${
-                                isUser
-                                  ? "bg-accent text-white"
-                                  : "bg-muted text-foreground"
-                              }`}
+                              className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUser ? "text-right" : "text-left"}`}
                             >
-                              <p className="text-[11px] font-semibold opacity-80">
-                                {name}{" "}
-                                {entry.createdAt && (
-                                  <span className="font-normal">
-                                    · {formatAdminTime(entry.createdAt)}
-                                  </span>
-                                )}
-                              </p>
-                              <p className="mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-                                {entry.message}
-                              </p>
+                              {showName && (
+                                <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
+                                  {name}
+                                </p>
+                              )}
+                              <div
+                                className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                                  isUser
+                                    ? "bg-accent text-white"
+                                    : "bg-white text-foreground border border-border"
+                                }`}
+                              >
+                                <p
+                                  className={`whitespace-pre-line leading-relaxed ${
+                                    hasVeryLongToken
+                                      ? "break-all"
+                                      : "break-words"
+                                  }`}
+                                >
+                                  {entry.message}
+                                </p>
+                              </div>
+                              {entry.createdAt && (
+                                <span
+                                  className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-4 py-3 text-sm text-white shadow-sm group-hover:inline-flex ${
+                                    isUser
+                                      ? "-left-1 -translate-x-full"
+                                      : "-right-1 translate-x-full"
+                                  } ${
+                                    isLikelyMultiLine
+                                      ? "top-1/2"
+                                      : "top-[68%]"
+                                  }`}
+                                >
+                                  {new Date(entry.createdAt).toLocaleDateString(
+                                    "en-US",
+                                    { weekday: "long" },
+                                  )}{" "}
+                                  {formatAdminTime(entry.createdAt)}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
