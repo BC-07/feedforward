@@ -22,7 +22,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowRight, Copy, Send } from "lucide-react";
+import { ArrowRight, Send } from "lucide-react";
 import { useDraftStorage } from "@/lib/useDraftStorage";
 import { toastApiError } from "@/lib/errorHandling";
 
@@ -36,45 +36,33 @@ interface FormData {
 export default function Submit() {
   const router = useRouter();
   const draftKey = "ff:submitDraft";
-  const emptyFormData: FormData = {
-    type: "",
-    category: "",
-    subject: "",
-    message: "",
-  };
   const {
     value: formData,
     setValue: setFormData,
     clear: clearDraft,
-  } = useDraftStorage<FormData>(draftKey, emptyFormData);
+  } = useDraftStorage<FormData>(draftKey, {
+    type: "",
+    category: "",
+    subject: "",
+    message: "",
+  });
+  const userEmail =
+    typeof window !== "undefined"
+      ? localStorage.getItem("currentUserEmail") || ""
+      : "";
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
-  const [isHydrated, setIsHydrated] = useState(false);
-  const [userEmail, setUserEmail] = useState("");
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsHydrated(true);
-    if (typeof window !== "undefined") {
-      setUserEmail(localStorage.getItem("currentUserEmail") || "");
-    }
-  }, []);
 
   useEffect(() => {
     void listCategories()
       .then((data) =>
         setCategories(
-          Array.from(
-            new Set(
-              data
-                .map((category) => category.name.trim())
-                .filter((name) => {
-                  if (!name) return false;
-                  const normalized = name.toLowerCase();
-                  return normalized !== "disabled" && normalized !== "inactive";
-                }),
-            ),
-          ),
+          data
+            .map((category) => category.name)
+            .filter((name) => {
+              const normalized = name.toLowerCase();
+              return normalized !== "disabled" && normalized !== "inactive";
+            }),
         ),
       )
       .catch((error) => {
@@ -83,25 +71,6 @@ export default function Submit() {
   }, []);
 
   // Draft storage handled by useDraftStorage.
-
-  const validateForm = () => {
-    if (!formData.type || !formData.category) {
-      toast.error("Please select both a feedback type and a category.");
-      return false;
-    }
-
-    if (!formData.subject.trim() || !formData.message.trim()) {
-      toast.error("Please complete the subject and message fields.");
-      return false;
-    }
-
-    if (!categories.includes(formData.category)) {
-      toast.error("Please choose a valid active category.");
-      return false;
-    }
-
-    return true;
-  };
 
   const copyToClipboard = (text: string) => {
     const textArea = document.createElement("textarea");
@@ -124,21 +93,7 @@ export default function Submit() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!validateForm()) {
-      return;
-    }
-
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
-    const trimmedFormData = {
-      ...formData,
-      category: formData.category.trim(),
-      subject: formData.subject.trim(),
-      message: formData.message.trim(),
-    };
-    const latestUserEmail =
-      typeof window !== "undefined"
-        ? localStorage.getItem("currentUserEmail") || ""
-        : "";
 
     try {
       const userId =
@@ -152,21 +107,23 @@ export default function Submit() {
 
       await createFeedback({
         id: newTrackingId,
-        ...trimmedFormData,
+        ...formData,
         userId,
         userName,
-        userEmail: latestUserEmail || undefined,
+        userEmail: userEmail || undefined,
         status: "Pending",
         priority: "Medium",
         isAnonymous: true,
         response: "",
       });
 
-      setUserEmail(latestUserEmail);
       setTrackingId(newTrackingId);
       toast.success("Feedback submitted successfully!");
-      setFormData(emptyFormData);
+      setFormData({ type: "", category: "", subject: "", message: "" });
       clearDraft();
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(draftKey);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to submit feedback.";
@@ -179,7 +136,9 @@ export default function Submit() {
         router.push("/login");
         return;
       }
-      toast.error(message);
+      toast.error(
+        message,
+      );
     }
   };
 
@@ -197,20 +156,11 @@ export default function Submit() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-muted rounded-lg p-4 text-center relative">
+            <div className="bg-muted rounded-lg p-4 text-center">
               <p className="text-sm text-muted-foreground mb-2">
                 Your Tracking ID
               </p>
               <p className="text-2xl font-bold text-primary">{trackingId}</p>
-              <button
-                type="button"
-                className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-white/80 text-muted-foreground hover:bg-white hover:text-foreground"
-                onClick={() => copyToClipboard(trackingId)}
-                aria-label="Copy tracking ID"
-                title="Copy tracking ID"
-              >
-                <Copy className="h-4 w-4" />
-              </button>
             </div>
             <p className="text-sm text-muted-foreground text-center">
               Please save this tracking ID to check the status of your
@@ -228,7 +178,14 @@ export default function Submit() {
             <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 variant="outline"
-                className="flex-1 w-full hover:text-white hover:bg-accent hover:border-accent"
+                className="flex-1 w-full"
+                onClick={() => copyToClipboard(trackingId)}
+              >
+                Copy ID
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 w-full"
                 onClick={() =>
                   router.push(
                     `/track?trackingId=${encodeURIComponent(trackingId)}`,
@@ -269,15 +226,14 @@ export default function Submit() {
             <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="type">Feedback Type *</Label>
-                {isHydrated ? (
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, type: value })
-                    }
-                    required
-                  >
-                    <SelectTrigger id="type">
+                <Select
+                  value={formData.type}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, type: value })
+                  }
+                  required
+                >
+                  <SelectTrigger id="type">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -288,41 +244,28 @@ export default function Submit() {
                       <SelectItem value="compliment">Compliment</SelectItem>
                     </SelectContent>
                   </Select>
-                ) : (
-                  <div
-                    className="h-10 rounded-md border bg-muted/30"
-                    aria-hidden="true"
-                  />
-                )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="category">Category *</Label>
-                {isHydrated ? (
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, category: value })
-                    }
-                    required
-                  >
-                    <SelectTrigger id="category">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div
-                    className="h-10 rounded-md border bg-muted/30"
-                    aria-hidden="true"
-                  />
-                )}
+                <Select
+                  value={formData.category}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, category: value })
+                  }
+                  required
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
