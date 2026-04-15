@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ArrowRight, Send } from "lucide-react";
-import { ArrowRight, Send } from "lucide-react";
 import { useDraftStorage } from "@/lib/useDraftStorage";
 import { toastApiError } from "@/lib/errorHandling";
 
