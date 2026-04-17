@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -1602,7 +1603,7 @@ export default function AdminDashboard() {
                                           <div className="space-y-4">
                                             {(() => {
                                               let lastDayLabel = "";
-                                              return messages.map((entry) => {
+                                              return messages.map((entry, index, allMessages) => {
                                                 const createdAt = entry.createdAt
                                                   ? new Date(entry.createdAt)
                                                   : null;
@@ -1627,11 +1628,39 @@ export default function AdminDashboard() {
                                                   lastDayLabel = dayLabel;
                                                 }
 
-                                                const isAdmin =
+                                                const isAdminMessage =
                                                   entry.senderRole !== "user";
-                                                const name = isAdmin
+                                                const name = isAdminMessage
                                                   ? "You"
                                                   : entry.senderName || "User";
+                                                const prev =
+                                                  index > 0
+                                                    ? allMessages[index - 1]
+                                                    : null;
+                                                const prevIsAdmin = prev
+                                                  ? prev.senderRole !== "user"
+                                                  : false;
+                                                const prevName = prev
+                                                  ? prevIsAdmin
+                                                    ? "You"
+                                                    : prev.senderName || "User"
+                                                  : "";
+                                                const showName =
+                                                  !prev ||
+                                                  showDayLabel ||
+                                                  prev.senderRole !==
+                                                    entry.senderRole ||
+                                                  prevName !== name;
+                                                const hasVeryLongToken =
+                                                  /\S{24,}/.test(
+                                                    entry.message || "",
+                                                  );
+                                                const isLikelyMultiLine =
+                                                  (entry.message || "").includes(
+                                                    "\n",
+                                                  ) ||
+                                                  (entry.message || "").length >
+                                                    60;
                                                 return (
                                                   <div
                                                     key={entry.id}
@@ -1645,27 +1674,58 @@ export default function AdminDashboard() {
                                                       </div>
                                                     )}
                                                     <div
-                                                      className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}
+                                                      className={`flex ${isAdminMessage ? "justify-end" : "justify-start"}`}
                                                     >
                                                       <div
-                                                        className={`max-w-[75%] rounded-lg px-4 py-3 text-sm shadow-sm ${
-                                                          isAdmin
-                                                            ? "bg-accent text-white"
-                                                            : "bg-muted/60 text-foreground border border-border"
-                                                        }`}
+                                                        className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isAdminMessage ? "text-right" : "text-left"}`}
                                                       >
-                                                        <p className="text-[11px] font-semibold opacity-80">
-                                                          {name}
-                                                          {entry.createdAt && (
-                                                            <span className="font-normal">
-                                                              {" "}
-                                                              · {formatAdminTime(entry.createdAt)}
-                                                            </span>
-                                                          )}
-                                                        </p>
-                                                        <p className="mt-1 whitespace-pre-wrap">
-                                                          {entry.message}
-                                                        </p>
+                                                        {showName && (
+                                                          <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
+                                                            {name}
+                                                          </p>
+                                                        )}
+                                                        <div
+                                                          className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                                                            isAdminMessage
+                                                              ? "bg-accent text-white"
+                                                              : "bg-white text-foreground border border-border"
+                                                          }`}
+                                                        >
+                                                          <p
+                                                            className={`whitespace-pre-line leading-relaxed ${
+                                                              hasVeryLongToken
+                                                                ? "break-all"
+                                                                : "break-words"
+                                                            }`}
+                                                          >
+                                                            {entry.message}
+                                                          </p>
+                                                        </div>
+                                                        {entry.createdAt && (
+                                                          <span
+                                                            className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-4 py-3 text-sm text-white shadow-sm group-hover:inline-flex ${
+                                                              isAdminMessage
+                                                                ? "-left-1 -translate-x-full"
+                                                                : "-right-1 translate-x-full"
+                                                            } ${
+                                                              isLikelyMultiLine
+                                                                ? "top-1/2"
+                                                                : "top-[68%]"
+                                                            }`}
+                                                          >
+                                                            {new Date(
+                                                              entry.createdAt,
+                                                            ).toLocaleDateString(
+                                                              "en-US",
+                                                              {
+                                                                weekday: "long",
+                                                              },
+                                                            )}{" "}
+                                                            {formatAdminTime(
+                                                              entry.createdAt,
+                                                            )}
+                                                          </span>
+                                                        )}
                                                       </div>
                                                     </div>
                                                   </div>
@@ -1676,27 +1736,32 @@ export default function AdminDashboard() {
                                         </div>
                                       </div>
                                       <div className="space-y-2">
-                                        <Label className="text-sm font-semibold">
+                                        <Label htmlFor="message" className="text-sm font-semibold">
+                                          Send a reply
                                         </Label>
-                                        <div className="flex items-center gap-3">
-                                          <Input
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                                          <Textarea
                                             id="message"
                                             placeholder="Type your message..."
+                                            rows={2}
                                             value={messageDraft}
                                             onChange={(e) =>
                                               setMessageDraft(e.target.value)
                                             }
                                             onKeyDown={(event) => {
-                                              if (event.key === "Enter") {
+                                              if (
+                                                event.key === "Enter" &&
+                                                !event.shiftKey
+                                              ) {
                                                 event.preventDefault();
                                                 void handleSendMessage();
                                               }
                                             }}
-                                            className="h-11 rounded-lg bg-muted/50"
+                                            className="min-h-[44px] rounded-lg bg-muted/50 sm:flex-1"
                                           />
                                           <Button
                                             type="button"
-                                            className="h-11 px-6"
+                                            className="h-11 px-6 sm:shrink-0"
                                             onClick={() => void handleSendMessage()}
                                             disabled={
                                               isSendingMessage ||
@@ -1808,4 +1873,6 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+
 

@@ -11,6 +11,7 @@ func AppRoutes(app *fiber.App) {
 	// app.Get("/", func(c *fiber.Ctx) error {
 	// 	return c.SendString("Hello Golang World!")
 	// })
+	
 
 	// CREATE YOUR ENDPOINTS HERE
 
