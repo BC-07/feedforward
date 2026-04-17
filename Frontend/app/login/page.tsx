@@ -52,6 +52,13 @@ export default function Login() {
     });
   };
 
+  const playLoginSuccessSound = () => {
+    const audio = new Audio("/faaah.mp3");
+    audio.play().catch(() => {
+      // Browser may block autoplay in some environments.
+    });
+  };
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const normalizedEmail = email.trim();
@@ -78,6 +85,7 @@ export default function Login() {
       localStorage.removeItem("isSuperAdminLoggedIn");
       localStorage.removeItem("superAdminName");
       localStorage.removeItem("superAdminExpiresAt");
+      playLoginSuccessSound();
       toast.success(`Welcome back, ${user.name}!`);
       router.push("/user");
       return;
@@ -104,6 +112,7 @@ export default function Login() {
         localStorage.removeItem("currentUserId");
         localStorage.removeItem("currentUserName");
         localStorage.removeItem("currentUserEmail");
+        playLoginSuccessSound();
         toast.success(`Welcome back, ${superName}!`);
         router.push("/superadmin");
         return;
@@ -120,6 +129,7 @@ export default function Login() {
       localStorage.removeItem("isSuperAdminLoggedIn");
       localStorage.removeItem("superAdminName");
       localStorage.removeItem("superAdminExpiresAt");
+      playLoginSuccessSound();
       toast.success(`Welcome back, ${admin.name}!`);
       router.push("/dashboard");
     } catch (error) {
@@ -137,16 +147,29 @@ export default function Login() {
     >
       {showWrongPasswordBg ? (
         <div className="pointer-events-none absolute inset-0">
-          <iframe
-            src="https://giphy.com/embed/xT1R9IrdXK8WnKDXwc"
-            width="100%"
-            height="100%"
-            className="absolute inset-0 h-full w-full"
-            frameBorder="0"
-            allowFullScreen
-            title="India dance background"
-          />
-          <div className="absolute inset-0 bg-black/30" />
+          <div className="absolute inset-y-0 left-0 w-[30%] min-w-[140px] max-w-[360px] overflow-hidden">
+            <iframe
+              src="https://giphy.com/embed/xT1R9IrdXK8WnKDXwc"
+              width="100%"
+              height="100%"
+              className="h-full w-full"
+              frameBorder="0"
+              allowFullScreen
+              title="India dance background left"
+            />
+          </div>
+          <div className="absolute inset-y-0 right-0 w-[30%] min-w-[140px] max-w-[360px] overflow-hidden">
+            <iframe
+              src="https://giphy.com/embed/xT1R9IrdXK8WnKDXwc"
+              width="100%"
+              height="100%"
+              className="h-full w-full"
+              frameBorder="0"
+              allowFullScreen
+              title="India dance background right"
+            />
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-black/35 via-white/70 to-black/35" />
         </div>
       ) : null}
 
