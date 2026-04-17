@@ -25,6 +25,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [expiredMessage, setExpiredMessage] = useState("");
+  const [showWrongPasswordBg, setShowWrongPasswordBg] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -43,6 +44,13 @@ export default function Login() {
       toast.error(expiredMessage);
     }
   }, [expiredMessage]);
+
+  const playWrongPasswordSound = () => {
+    const audio = new Audio("/indiansound.mp3");
+    audio.play().catch(() => {
+      // Browser may block autoplay in some environments.
+    });
+  };
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -115,13 +123,34 @@ export default function Login() {
       toast.success(`Welcome back, ${admin.name}!`);
       router.push("/dashboard");
     } catch (error) {
+      setShowWrongPasswordBg(true);
+      playWrongPasswordSound();
       toastApiError(error, "Invalid email or password");
     }
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
-      <div className="container mx-auto flex min-h-full max-w-md items-center justify-center">
+    <div
+      className={`relative min-h-[calc(100vh-200px)] overflow-hidden px-4 py-8 sm:py-12 ${
+        showWrongPasswordBg ? "" : "bg-gradient-to-br from-white to-muted"
+      }`}
+    >
+      {showWrongPasswordBg ? (
+        <div className="pointer-events-none absolute inset-0">
+          <iframe
+            src="https://giphy.com/embed/xT1R9IrdXK8WnKDXwc"
+            width="100%"
+            height="100%"
+            className="absolute inset-0 h-full w-full"
+            frameBorder="0"
+            allowFullScreen
+            title="India dance background"
+          />
+          <div className="absolute inset-0 bg-black/30" />
+        </div>
+      ) : null}
+
+      <div className="relative z-10 container mx-auto flex min-h-full max-w-md items-center justify-center">
         <Card className="w-full shadow-lg">
           <CardHeader className="text-center">
             <div className="mx-auto mb-3 sm:mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
