@@ -135,6 +135,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 export async function listFeedbacks(filters?: {
   category?: string;
   userId?: string;
+  search?: string;
+  type?: string;
+  status?: string;
+  priority?: string;
 }): Promise<Feedback[]> {
   const params = new URLSearchParams();
 
@@ -144,6 +148,22 @@ export async function listFeedbacks(filters?: {
 
   if (filters?.userId) {
     params.set("userId", filters.userId);
+  }
+
+  if (filters?.search) {
+    params.set("search", filters.search);
+  }
+
+  if (filters?.type) {
+    params.set("type", filters.type);
+  }
+
+  if (filters?.status) {
+    params.set("status", filters.status);
+  }
+
+  if (filters?.priority) {
+    params.set("priority", filters.priority);
   }
 
   const query = params.toString();

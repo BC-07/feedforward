@@ -23,20 +23,15 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const [expiredMessage, setExpiredMessage] = useState("");
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
+  const isMounted = typeof window !== "undefined";
+  const [expiredMessage] = useState(() => {
+    if (typeof window === "undefined") return "";
     const storedMessage = localStorage.getItem("sessionExpiredMessage") || "";
     if (storedMessage) {
-      setExpiredMessage(storedMessage);
       localStorage.removeItem("sessionExpiredMessage");
     }
-  }, []);
+    return storedMessage;
+  });
 
   useEffect(() => {
     if (expiredMessage) {

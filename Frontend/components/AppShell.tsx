@@ -12,7 +12,7 @@ import {
   updateUserProfile,
   type Feedback,
 } from "@/lib/api";
-import { LogOut, User, UserCircle2, Camera, Bell, MoreVertical, Eye, EyeOff, ChevronDown } from "lucide-react";
+import { LogOut, User, UserCircle2, Camera, Bell, MoreVertical, Eye, EyeOff, ChevronDown, Menu, LayoutDashboard, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -43,9 +43,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  OPEN_FEEDBACK_EVENT,
+  PENDING_ADMIN_FEEDBACK_KEY,
+} from "@/components/admin/constants";
 
 const SESSION_EVENT = "feedforward:session-change";
-const OPEN_FEEDBACK_EVENT = "feedforward:open-feedback";
 const emailLikePattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 
 function containsEmailLike(value: string): boolean {
@@ -211,6 +214,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isSuperAdminRoute = pathname.startsWith("/superadmin");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
   const userAvatarInputRef = useRef<HTMLInputElement>(null);
   const [passwordEdit, setPasswordEdit] = useState({
@@ -401,6 +405,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       saveReadNotificationIds(next);
     }
     setIsNotificationsOpen(false);
+    sessionStorage.setItem(PENDING_ADMIN_FEEDBACK_KEY, feedback.id);
+    router.push("/dashboard/feedback-submission");
     window.setTimeout(() => {
       window.dispatchEvent(
         new CustomEvent(OPEN_FEEDBACK_EVENT, {
@@ -701,6 +707,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const logoutDialogCopy = logoutConfirmRole
     ? getLogoutDialogCopy(logoutConfirmRole)
     : null;
+  const adminPageTitle =
+    pathname === "/dashboard/feedback-submission"
+      ? "Feedback Submission"
+      : "Admin Dashboard";
 
   const AppFooter = () => (
     <footer className="border-t border-muted bg-white mt-auto">
@@ -719,22 +729,86 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-50 border-b border-border bg-white">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <Link
-              href="/"
-              className="flex items-center gap-2"
-              onClick={handleLogoClick}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/favicon.ico"
-                alt="FeedForward logo"
-                className="h-8 w-8"
-              />
-              <div>
-                <h1 className="text-xl font-bold text-primary tracking-tight">FEED FORWARD</h1>
-                <p className="text-xs text-muted-foreground">SMART. FAST. SAFE.</p>
-              </div>
-            </Link>
+            <div className="flex items-center gap-3">
+              {isDashboardRoute && isAdminLoggedIn && (
+                <Sheet open={isAdminMenuOpen} onOpenChange={setIsAdminMenuOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0"
+                      aria-label="Open admin menu"
+                    >
+                      <Menu className="h-5 w-5" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="w-[320px] sm:max-w-sm">
+                    <SheetHeader>
+                      <div className="flex items-center gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/favicon.ico"
+                          alt="FeedForward logo"
+                          className="h-9 w-9"
+                        />
+                        <div className="text-left">
+                          <SheetTitle className="text-lg tracking-tight">
+                            FEED FORWARD
+                          </SheetTitle>
+                          <SheetDescription className="text-xs">
+                            SMART. FAST. SAFE.
+                          </SheetDescription>
+                        </div>
+                      </div>
+                    </SheetHeader>
+                    <div className="px-4 pb-4">
+                      <Link
+                        href="/dashboard"
+                        className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                        onClick={() => setIsAdminMenuOpen(false)}
+                      >
+                        <LayoutDashboard className="h-4 w-4" />
+                        <span>Home</span>
+                      </Link>
+                      <div className="h-px bg-border" />
+                      <Link
+                        href="/dashboard/feedback-submission"
+                        className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                        onClick={() => setIsAdminMenuOpen(false)}
+                      >
+                        <MessageSquareText className="h-4 w-4" />
+                        <span>Feedback Submission</span>
+                      </Link>
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              )}
+
+              <Link
+                href="/"
+                className="flex items-center gap-2"
+                onClick={handleLogoClick}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/favicon.ico"
+                  alt="FeedForward logo"
+                  className="h-8 w-8"
+                />
+                <div>
+                  <h1 className="text-xl font-bold text-primary tracking-tight">
+                    {isDashboardRoute && isAdminLoggedIn
+                      ? adminPageTitle
+                      : "FEED FORWARD"}
+                  </h1>
+                  <p className="text-xs text-muted-foreground">
+                    {isDashboardRoute && isAdminLoggedIn
+                      ? adminUnit || "Admin"
+                      : "SMART. FAST. SAFE."}
+                  </p>
+                </div>
+              </Link>
+            </div>
 
             {/* Public nav */}
             {!isDashboardRoute && !isSuperAdminRoute && (
@@ -811,15 +885,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </Button>
                   </SheetTrigger>
                 <SheetContent className="w-[360px] sm:w-[400px] overflow-hidden rounded-l-3xl ff-sheet-anim">
-                  <SheetHeader className="pb-0 px-3">
-                    <div className="w-full rounded-lg bg-white px-4 py-1.5 shadow-sm">
-                      <SheetTitle className="text-center text-lg font-semibold">
-                        Notifications
-                      </SheetTitle>
-                      <SheetDescription className="sr-only">
-                        Recent feedback notifications. Select an item to open it in the dashboard.
-                      </SheetDescription>
-                    </div>
+                  <SheetHeader className="px-3 pb-0 pt-4">
+                    <SheetTitle className="text-center text-lg font-semibold">
+                      Notifications
+                    </SheetTitle>
+                    <SheetDescription className="sr-only">
+                      Recent feedback notifications. Select an item to open it in the feedback submission page.
+                    </SheetDescription>
                   </SheetHeader>
                   <div className="mt-0.5 flex items-center justify-end px-3">
                     <Button

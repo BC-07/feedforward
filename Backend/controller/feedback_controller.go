@@ -86,6 +86,23 @@ func GetFeedbacks(c *fiber.Ctx) error {
 		conditions = append(conditions, "user_id = ?")
 		args = append(args, userID)
 	}
+	if search := strings.TrimSpace(c.Query("search")); search != "" {
+		pattern := "%" + strings.ToLower(search) + "%"
+		conditions = append(conditions, "(LOWER(id) LIKE ? OR LOWER(subject) LIKE ? OR LOWER(message) LIKE ? OR LOWER(COALESCE(user_name, '')) LIKE ?)")
+		args = append(args, pattern, pattern, pattern, pattern)
+	}
+	if feedbackType := strings.TrimSpace(c.Query("type")); feedbackType != "" {
+		conditions = append(conditions, "LOWER(type) = LOWER(?)")
+		args = append(args, feedbackType)
+	}
+	if status := normalizeFeedbackStatusFilter(c.Query("status")); status != "" {
+		conditions = append(conditions, "status = ?")
+		args = append(args, status)
+	}
+	if priority := normalizeFeedbackPriorityFilter(c.Query("priority")); priority != "" {
+		conditions = append(conditions, "priority = ?")
+		args = append(args, priority)
+	}
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
@@ -97,6 +114,35 @@ func GetFeedbacks(c *fiber.Ctx) error {
 	}
 
 	return success(c, fiber.StatusOK, feedbacks)
+}
+
+func normalizeFeedbackStatusFilter(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.NewReplacer(" ", "", "_", "", "-", "").Replace(normalized)
+
+	switch normalized {
+	case "pending":
+		return "Pending"
+	case "inprogress":
+		return "In Progress"
+	case "resolved":
+		return "Resolved"
+	default:
+		return ""
+	}
+}
+
+func normalizeFeedbackPriorityFilter(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "low":
+		return "Low"
+	case "medium":
+		return "Medium"
+	case "high":
+		return "High"
+	default:
+		return ""
+	}
 }
 
 func GetFeedbackByID(c *fiber.Ctx) error {
