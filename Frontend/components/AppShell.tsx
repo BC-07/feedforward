@@ -12,7 +12,26 @@ import {
   updateUserProfile,
   type Feedback,
 } from "@/lib/api";
-import { LogOut, User, UserCircle2, Camera, Bell, MoreVertical, Eye, EyeOff, ChevronDown, Menu, LayoutDashboard, MessageSquareText } from "lucide-react";
+import {
+  LogOut,
+  User,
+  UserCircle2,
+  Camera,
+  Bell,
+  MoreVertical,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  Menu,
+  House,
+  ClipboardList,
+  Send,
+  ListChecks,
+  Search,
+  ShieldCheck,
+  UserCog,
+  Tag,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -75,6 +94,12 @@ type SessionSnapshot = {
 };
 
 type LogoutRole = "user" | "admin" | "superadmin";
+type SidebarShortcut = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  isActive: (path: string) => boolean;
+};
 
 const emptySessionSnapshot: SessionSnapshot = {
   isUserLoggedIn: false,
@@ -214,7 +239,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isSuperAdminRoute = pathname.startsWith("/superadmin");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isAdminMenuOpen, setIsAdminMenuOpen] = useState(false);
+  const [isDesktopSidebarExpanded, setIsDesktopSidebarExpanded] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const desktopSidebarRef = useRef<HTMLDivElement>(null);
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
   const userAvatarInputRef = useRef<HTMLInputElement>(null);
   const [passwordEdit, setPasswordEdit] = useState({
@@ -292,6 +319,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setIsHydrated(true);
   }, []);
 
+  useEffect(() => {
+    if (!isDesktopSidebarExpanded) return;
+
+    const handleOutsidePointer = (event: MouseEvent | TouchEvent) => {
+      const sidebarNode = desktopSidebarRef.current;
+      if (!sidebarNode) return;
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (sidebarNode.contains(target)) return;
+      setIsDesktopSidebarExpanded(false);
+    };
+
+    document.addEventListener("mousedown", handleOutsidePointer);
+    document.addEventListener("touchstart", handleOutsidePointer);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsidePointer);
+      document.removeEventListener("touchstart", handleOutsidePointer);
+    };
+  }, [isDesktopSidebarExpanded]);
+
   const {
     isUserLoggedIn,
     isAdminLoggedIn,
@@ -306,6 +353,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     adminUnit,
     adminAvatar,
   } = effectiveSession;
+  const shouldShowSidebar =
+    pathname.startsWith("/user") ||
+    pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/superadmin") ||
+    pathname.startsWith("/admin");
+  const topBarHeightClass = "h-16";
+  const collapsedSidebarOffsetClass = shouldShowSidebar ? "md:pl-14" : "";
 
   const saveReadNotificationIds = useCallback(
     (nextSet: Set<string>) => {
@@ -711,6 +765,96 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     pathname === "/dashboard/feedback-submission"
       ? "Feedback Submission"
       : "Admin Dashboard";
+  const userPageTitle =
+    pathname === "/user/track-feedback"
+      ? "Track Feedback"
+      : pathname === "/user/my-submissions"
+        ? "My Submissions"
+        : pathname === "/user/submit-feedback"
+          ? "Submit Feedback"
+          : "User";
+  const superAdminPageTitle =
+    pathname === "/superadmin" || pathname === "/superadmin/admin-dashboard"
+      ? "Admin Dashboard"
+      : pathname === "/superadmin/admin-control"
+        ? "Admin Control"
+        : pathname === "/superadmin/category-control"
+          ? "Category Control"
+          : "Superadmin";
+  const sidebarShortcuts: SidebarShortcut[] = isAdminLoggedIn
+    ? [
+        {
+          href: "/dashboard",
+          label: "Home",
+          icon: House,
+          isActive: (path) => path === "/dashboard",
+        },
+        {
+          href: "/dashboard/feedback-submission",
+          label: "Submission List",
+          icon: ClipboardList,
+          isActive: (path) => path.startsWith("/dashboard/feedback-submission"),
+        },
+      ]
+    : isUserLoggedIn
+      ? [
+          {
+            href: "/user/submit-feedback",
+            label: "Submit Feedback",
+            icon: Send,
+            isActive: (path) => path === "/user/submit-feedback",
+          },
+          {
+            href: "/user/my-submissions",
+            label: "My Submissions",
+            icon: ListChecks,
+            isActive: (path) => path === "/user/my-submissions",
+          },
+          {
+            href: "/user/track-feedback",
+            label: "Track Feedback",
+            icon: Search,
+            isActive: (path) => path === "/user/track-feedback",
+          },
+        ]
+      : isSuperAdminLoggedIn
+        ? [
+            {
+              href: "/superadmin/admin-dashboard",
+              label: "Admin Dashboard",
+              icon: ShieldCheck,
+              isActive: (path) =>
+                path === "/superadmin" || path.startsWith("/superadmin/admin-dashboard"),
+            },
+            {
+              href: "/superadmin/admin-control",
+              label: "Admin Control",
+              icon: UserCog,
+              isActive: (path) => path.startsWith("/superadmin/admin-control"),
+            },
+            {
+              href: "/superadmin/category-control",
+              label: "Category Control",
+              icon: Tag,
+              isActive: (path) => path.startsWith("/superadmin/category-control"),
+            },
+          ]
+        : [
+            {
+              href: "/submit",
+              label: "Submit Feedback",
+              icon: Send,
+              isActive: (path) => path === "/submit",
+            },
+            {
+              href: "/track",
+              label: "Track Feedback",
+              icon: Search,
+              isActive: (path) => path === "/track",
+            },
+          ];
+  const expandedSidebarTitle = "FEED FORWARD";
+  const expandedSidebarSubtitle = "SMART. FAST. SAFE.";
 
   const AppFooter = () => (
     <footer className="border-t border-muted bg-white mt-auto">
@@ -725,24 +869,122 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-[100svh] flex flex-col bg-background">
+      {shouldShowSidebar && sidebarShortcuts.length > 0 && (
+        <aside className="fixed left-0 top-0 bottom-0 z-[60] hidden md:flex">
+          <div
+            ref={desktopSidebarRef}
+            className={`flex h-full flex-col border-r border-border bg-muted shadow-sm transition-[width] duration-300 ease-out ${
+              isDesktopSidebarExpanded ? "backdrop-blur-0" : "backdrop-blur"
+            } ${
+              isDesktopSidebarExpanded ? "w-60 items-center" : "w-14 items-center"
+            }`}
+          >
+            {isDesktopSidebarExpanded ? (
+              <div className={`w-full border-b border-border bg-white px-2 ${topBarHeightClass}`}>
+                <div className="flex h-full items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/favicon.ico"
+                      alt="FeedForward logo"
+                      className="h-8 w-8 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <p className="whitespace-nowrap text-lg font-semibold leading-tight text-foreground">
+                        {expandedSidebarTitle}
+                      </p>
+                      <p className="whitespace-nowrap text-[11px] leading-tight text-muted-foreground">
+                        {expandedSidebarSubtitle}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 text-foreground hover:bg-muted/80"
+                    aria-label="Collapse sidebar menu"
+                    onClick={() => setIsDesktopSidebarExpanded(false)}
+                  >
+                    <Menu className="h-4 w-4 text-foreground" />
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className={`flex w-full items-center justify-center ${topBarHeightClass}`}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-foreground hover:bg-muted/80"
+                  aria-label="Expand sidebar menu"
+                  onClick={() => setIsDesktopSidebarExpanded(true)}
+                >
+                  <Menu className="h-5 w-5 text-foreground" />
+                </Button>
+              </div>
+            )}
+            {sidebarShortcuts.map((item, index) => {
+                const Icon = item.icon;
+                const active = item.isActive(pathname);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    title={item.label}
+                    aria-label={item.label}
+                    className={`${isDesktopSidebarExpanded && index === 0 ? "mt-2" : ""} mb-0.5 flex h-10 items-center justify-center rounded-lg border transition-all duration-300 ${
+                      isDesktopSidebarExpanded
+                        ? "mx-auto w-[calc(100%-1.5rem)] justify-start px-4"
+                        : "w-9 justify-center"
+                    } ${
+                      active
+                        ? "border-accent bg-accent/15 text-accent"
+                        : "border-transparent text-muted-foreground hover:border-border hover:bg-muted/60 hover:text-foreground"
+                    }`}
+                  >
+                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span
+                      className={`overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-200 ${
+                        isDesktopSidebarExpanded
+                          ? "ml-3 max-w-[180px] opacity-100"
+                          : "ml-0 max-w-0 opacity-0"
+                      }`}
+                    >
+                      {item.label}
+                    </span>
+                  </Link>
+                );
+              })}
+          </div>
+        </aside>
+      )}
+
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-white">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
+      <header
+        className={`sticky top-0 z-50 border-b border-border bg-white ${collapsedSidebarOffsetClass}`}
+      >
+        <div className={`container mx-auto px-4 ${topBarHeightClass}`}>
+          <div className="flex h-full items-center justify-between">
             <div className="flex items-center gap-3">
-              {isDashboardRoute && isAdminLoggedIn && (
-                <Sheet open={isAdminMenuOpen} onOpenChange={setIsAdminMenuOpen}>
+              {shouldShowSidebar && (
+                <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                   <SheetTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="shrink-0"
-                      aria-label="Open admin menu"
+                      className="shrink-0 md:hidden"
+                      aria-label="Open sidebar menu"
                     >
                       <Menu className="h-5 w-5" />
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="left" className="w-[320px] sm:max-w-sm">
+                  <SheetContent
+                    side="left"
+                    className="z-[80] w-[320px] sm:max-w-sm md:hidden"
+                  >
                     <SheetHeader>
                       <div className="flex items-center gap-3">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -762,23 +1004,111 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       </div>
                     </SheetHeader>
                     <div className="px-4 pb-4">
-                      <Link
-                        href="/dashboard"
-                        className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
-                        onClick={() => setIsAdminMenuOpen(false)}
-                      >
-                        <LayoutDashboard className="h-4 w-4" />
-                        <span>Home</span>
-                      </Link>
-                      <div className="h-px bg-border" />
-                      <Link
-                        href="/dashboard/feedback-submission"
-                        className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
-                        onClick={() => setIsAdminMenuOpen(false)}
-                      >
-                        <MessageSquareText className="h-4 w-4" />
-                        <span>Feedback Submission</span>
-                      </Link>
+                      {isAdminLoggedIn && (
+                        <>
+                          <Link
+                            href="/dashboard"
+                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <House className="h-4 w-4" />
+                            <span>Admin Dashboard</span>
+                          </Link>
+                          <div className="h-px bg-border" />
+                          <Link
+                            href="/dashboard/feedback-submission"
+                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <ClipboardList className="h-4 w-4" />
+                            <span>Submission List</span>
+                          </Link>
+                        </>
+                      )}
+
+                      {isUserLoggedIn && !isAdminLoggedIn && (
+                        <>
+                          <Link
+                            href="/user/submit-feedback"
+                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <Send className="h-4 w-4" />
+                            <span>Submit Feedback</span>
+                          </Link>
+                          <div className="h-px bg-border" />
+                          <Link
+                            href="/user/my-submissions"
+                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <ListChecks className="h-4 w-4" />
+                            <span>My Submissions</span>
+                          </Link>
+                          <div className="h-px bg-border" />
+                          <Link
+                            href="/user/track-feedback"
+                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <Search className="h-4 w-4" />
+                            <span>Track Feedback</span>
+                          </Link>
+                        </>
+                      )}
+
+                      {isSuperAdminLoggedIn && !isAdminLoggedIn && !isUserLoggedIn && (
+                        <>
+                          <Link
+                            href="/superadmin/admin-dashboard"
+                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <ShieldCheck className="h-4 w-4" />
+                            <span>Admin Dashboard</span>
+                          </Link>
+                          <div className="h-px bg-border" />
+                          <Link
+                            href="/superadmin/admin-control"
+                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <UserCog className="h-4 w-4" />
+                            <span>Admin Control</span>
+                          </Link>
+                          <div className="h-px bg-border" />
+                          <Link
+                            href="/superadmin/category-control"
+                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <Tag className="h-4 w-4" />
+                            <span>Category Control</span>
+                          </Link>
+                        </>
+                      )}
+
+                      {!isAdminLoggedIn && !isUserLoggedIn && !isSuperAdminLoggedIn && (
+                        <>
+                          <Link
+                            href="/submit"
+                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <Send className="h-4 w-4" />
+                            <span>Submit Feedback</span>
+                          </Link>
+                          <div className="h-px bg-border" />
+                          <Link
+                            href="/track"
+                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                          >
+                            <Search className="h-4 w-4" />
+                            <span>Track Feedback</span>
+                          </Link>
+                        </>
+                      )}
                     </div>
                   </SheetContent>
                 </Sheet>
@@ -799,12 +1129,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <h1 className="text-xl font-bold text-primary tracking-tight">
                     {isDashboardRoute && isAdminLoggedIn
                       ? adminPageTitle
-                      : "FEED FORWARD"}
+                      : isUserLoggedIn && pathname.startsWith("/user")
+                        ? userPageTitle
+                        : isSuperAdminLoggedIn && pathname.startsWith("/superadmin")
+                          ? superAdminPageTitle
+                        : "FEED FORWARD"}
                   </h1>
                   <p className="text-xs text-muted-foreground">
                     {isDashboardRoute && isAdminLoggedIn
                       ? adminUnit || "Admin"
-                      : "SMART. FAST. SAFE."}
+                      : isUserLoggedIn && pathname.startsWith("/user")
+                        ? ""
+                        : isSuperAdminLoggedIn && pathname.startsWith("/superadmin")
+                          ? "Superadmin"
+                        : "SMART. FAST. SAFE."}
                   </p>
                 </div>
               </Link>
@@ -1093,14 +1431,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col">
+      <main className={`flex-1 flex flex-col ${collapsedSidebarOffsetClass}`}>
         <div key={pathname} className="page-fade">
           {children}
         </div>
       </main>
 
       {/* Footer */}
-      <AppFooter />
+      <div className={collapsedSidebarOffsetClass}>
+        <AppFooter />
+      </div>
 
       {/* Logout Confirmation */}
       <AlertDialog

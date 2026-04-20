@@ -93,10 +93,10 @@ export function AdminFeedbackTypeChart({
           </div>
         </div>
 
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
+        <ChartContainer config={chartConfig} className="h-[235] w-full">
           <BarChart
             data={chartData}
-            margin={{ top: 12, right: 16, left: 0, bottom: 0 }}
+            margin={{ top: 12, right: 16, left: 1, bottom: 1 }}
           >
             <CartesianGrid vertical={false} />
             <XAxis

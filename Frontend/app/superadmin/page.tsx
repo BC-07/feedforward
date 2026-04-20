@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   createCategoryBySuperAdmin,
   createAdminBySuperAdmin,
@@ -51,7 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Shield, UserCog, UserPlus, Trash2, Pencil, Tag, Save, Ban, UserCheck, Eye, EyeOff } from "lucide-react";
+import { Shield, UserCog, UserPlus, Trash2, Pencil, Tag, Save, Ban, UserCheck, Eye, EyeOff, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { getErrorMessage, toastApiError } from "@/lib/errorHandling";
 
@@ -114,6 +114,11 @@ function clearSuperAdminSession(onRedirect: () => void) {
 
 export default function SuperAdminDashboard() {
   const router = useRouter();
+  const pathname = usePathname();
+  const isAdminDashboardPage =
+    pathname === "/superadmin" || pathname.startsWith("/superadmin/admin-dashboard");
+  const isAdminControlPage = pathname.startsWith("/superadmin/admin-control");
+  const isCategoryControlPage = pathname.startsWith("/superadmin/category-control");
   const idleLimitMs = 5 * 60 * 1000;
   const lastServerActivityRef = useRef<number | null>(null);
   const lastPingAtRef = useRef<number>(0);
@@ -123,6 +128,7 @@ export default function SuperAdminDashboard() {
   const [createForm, setCreateForm] = useState<CreateAdminForm>(emptyCreateForm);
   const [editForm, setEditForm] = useState<EditAdminForm>(emptyEditForm);
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
@@ -193,6 +199,12 @@ export default function SuperAdminDashboard() {
         !admin.isDisabled && admin.unit.trim().toLowerCase() === name,
     );
   });
+  const activeAdminsCount = admins.filter((admin) => !admin.isDisabled).length;
+  const disabledAdminsCount = admins.filter((admin) => Boolean(admin.isDisabled)).length;
+  const manageableCategoriesCount = categories.filter((category) => {
+    const name = category.name.trim().toLowerCase();
+    return name !== "disabled" && name !== "inactive";
+  }).length;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -329,6 +341,7 @@ export default function SuperAdminDashboard() {
     try {
       await createAdminBySuperAdmin(createForm);
       setCreateForm(emptyCreateForm);
+      setIsCreateOpen(false);
       await fetchAdmins(setAdmins, () =>
         clearSuperAdminSession(() => router.push("/login")),
       );
@@ -517,26 +530,6 @@ export default function SuperAdminDashboard() {
 
   return (
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-slate-50 via-stone-50 to-amber-50">
-      <div className="border-b bg-slate-900 text-white">
-        <div className="container mx-auto px-4 py-6 sm:py-8">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-white/80">
-                <Shield className="h-3.5 w-3.5" />
-                Restricted Console
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                Superadmin Dashboard
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm text-white/70 sm:text-base">
-                System control for managing & creating admin accounts across all
-                units.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <div className="container mx-auto px-4 py-6 sm:py-8">
         {/*
         <div className="mb-8 grid gap-4 md:grid-cols-3">
@@ -573,181 +566,38 @@ export default function SuperAdminDashboard() {
           </Card>
         </div>
         */}
-        <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <div className="space-y-6">
-            <Card className="h-fit">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <UserPlus className="h-5 w-5" />
-                  Create Admin
-                </CardTitle>
-                <CardDescription>
-                  Provision a new unit admin directly from the control console.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCreateAdmin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="create-first-name">First Name</Label>
-                    <Input
-                      id="create-first-name"
-                      value={createForm.firstName}
-                      onChange={(event) =>
-                        setCreateForm((current) => ({
-                          ...current,
-                          firstName: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="create-last-name">Last Name</Label>
-                    <Input
-                      id="create-last-name"
-                      value={createForm.lastName}
-                      onChange={(event) =>
-                        setCreateForm((current) => ({
-                          ...current,
-                          lastName: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="create-email">Email</Label>
-                    <Input
-                      id="create-email"
-                      type="email"
-                      value={createForm.email}
-                      onChange={(event) =>
-                        setCreateForm((current) => ({
-                          ...current,
-                          email: event.target.value,
-                        }))
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Unit</Label>
-                    <Select
-                      value={createForm.unit}
-                      onValueChange={(value) =>
-                        setCreateForm((current) => ({ ...current, unit: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a unit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableCategories.map((category) => (
-                          <SelectItem key={category.id} value={category.name}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="submit" className="w-full">
-                    Create Admin Account
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card className="h-fit">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Tag className="h-5 w-5" />
-                  Category Control
-                </CardTitle>
-                <CardDescription>
-                  Create or rename categories and sync them across admin units
-                  and feedback categories.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <form
-                  onSubmit={handleCreateCategory}
-                  className="flex flex-col gap-2 sm:flex-row"
-                >
-                  <Input
-                    placeholder="New category name"
-                    value={newCategoryName}
-                    onChange={(event) => setNewCategoryName(event.target.value)}
-                    required
-                  />
-                  <Button type="submit" variant="secondary">
-                    Add
-                  </Button>
-                </form>
-
-                <div className="space-y-2">
-                  {categories.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No categories found.
-                    </p>
-                  ) : (
-                    <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
-                      {categories
-                        .filter((category) => {
-                          const name = category.name.trim().toLowerCase();
-                          return name !== "disabled" && name !== "inactive";
-                        })
-                        .map((category) => (
-                        <div
-                          key={category.id}
-                          className="flex items-center gap-2 rounded-md border p-2"
-                        >
-                          {editingCategoryId === category.id ? (
-                            <>
-                              <Input
-                                value={editingCategoryName}
-                                onChange={(event) =>
-                                  setEditingCategoryName(event.target.value)
-                                }
-                              />
-                              <Button
-                                size="sm"
-                                onClick={handleSaveCategoryEdit}
-                                type="button"
-                              >
-                                <Save className="h-4 w-4" />
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <p className="flex-1 truncate text-sm">{category.name}</p>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                type="button"
-                                onClick={() => handleStartCategoryEdit(category)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                type="button"
-                                onClick={() => handleDeleteCategory(category)}
-                                className="border-border text-foreground hover:border-red-600 hover:bg-red-600 hover:text-black"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+        <div className="space-y-6">
+          {isAdminDashboardPage && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Admin Dashboard
+              </CardTitle>
+              <CardDescription>
+                Overview of admin accounts and category coverage.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="rounded-lg border bg-background p-4">
+                  <p className="text-sm text-muted-foreground">Active Admins</p>
+                  <p className="mt-2 text-3xl font-semibold">{activeAdminsCount}</p>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <div className="rounded-lg border bg-background p-4">
+                  <p className="text-sm text-muted-foreground">Disabled Admins</p>
+                  <p className="mt-2 text-3xl font-semibold">{disabledAdminsCount}</p>
+                </div>
+                <div className="rounded-lg border bg-background p-4">
+                  <p className="text-sm text-muted-foreground">Categories</p>
+                  <p className="mt-2 text-3xl font-semibold">{manageableCategoriesCount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          )}
 
+          {isAdminControlPage && (
           <Card>
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -762,25 +612,37 @@ export default function SuperAdminDashboard() {
                       : "Review, modify, and disable admin accounts in the system."}
                   </CardDescription>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-2 py-1">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
-                    size="sm"
-                    variant={adminFilter === "active" ? "default" : "ghost"}
-                    onClick={() => setAdminFilter("active")}
-                    className="h-8 rounded-full px-3 flex-1 sm:flex-none"
+                    size="icon"
+                    className="h-9 w-9 rounded-full"
+                    onClick={() => setIsCreateOpen(true)}
+                    aria-label="Create admin"
+                    title="Create admin"
                   >
-                    Active
+                    <Plus className="h-4 w-4" />
                   </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={adminFilter === "disabled" ? "default" : "ghost"}
-                    onClick={() => setAdminFilter("disabled")}
-                    className="h-8 rounded-full px-3 flex-1 sm:flex-none"
-                  >
-                    Disabled
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-2 py-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={adminFilter === "active" ? "default" : "ghost"}
+                      onClick={() => setAdminFilter("active")}
+                      className="h-8 rounded-full px-3 flex-1 sm:flex-none"
+                    >
+                      Active
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={adminFilter === "disabled" ? "default" : "ghost"}
+                      onClick={() => setAdminFilter("disabled")}
+                      className="h-8 rounded-full px-3 flex-1 sm:flex-none"
+                    >
+                      Disabled
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -873,8 +735,183 @@ export default function SuperAdminDashboard() {
               </div>
             </CardContent>
           </Card>
+          )}
+
+          {isCategoryControlPage && (
+          <Card className="h-fit">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Tag className="h-5 w-5" />
+                Category Control
+              </CardTitle>
+              <CardDescription>
+                Create or rename categories and sync them across admin units
+                and feedback categories.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form
+                onSubmit={handleCreateCategory}
+                className="flex flex-col gap-2 sm:flex-row"
+              >
+                <Input
+                  placeholder="New category name"
+                  value={newCategoryName}
+                  onChange={(event) => setNewCategoryName(event.target.value)}
+                  required
+                />
+                <Button type="submit" variant="secondary">
+                  Add
+                </Button>
+              </form>
+
+              <div className="space-y-2">
+                {categories.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No categories found.
+                  </p>
+                ) : (
+                  <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+                    {categories
+                      .filter((category) => {
+                        const name = category.name.trim().toLowerCase();
+                        return name !== "disabled" && name !== "inactive";
+                      })
+                      .map((category) => (
+                      <div
+                        key={category.id}
+                        className="flex items-center gap-2 rounded-md border p-2"
+                      >
+                        {editingCategoryId === category.id ? (
+                          <>
+                            <Input
+                              value={editingCategoryName}
+                              onChange={(event) =>
+                                setEditingCategoryName(event.target.value)
+                              }
+                            />
+                            <Button
+                              size="sm"
+                              onClick={handleSaveCategoryEdit}
+                              type="button"
+                            >
+                              <Save className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <p className="flex-1 truncate text-sm">{category.name}</p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              type="button"
+                              onClick={() => handleStartCategoryEdit(category)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              type="button"
+                              onClick={() => handleDeleteCategory(category)}
+                              className="border-border text-foreground hover:border-red-600 hover:bg-red-600 hover:text-black"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          )}
         </div>
       </div>
+
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-lg data-[state=open]:duration-200 data-[state=closed]:duration-150">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Create Admin
+            </DialogTitle>
+            <DialogDescription>
+              Provision a new unit admin directly from the control console.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateAdmin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="create-first-name">First Name</Label>
+              <Input
+                id="create-first-name"
+                value={createForm.firstName}
+                onChange={(event) =>
+                  setCreateForm((current) => ({
+                    ...current,
+                    firstName: event.target.value,
+                  }))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-last-name">Last Name</Label>
+              <Input
+                id="create-last-name"
+                value={createForm.lastName}
+                onChange={(event) =>
+                  setCreateForm((current) => ({
+                    ...current,
+                    lastName: event.target.value,
+                  }))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-email">Email</Label>
+              <Input
+                id="create-email"
+                type="email"
+                value={createForm.email}
+                onChange={(event) =>
+                  setCreateForm((current) => ({
+                    ...current,
+                    email: event.target.value,
+                  }))
+                }
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Unit</Label>
+              <Select
+                value={createForm.unit}
+                onValueChange={(value) =>
+                  setCreateForm((current) => ({ ...current, unit: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.name}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" className="w-full">
+              Create Admin Account
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent>
