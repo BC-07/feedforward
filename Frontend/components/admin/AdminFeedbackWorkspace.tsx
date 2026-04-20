@@ -64,7 +64,7 @@ import { formatLocalTime } from "@/lib/time";
 import { toastApiError } from "@/lib/errorHandling";
 import ExcelJS from "exceljs";
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import autoTable, { type RowInput } from "jspdf-autotable";
 import {
   AlertCircle,
   BarChart3,
@@ -534,7 +534,7 @@ export function AdminFeedbackWorkspace({
       return;
     }
 
-    const body = rows.flatMap((row) => [
+    const body: RowInput[] = rows.flatMap((row): RowInput[] => [
       [
         { content: row.id, styles: { fontStyle: "bold", textColor: [31, 41, 55] } },
         { content: row.type },
@@ -972,8 +972,8 @@ export function AdminFeedbackWorkspace({
             <div className="space-y-4">
               <div className="overflow-x-auto">
               <Table className="min-w-[980px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
-                <TableHeader>
-                  <TableRow>
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
                     <TableHead>Name</TableHead>
                     <TableHead>Tracking ID</TableHead>
                     <TableHead>Type</TableHead>
@@ -983,7 +983,7 @@ export function AdminFeedbackWorkspace({
                     <TableHead className="w-[150px] whitespace-nowrap">
                       Date
                     </TableHead>
-                    <TableHead className="w-[110px] text-right">
+                    <TableHead className="w-[110px] text-center">
                       Actions
                     </TableHead>
                   </TableRow>
@@ -1026,32 +1026,37 @@ export function AdminFeedbackWorkspace({
                       <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                         {formatSubmittedAt(feedback.createdAt)}
                       </TableCell>
-                      <TableCell className="w-[110px] text-right">
-                        <Dialog
-                          open={
-                            isEditDialogOpen &&
-                            selectedFeedback?.id === feedback.id
-                          }
-                          onOpenChange={(open) => {
-                            if (!open) {
-                              setIsEditDialogOpen(false);
-                              setSelectedFeedback(null);
-                              setMessages([]);
-                              setMessageDraft("");
+                      <TableCell className="w-[110px] pr-3">
+                        <div className="flex justify-end">
+                          <Dialog
+                            open={
+                              isEditDialogOpen &&
+                              selectedFeedback?.id === feedback.id
                             }
-                          }}
-                        >
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => void openFeedbackDialog(feedback)}
+                            onOpenChange={(open) => {
+                              if (!open) {
+                                setIsEditDialogOpen(false);
+                                setSelectedFeedback(null);
+                                setMessages([]);
+                                setMessageDraft("");
+                              }
+                            }}
+                          >
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => void openFeedbackDialog(feedback)}
+                              >
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent
+                              className="max-h-[90vh] max-w-2xl overflow-y-auto"
+                              onInteractOutside={(event) => event.preventDefault()}
+                              onEscapeKeyDown={(event) => event.preventDefault()}
                             >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
                             <DialogHeader>
                               <DialogTitle>Feedback Details</DialogTitle>
                               <DialogDescription>
@@ -1334,8 +1339,9 @@ export function AdminFeedbackWorkspace({
                                 </TabsContent>
                               </Tabs>
                             ) : null}
-                          </DialogContent>
-                        </Dialog>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

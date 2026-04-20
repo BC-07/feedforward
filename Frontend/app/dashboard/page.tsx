@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listFeedbacks, type Feedback } from "@/lib/api";
 import { toastApiError } from "@/lib/errorHandling";
 import { AdminDashboardShell } from "@/components/admin/AdminDashboardShell";
+import { AdminFeedbackStatusChart } from "@/components/admin/AdminFeedbackStatusChart";
 import { AdminFeedbackTypeChart } from "@/components/admin/AdminFeedbackTypeChart";
 import { AdminStatsGrid } from "@/components/admin/AdminStatsGrid";
 import { useAdminSession } from "@/components/admin/useAdminSession";
@@ -43,7 +44,10 @@ export default function AdminDashboardHome() {
     >
       <div className="space-y-6">
         <AdminStatsGrid stats={stats} />
-        <AdminFeedbackTypeChart feedbacks={feedbacks} />
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
+          <AdminFeedbackTypeChart feedbacks={feedbacks} />
+          <AdminFeedbackStatusChart feedbacks={feedbacks} />
+        </div>
       </div>
     </AdminDashboardShell>
   );

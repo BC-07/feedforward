@@ -6,7 +6,6 @@ import type { Feedback } from "@/lib/api";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -74,13 +73,9 @@ export function AdminFeedbackTypeChart({
   }, [feedbacks]);
 
   return (
-    <Card className="shadow-lg">
+    <Card className="h-full shadow-lg">
       <CardHeader>
         <CardTitle>Feedback Type Bar Graph</CardTitle>
-        <CardDescription>
-          Live submission counts by feedback type from the database for your
-          unit.
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3 text-sm">

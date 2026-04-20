@@ -742,7 +742,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       <Menu className="h-5 w-5" />
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="left" className="w-[320px] sm:max-w-sm">
+                  <SheetContent
+                    side="left"
+                    className="w-[320px] overflow-hidden rounded-r-3xl ff-sheet-anim sm:max-w-sm"
+                  >
                     <SheetHeader>
                       <div className="flex items-center gap-3">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
