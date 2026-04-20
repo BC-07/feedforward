@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   createFeedback,
   createFeedbackMessage,
@@ -32,12 +32,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +59,8 @@ import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
 import { useDraftStorage } from "@/lib/useDraftStorage";
 import { toastApiError } from "@/lib/errorHandling";
+import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
+import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
 import {
   ArrowRight,
   Send,
@@ -59,12 +70,13 @@ import {
   Circle,
   Wrench,
   MessageCircle,
-  ChevronLeft,
   X,
+  Copy,
 } from "lucide-react";
 
 export default function UserProfile() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const draftKey = "userFeedbackDraft";
   const emptyForm = {
     type: "",
@@ -103,6 +115,9 @@ export default function UserProfile() {
   const [messageDraft, setMessageDraft] = useState("");
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const activePanel =
+    searchParams.get("panel") === "feedback" ? "feedback" : "home";
+  const [submissionPage, setSubmissionPage] = useState(1);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const leftColumnRef = useRef<HTMLDivElement | null>(null);
@@ -299,6 +314,10 @@ export default function UserProfile() {
     restoreSubmissionsScroll();
   }, [feedbacks.length, selectedFeedback, trackingId, leftColumnHeight, restoreSubmissionsScroll]);
 
+  useEffect(() => {
+    setSubmissionPage(1);
+  }, [feedbacks.length]);
+
   const handleLogout = () => {
     localStorage.removeItem("isUserLoggedIn");
     localStorage.removeItem("currentUserId");
@@ -455,8 +474,15 @@ export default function UserProfile() {
     }
   };
 
+  const normalizeStatus = (status: string) =>
+    status
+      .trim()
+      .toLowerCase()
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ");
+
   const getStatusIndicatorClass = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch (normalizeStatus(status)) {
       case "pending":
         return "border-amber-300/80 bg-amber-50 text-amber-700";
       case "in progress":
@@ -468,21 +494,8 @@ export default function UserProfile() {
     }
   };
 
-  const getStatusIconTone = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "pending":
-        return "text-amber-700";
-      case "in progress":
-        return "text-orange-700";
-      case "resolved":
-        return "text-emerald-700";
-      default:
-        return "text-slate-700";
-    }
-  };
-
   const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch (normalizeStatus(status)) {
       case "pending":
         return Clock;
       case "in progress":
@@ -491,19 +504,6 @@ export default function UserProfile() {
         return CheckCircle;
       default:
         return Circle;
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority.toLowerCase()) {
-      case "low":
-        return "text-gray-600";
-      case "medium":
-        return "text-yellow-600";
-      case "high":
-        return "text-orange-600";
-      default:
-        return "text-gray-600";
     }
   };
 
@@ -517,37 +517,6 @@ export default function UserProfile() {
     });
   };
 
-  const getStatusMessage = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "pending":
-        return "Your feedback has been received and is awaiting review.";
-      case "in progress":
-        return "We are actively working on addressing your feedback.";
-      case "resolved":
-        return "Your feedback has been addressed and resolved.";
-      default:
-        return "Your feedback is being processed.";
-    }
-  };
-
-  const getStatusSteps = (currentStatus: string) => {
-    const steps = [
-      { name: "Submitted", description: "", completed: true },
-      {
-        name: "In Progress",
-        description: "Actions being taken",
-        completed: false,
-      },
-      { name: "Resolved", description: "Issue addressed", completed: false },
-    ];
-    const statusOrder = ["Pending", "In Progress", "Resolved"];
-    const currentIndex = statusOrder.indexOf(currentStatus.toLowerCase());
-    return steps.map((step, index) => ({
-      ...step,
-      completed: index <= currentIndex,
-    }));
-  };
-
   const formatMessagePreview = (value: string) => {
     if (!value) return value;
     let result = value.replace(/(^\s*[a-z])/, (match) => match.toUpperCase());
@@ -557,13 +526,69 @@ export default function UserProfile() {
     return result;
   };
 
+  const sortedFeedbacks = [...feedbacks].sort((a, b) => {
+    const order = ["pending", "in progress", "resolved"];
+    const aIndex = order.indexOf(a.status.toLowerCase());
+    const bIndex = order.indexOf(b.status.toLowerCase());
+    const safeA = aIndex === -1 ? order.length : aIndex;
+    const safeB = bIndex === -1 ? order.length : bIndex;
+    if (safeA !== safeB) {
+      return safeA - safeB;
+    }
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+
+  const submissionsPerPage = 10;
+  const totalSubmissionPages = Math.max(
+    1,
+    Math.ceil(sortedFeedbacks.length / submissionsPerPage),
+  );
+  const paginatedFeedbacks = sortedFeedbacks.slice(
+    (submissionPage - 1) * submissionsPerPage,
+    submissionPage * submissionsPerPage,
+  );
+  const showingStart =
+    sortedFeedbacks.length === 0
+      ? 0
+      : (submissionPage - 1) * submissionsPerPage + 1;
+  const showingEnd = Math.min(
+    submissionPage * submissionsPerPage,
+    sortedFeedbacks.length,
+  );
+
   return (
     <>
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
       {trackingId && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-8 animate-in fade-in-0">
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4 py-8 animate-in fade-in-0"
+          onClick={() => {
+            setTrackingId(null);
+            setSelectedFeedback(null);
+            setTimeout(() => {
+              restoreSubmissionsScroll(true);
+            }, 200);
+          }}
+        >
           <div className="w-full max-w-lg -translate-y-[10%]">
-            <Card className="shadow-lg animate-in zoom-in-95 fade-in-0">
+            <Card
+              className="relative shadow-lg animate-in zoom-in-95 fade-in-0"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Close"
+                onClick={() => {
+                  setTrackingId(null);
+                  setSelectedFeedback(null);
+                  setTimeout(() => {
+                    restoreSubmissionsScroll(true);
+                  }, 200);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </button>
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
                   <ArrowRight className="h-8 w-8 text-accent" />
@@ -574,13 +599,22 @@ export default function UserProfile() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="bg-muted rounded-lg p-4 text-center">
+                <div className="w-full bg-muted rounded-lg p-4 text-center relative">
                   <p className="text-sm text-muted-foreground mb-2">
                     Your Tracking ID
                   </p>
                   <p className="text-2xl font-bold text-primary">
                     {trackingId}
                   </p>
+                  <button
+                    type="button"
+                    className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-white/80 text-muted-foreground hover:bg-white hover:text-foreground"
+                    onClick={() => copyToClipboard(trackingId)}
+                    aria-label="Copy tracking ID"
+                    title="Copy tracking ID"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
                 </div>
                 <p className="text-sm text-muted-foreground text-center">
                   Please save this tracking ID to check the status of your
@@ -591,27 +625,6 @@ export default function UserProfile() {
                     A copy of this tracking ID was sent to {currentUser.email}.
                   </p>
                 )}
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => copyToClipboard(trackingId)}
-                  >
-                    Copy ID
-                  </Button>
-                  <Button
-                    className="flex-1 bg-accent hover:bg-accent/90"
-                    onClick={() => {
-                      setTrackingId(null);
-                      setSelectedFeedback(null);
-                      setTimeout(() => {
-                        restoreSubmissionsScroll(true);
-                      }, 200);
-                    }}
-                  >
-                    Back to Dashboard
-                  </Button>
-                </div>
               </CardContent>
             </Card>
           </div>
@@ -746,600 +759,552 @@ export default function UserProfile() {
           </div>
         </DialogContent>
       </Dialog>
-      <div className="bg-accent text-accent-foreground">
-        <div className="container mx-auto px-4 py-5 sm:py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold">User Dashboard</h1>
-              <p className="text-accent-foreground/80 mt-1 text-sm sm:text-base">
-                Welcome, {currentUser?.fullName}
-              </p>
+      {selectedFeedback && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <button
+            type="button"
+            aria-label="Close feedback details"
+            className="ff-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+            onClick={() => {
+              setSelectedFeedback(null);
+              setSearchTrackingId("");
+            }}
+          />
+          <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
+            <CardHeader className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle>Feedback Details</CardTitle>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedFeedback(null);
+                    setSearchTrackingId("");
+                  }}
+                >
+                  Close
+                </Button>
+              </div>
+              <CardDescription className="font-mono">
+                {selectedFeedback.id}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-6">
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+            <FeedbackStatusCard
+              feedback={selectedFeedback}
+              formatDate={formatDate}
+              className="xl:col-span-6 h-full"
+            />
+
+            <div className="xl:col-span-6">
+              <FeedbackDetailsCard
+                feedback={selectedFeedback}
+                title="Feedback Details"
+                formatDate={formatDate}
+                className="h-full"
+              />
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-6 sm:py-8">
-        <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 items-stretch">
-          <div ref={leftColumnRef} className="flex flex-col gap-6">
-            {/* Track Feedback */}
-            <div className="order-2 sm:order-1">
-              <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Track Your Feedback</h2>
-
-              <Card className="shadow-lg mb-6">
-                <CardHeader>
-                  <CardTitle>Enter Tracking ID</CardTitle>
-                  <CardDescription>
-                    Search for your submitted feedback
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
-                    <Input
-                      placeholder="e.g., FF-ABC123XYZ"
-                      value={searchTrackingId}
-                      onChange={(e) => setSearchTrackingId(e.target.value)}
-                      required
-                    />
-                    <Button
-                      type="submit"
-                      className="bg-accent hover:bg-accent/90"
-                    >
-                      <Search className="mr-2 h-4 w-4" />
-                      Search
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-
             </div>
 
-            {/* Submit Feedback */}
-            <div className="order-1 sm:order-2">
-              <h2 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Submit Feedback</h2>
-              <Card className="shadow-lg">
-                <CardHeader>
-                  <CardTitle>Feedback Form</CardTitle>
-                  <CardDescription>
-                    Check anonymous if you want your name hidden from
-                    admin views.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="type">Feedback Type *</Label>
-                      {isHydrated ? (
-                        <Select
-                          value={formData.type}
-                          onValueChange={(value) =>
-                            setFormData({ ...formData, type: value })
-                          }
-                          required
-                        >
-                          <SelectTrigger id="type">
-                            <SelectValue placeholder="Select type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="suggestion">
-                              Suggestion
-                            </SelectItem>
-                            <SelectItem value="complaint">Complaint</SelectItem>
-                            <SelectItem value="inquiry">Inquiry</SelectItem>
-                            <SelectItem value="request">Request</SelectItem>
-                            <SelectItem value="compliment">Compliment</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <div
-                          className="h-10 rounded-md border bg-muted/30"
-                          aria-hidden="true"
-                        />
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Category *</Label>
-                      {isHydrated ? (
-                        <Select
-                          value={formData.category}
-                          onValueChange={(value) =>
-                            setFormData({ ...formData, category: value })
-                          }
-                          required
-                        >
-                          <SelectTrigger id="category">
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((category) => (
-                              <SelectItem key={category} value={category}>
-                                {category}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <div
-                          className="h-10 rounded-md border bg-muted/30"
-                          aria-hidden="true"
-                        />
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="priority">Severity Level *</Label>
-                      {isHydrated ? (
-                        <Select
-                          value={formData.priority}
-                          onValueChange={(value) =>
-                            setFormData({ ...formData, priority: value })
-                          }
-                          required
-                        >
-                          <SelectTrigger id="priority">
-                            <SelectValue placeholder="Select severity" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Low">Low</SelectItem>
-                            <SelectItem value="Medium">Medium</SelectItem>
-                            <SelectItem value="High">High</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <div
-                          className="h-10 rounded-md border bg-muted/30"
-                          aria-hidden="true"
-                        />
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="subject">Subject *</Label>
-                      <Input
-                        id="subject"
-                        placeholder="Brief summary of your feedback"
-                        value={formData.subject}
-                        onChange={(e) =>
-                          setFormData({ ...formData, subject: e.target.value })
+            <Card className="shadow-lg bg-muted/40 border-border">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <MessageCircle className="h-5 w-5" />
+                  Conversation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="max-h-[320px] overflow-y-auto rounded-lg border border-border bg-white/70 p-4">
+                  {isMessagesLoading && (
+                    <p className="text-sm text-muted-foreground">
+                      Loading conversation...
+                    </p>
+                  )}
+                  {!isMessagesLoading && messages.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      No messages yet. Updates from the admin team will appear here.
+                    </p>
+                  )}
+                  <div className="space-y-4">
+                    {(() => {
+                      let lastDayLabel = "";
+                      return messages.map((entry, index, allMessages) => {
+                        const createdAt = entry.createdAt
+                          ? new Date(entry.createdAt)
+                          : null;
+                        const today = new Date();
+                        const dayLabel = createdAt
+                          ? createdAt.toDateString() === today.toDateString()
+                            ? "Today"
+                            : createdAt.toLocaleDateString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })
+                          : "";
+                        const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
+                        if (showDayLabel) {
+                          lastDayLabel = dayLabel;
                         }
-                        required
-                      />
-                    </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="message">Message *</Label>
-                      <Textarea
-                        id="message"
-                        placeholder="Provide detailed information about your feedback..."
-                        rows={5}
-                        value={formData.message}
-                        onChange={(e) =>
-                          setFormData({ ...formData, message: e.target.value })
-                        }
-                        required
-                      />
-                    </div>
-
-                    <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-4">
-                      <Checkbox
-                        id="is-anonymous"
-                        checked={isAnonymous}
-                        onCheckedChange={(checked) =>
-                          setIsAnonymous(checked === true)
-                        }
-                        className="mt-0.5"
-                      />
-                      <div className="space-y-1">
-                        <Label
-                          htmlFor="is-anonymous"
-                          className="cursor-pointer text-sm font-medium"
-                        >
-                          Submit anonymously
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          When checked, your name will be hidden to the admins.
-                        </p>
-                      </div>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      className="w-full bg-accent hover:bg-accent/90"
-                    >
-                      <Send className="mr-2 h-4 w-4" />
-                      Submit Feedback
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          <div
-            className="flex flex-col min-h-0 h-full overflow-hidden"
-            style={leftColumnHeight ? { height: leftColumnHeight } : undefined}
-          >
-            {selectedFeedback ? (
-              <Card className="shadow-lg h-full min-h-0 flex flex-col overflow-hidden">
-                <CardHeader className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <CardTitle>Feedback Details</CardTitle>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedFeedback(null);
-                        setSearchTrackingId("");
-                      }}
-                    >
-                      <ChevronLeft className="mr-1 h-4 w-4" />
-                      Back to My Submissions
-                    </Button>
-                  </div>
-                  <CardDescription className="font-mono">
-                    {selectedFeedback.id}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6 flex-1 min-h-0 overflow-y-auto">
-                  <Card className="shadow-lg">
-                    <CardContent className="pt-6">
-                      <div className="flex items-start justify-between mb-6">
-                        <h3 className="text-lg font-semibold mb-1">
-                          Status:{" "}
-                          <span className="uppercase">
-                            {selectedFeedback.status}
-                          </span>
-                        </h3>
-                        {(() => {
-                          const StatusIcon = getStatusIcon(
-                            selectedFeedback.status,
-                          );
-                          return (
-                            <span
-                              aria-label={selectedFeedback.status}
-                              title={selectedFeedback.status}
-                              className={`inline-flex h-8 w-8 items-center justify-center rounded-full border shadow-sm ${getStatusIndicatorClass(
-                                selectedFeedback.status,
-                              )}`}
+                        const isUser = entry.senderRole === "user";
+                        const name = isUser ? "You" : entry.senderName;
+                        const prev = index > 0 ? allMessages[index - 1] : null;
+                        const prevIsUser = prev ? prev.senderRole === "user" : false;
+                        const prevName = prev
+                          ? prevIsUser
+                            ? "You"
+                            : prev.senderName
+                          : "";
+                        const showName =
+                          !prev ||
+                          showDayLabel ||
+                          prev.senderRole !== entry.senderRole ||
+                          prevName !== name;
+                        const hasVeryLongToken = /\S{24,}/.test(entry.message || "");
+                        const isLikelyMultiLine =
+                          (entry.message || "").includes("\n") ||
+                          (entry.message || "").length > 60;
+                        return (
+                          <div key={entry.id} className="space-y-3">
+                            {showDayLabel && (
+                              <div className="flex justify-center">
+                                <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                  {dayLabel}
+                                </span>
+                              </div>
+                            )}
+                            <div
+                              className={`flex ${isUser ? "justify-end" : "justify-start"}`}
                             >
-                              <StatusIcon className="h-[18px] w-[18px]" />
-                            </span>
-                          );
-                        })()}
-                      </div>
-
-                      <div className="flex items-start gap-3 mb-8 p-4 bg-muted/50 rounded-lg">
-                        {(() => {
-                          const StatusMessageIcon = getStatusIcon(
-                            selectedFeedback.status,
-                          );
-                          return (
-                            <StatusMessageIcon
-                              className={`h-5 w-5 mt-0.5 flex-shrink-0 ${getStatusIconTone(
-                                selectedFeedback.status,
-                              )}`}
-                            />
-                          );
-                        })()}
-                        <p className="text-sm">
-                          {getStatusMessage(selectedFeedback.status)}
-                        </p>
-                      </div>
-
-                      <div className="space-y-4">
-                        {getStatusSteps(selectedFeedback.status).map(
-                          (step, index) => (
-                            <div key={index} className="flex gap-4">
-                              <div className="flex flex-col items-center">
+                              <div
+                                className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUser ? "text-right" : "text-left"}`}
+                              >
+                                {showName && (
+                                  <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
+                                    {name}
+                                  </p>
+                                )}
                                 <div
-                                  className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                                    step.completed
-                                      ? "bg-green-500/20"
-                                      : "bg-gray-200"
+                                  className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                                    isUser
+                                      ? "bg-accent text-white"
+                                      : "bg-white text-foreground border border-border"
                                   }`}
                                 >
-                                  {step.completed ? (
-                                    <CheckCircle className="h-5 w-5 text-green-700" />
-                                  ) : (
-                                    <Circle className="h-5 w-5 text-gray-400" />
-                                  )}
+                                  <p
+                                    className={`whitespace-pre-line leading-relaxed ${
+                                      hasVeryLongToken ? "break-all" : "break-words"
+                                    }`}
+                                  >
+                                    {entry.message}
+                                  </p>
                                 </div>
-                                {index <
-                                  getStatusSteps(selectedFeedback.status)
-                                    .length -
-                                    1 && (
-                                  <div className="h-12 w-px bg-border"></div>
-                                )}
-                              </div>
-                              <div className="pb-4 flex-1">
-                                <p className="font-semibold">{step.name}</p>
-                                {step.name === "Submitted" && (
-                                  <p className="text-sm text-muted-foreground">
-                                    {formatDate(selectedFeedback.createdAt)}
-                                  </p>
-                                )}
-                                {step.description && (
-                                  <p className="text-sm text-muted-foreground">
-                                    {step.description}
-                                  </p>
+                                {entry.createdAt && (
+                                  <span
+                                    className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-4 py-3 text-sm text-white shadow-sm group-hover:inline-flex ${
+                                      isUser
+                                        ? "-left-1 -translate-x-full"
+                                        : "-right-1 translate-x-full"
+                                    } ${
+                                      isLikelyMultiLine ? "top-1/2" : "top-[68%]"
+                                    }`}
+                                  >
+                                    {new Date(entry.createdAt).toLocaleDateString("en-US", {
+                                      weekday: "long",
+                                    })}{" "}
+                                    {formatLocalTime(entry.createdAt)}
+                                  </span>
                                 )}
                               </div>
                             </div>
-                          ),
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reply-message">Send a reply</Label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Textarea
+                      id="reply-message"
+                      placeholder="Type your message..."
+                      rows={2}
+                      value={messageDraft}
+                      onChange={(e) => setMessageDraft(e.target.value)}
+                      disabled={isSendingMessage}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          void handleSendMessage();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleSendMessage}
+                      className="bg-accent hover:bg-accent/90"
+                      disabled={isSendingMessage}
+                    >
+                      {isSendingMessage ? "Sending..." : "Send"}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-                  <Card className="shadow-lg">
-                    <CardHeader>
-                      <CardTitle>Feedback Details</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground mb-1">
-                          Type
-                        </p>
-                        <p className="capitalize">{selectedFeedback.type}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground mb-1">
-                          Category
-                        </p>
-                        <p>{selectedFeedback.category}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground mb-1">
-                          Priority
-                        </p>
-                        <p
-                          className={`capitalize ${getPriorityColor(selectedFeedback.priority)}`}
-                        >
-                          {selectedFeedback.priority}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground mb-1">
-                          Subject
-                        </p>
-                        <p className="font-semibold break-words">
-                          {selectedFeedback.subject}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground mb-1">
-                          Message
-                        </p>
-                        <p className="text-sm leading-relaxed break-all">
-                          {selectedFeedback.message}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-muted-foreground mb-1">
-                          Last Updated
-                        </p>
-                        <p className="text-sm">
-                          {formatDate(selectedFeedback.updatedAt)}
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="shadow-lg bg-muted/40 border-border">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-foreground">
-                        <MessageCircle className="h-5 w-5" />
-                        Conversation
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="max-h-[320px] overflow-y-auto rounded-lg border border-border bg-white/70 p-4">
-                        {isMessagesLoading && (
-                          <p className="text-sm text-muted-foreground">
-                            Loading conversation...
-                          </p>
-                        )}
-                        {!isMessagesLoading && messages.length === 0 && (
-                          <p className="text-sm text-muted-foreground">
-                            No messages yet. Updates from the admin team will appear here.
-                          </p>
-                        )}
-                        <div className="space-y-4">
-                          {(() => {
-                            let lastDayLabel = "";
-                            return messages.map((entry) => {
-                              const createdAt = entry.createdAt
-                                ? new Date(entry.createdAt)
-                                : null;
-                              const today = new Date();
-                              const dayLabel = createdAt
-                                ? createdAt.toDateString() ===
-                                  today.toDateString()
-                                  ? "Today"
-                                  : createdAt.toLocaleDateString(undefined, {
-                                      month: "short",
-                                      day: "numeric",
-                                      year: "numeric",
-                                    })
-                                : "";
-                              const showDayLabel =
-                                dayLabel && dayLabel !== lastDayLabel;
-                              if (showDayLabel) {
-                                lastDayLabel = dayLabel;
-                              }
-
-                              const isUser = entry.senderRole === "user";
-                              const name = isUser ? "You" : entry.senderName;
-                              return (
-                                <div key={entry.id} className="space-y-3">
-                                  {showDayLabel && (
-                                    <div className="flex justify-center">
-                                      <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                                        {dayLabel}
-                                      </span>
-                                    </div>
-                                  )}
-                                  <div
-                                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                                  >
-                                    <div
-                                      className={`max-w-[75%] rounded-lg px-4 py-3 text-sm shadow-sm ${
-                                        isUser
-                                          ? "bg-accent text-white"
-                                          : "bg-white text-foreground border border-border"
-                                      }`}
-                                    >
-                                      <p className="text-[11px] font-semibold opacity-80">
-                                        {name}{" "}
-                                        {entry.createdAt && (
-                                          <span className="font-normal">
-                                            · {formatLocalTime(entry.createdAt)}
-                                          </span>
-                                        )}
-                                      </p>
-                                      <p className="mt-1 whitespace-pre-wrap">
-                                        {entry.message}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            });
-                          })()}
-                        </div>
-                      </div>
+      <div className="container mx-auto px-4 py-6 sm:py-8">
+        <div ref={leftColumnRef} className="min-h-0">
+            {activePanel === "home" ? (
+              <div className="mx-auto w-full max-w-3xl">
+                <h2 className="mb-3 text-xl font-bold sm:mb-4 sm:text-2xl">Submit Feedback</h2>
+                <Card className="shadow-lg">
+                  <CardHeader>
+                    <CardTitle>Feedback Form</CardTitle>
+                    <CardDescription>
+                      Check anonymous if you want your name hidden from
+                      admin views.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleSubmit} className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="reply-message">Send a reply</Label>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Textarea
-                            id="reply-message"
-                            placeholder="Type your message..."
-                            rows={2}
-                            value={messageDraft}
-                            onChange={(e) => setMessageDraft(e.target.value)}
-                            disabled={isSendingMessage}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" && !event.shiftKey) {
-                                event.preventDefault();
-                                void handleSendMessage();
-                              }
-                            }}
-                          />
-                          <Button
-                            type="button"
-                            onClick={handleSendMessage}
-                            className="bg-accent hover:bg-accent/90"
-                            disabled={isSendingMessage}
+                        <Label htmlFor="type">Feedback Type *</Label>
+                        {isHydrated ? (
+                          <Select
+                            value={formData.type}
+                            onValueChange={(value) =>
+                              setFormData({ ...formData, type: value })
+                            }
+                            required
                           >
-                            {isSendingMessage ? "Sending..." : "Send"}
-                          </Button>
+                            <SelectTrigger id="type">
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="suggestion">
+                                Suggestion
+                              </SelectItem>
+                              <SelectItem value="complaint">Complaint</SelectItem>
+                              <SelectItem value="inquiry">Inquiry</SelectItem>
+                              <SelectItem value="request">Request</SelectItem>
+                              <SelectItem value="compliment">Compliment</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div
+                            className="h-10 rounded-md border bg-muted/30"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="category">Category *</Label>
+                        {isHydrated ? (
+                          <Select
+                            value={formData.category}
+                            onValueChange={(value) =>
+                              setFormData({ ...formData, category: value })
+                            }
+                            required
+                          >
+                            <SelectTrigger id="category">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((category) => (
+                                <SelectItem key={category} value={category}>
+                                  {category}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div
+                            className="h-10 rounded-md border bg-muted/30"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="priority">Severity Level *</Label>
+                        {isHydrated ? (
+                          <Select
+                            value={formData.priority}
+                            onValueChange={(value) =>
+                              setFormData({ ...formData, priority: value })
+                            }
+                            required
+                          >
+                            <SelectTrigger id="priority">
+                              <SelectValue placeholder="Select severity" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Low">Low</SelectItem>
+                              <SelectItem value="Medium">Medium</SelectItem>
+                              <SelectItem value="High">High</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div
+                            className="h-10 rounded-md border bg-muted/30"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="subject">Subject *</Label>
+                        <Input
+                          id="subject"
+                          placeholder="Brief summary of your feedback"
+                          value={formData.subject}
+                          onChange={(e) =>
+                            setFormData({ ...formData, subject: e.target.value })
+                          }
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="message">Message *</Label>
+                        <Textarea
+                          id="message"
+                          placeholder="Provide detailed information about your feedback..."
+                          rows={5}
+                          value={formData.message}
+                          onChange={(e) =>
+                            setFormData({ ...formData, message: e.target.value })
+                          }
+                          required
+                        />
+                      </div>
+
+                      <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-4">
+                        <Checkbox
+                          id="is-anonymous"
+                          checked={isAnonymous}
+                          onCheckedChange={(checked) =>
+                            setIsAnonymous(checked === true)
+                          }
+                          className="mt-0.5"
+                        />
+                        <div className="space-y-1">
+                          <Label
+                            htmlFor="is-anonymous"
+                            className="cursor-pointer text-sm font-medium"
+                          >
+                            Submit anonymously
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            When checked, your name will be hidden to the admins.
+                          </p>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                </CardContent>
-              </Card>
-            ) : feedbacks.length > 0 ? (
+
+                      <Button
+                        type="submit"
+                        className="w-full bg-accent hover:bg-accent/90"
+                      >
+                        <Send className="mr-2 h-4 w-4" />
+                        Submit Feedback
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
               <Card className="shadow-lg h-full min-h-0 flex flex-col overflow-hidden">
                 <CardHeader>
-                  <CardTitle>My Submissions</CardTitle>
+                  <CardTitle>Feedback Submission</CardTitle>
                   <CardDescription>
-                    Your recent feedback submissions
+                    Track feedback and browse your recent submissions
                   </CardDescription>
                 </CardHeader>
-                <CardContent
-                  ref={submissionsScrollRef}
-                  className="space-y-4 flex-1 min-h-0 overflow-y-auto max-h-[420px] sm:max-h-none"
-                  onScroll={(event) => {
-                    const top = event.currentTarget.scrollTop;
-                    submissionsScrollTop.current = top;
-                    if (typeof window !== "undefined") {
-                      window.localStorage.setItem(
-                        submissionsScrollKey,
-                        top.toString(),
-                      );
-                    }
-                  }}
-                >
-                  {[...feedbacks].sort((a, b) => {
-                    const order = ["pending", "in progress", "resolved"];
-                    const aIndex = order.indexOf(a.status.toLowerCase());
-                    const bIndex = order.indexOf(b.status.toLowerCase());
-                    const safeA = aIndex === -1 ? order.length : aIndex;
-                    const safeB = bIndex === -1 ? order.length : bIndex;
-                    return safeA - safeB;
-                  }).map((feedback) => (
-                    <div
-                      key={feedback.id}
-                      className="relative p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => handleViewFeedback(feedback)}
-                    >
-                      {feedback.status.toLowerCase() === "pending" && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="absolute right-2 top-2 h-6 w-6 rounded-full text-rose-600 hover:bg-rose-600 hover:text-white"
-                          aria-label="Delete submission"
-                          title="Delete submission"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setDeleteTarget(feedback);
-                            setIsDeleteOpen(true);
-                          }}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      <div className="flex items-start justify-between gap-3 mb-2">
-                        <p className="min-w-0 flex-1 font-semibold break-words break-all">
-                          {feedback.subject}
-                        </p>
-                        <div className="w-14 flex justify-center flex-shrink-0 pt-0.5 mr-6">
-                          {(() => {
-                            const StatusIcon = getStatusIcon(feedback.status);
-                            return (
-                              <span
-                                aria-label={feedback.status}
-                                title={feedback.status}
-                                className={`inline-flex h-8 w-8 items-center justify-center rounded-full border shadow-sm ${getStatusIndicatorClass(
-                                  feedback.status,
-                                )}`}
-                              >
-                                <StatusIcon className="h-[18px] w-[18px]" />
-                              </span>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="font-mono">{feedback.id}</span>
-                        <span className="w-14 text-center mr-6 inline-block translate-y-1">
-                          {new Date(feedback.createdAt).toLocaleDateString(
-                            "en-US",
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="shadow-lg h-full flex flex-col">
-                <CardContent className="pt-6 flex-1 flex items-center">
-                  <div className="text-center py-8 w-full">
-                    <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      No Submissions Yet
-                    </h3>
-                    <p className="text-muted-foreground">
-                      Submit your first feedback using the form on the left.
-                    </p>
+                <CardContent className="space-y-5 flex-1 min-h-0 overflow-hidden">
+                  <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+                    <h3 className="text-sm font-semibold">Track Feedback</h3>
+                    <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        placeholder="e.g., FF-ABC123XYZ"
+                        value={searchTrackingId}
+                        onChange={(e) => setSearchTrackingId(e.target.value)}
+                        required
+                      />
+                      <Button
+                        type="submit"
+                        className="bg-accent hover:bg-accent/90"
+                      >
+                        <Search className="mr-2 h-4 w-4" />
+                        Search
+                      </Button>
+                    </form>
                   </div>
+
+                  {sortedFeedbacks.length === 0 ? (
+                    <div className="rounded-lg border py-10 text-center">
+                      <MessageCircle className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+                      <h3 className="text-sm font-semibold">No Submissions Yet</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Submit your first feedback in Home.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex min-h-0 flex-1 flex-col">
+                      <div className="mb-3">
+                        <h3 className="text-base font-semibold">My Submissions</h3>
+                        <p className="text-xs text-muted-foreground">
+                          Showing {showingStart}-{showingEnd} of {sortedFeedbacks.length}
+                        </p>
+                      </div>
+
+                      <div className="mb-2 grid grid-cols-[1fr_auto] rounded-md bg-muted/60 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        <span>Submission</span>
+                        <span className="pr-10">Status / Date</span>
+                      </div>
+
+                      <div
+                        ref={submissionsScrollRef}
+                        className="space-y-3 flex-1 min-h-0 overflow-y-auto pr-1"
+                        onScroll={(event) => {
+                          const top = event.currentTarget.scrollTop;
+                          submissionsScrollTop.current = top;
+                          if (typeof window !== "undefined") {
+                            window.localStorage.setItem(
+                              submissionsScrollKey,
+                              top.toString(),
+                            );
+                          }
+                        }}
+                      >
+                        {paginatedFeedbacks.map((feedback) => (
+                          <div
+                            key={feedback.id}
+                            className="relative rounded-lg border bg-background p-4 transition-colors hover:bg-muted/40 cursor-pointer"
+                            onClick={() => handleViewFeedback(feedback)}
+                          >
+                            {feedback.status.toLowerCase() === "pending" && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-2 top-2 h-6 w-6 rounded-full text-rose-600 hover:bg-rose-600 hover:text-white"
+                                aria-label="Delete submission"
+                                title="Delete submission"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setDeleteTarget(feedback);
+                                  setIsDeleteOpen(true);
+                                }}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            <div className="mb-1 flex items-start justify-between gap-3">
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <p className="font-semibold break-words break-all">
+                                  {feedback.subject}
+                                </p>
+                                <p className="font-mono text-xs text-muted-foreground break-all">
+                                  {feedback.id}
+                                </p>
+                                <p className="text-xs text-muted-foreground capitalize">
+                                  {feedback.type} • {feedback.category}
+                                </p>
+                              </div>
+                              <div className="mr-6 flex flex-col items-end gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className={`capitalize ${getStatusIndicatorClass(
+                                    feedback.status,
+                                  )}`}
+                                >
+                                  {feedback.status}
+                                </Badge>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  {(() => {
+                                    const StatusIcon = getStatusIcon(feedback.status);
+                                    return <StatusIcon className="h-4 w-4" />;
+                                  })()}
+                                  <span>
+                                    {new Date(feedback.createdAt).toLocaleDateString(
+                                      "en-US",
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {totalSubmissionPages > 1 && (
+                        <Pagination className="mt-4 justify-end">
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                href="#"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  setSubmissionPage((current) =>
+                                    Math.max(1, current - 1),
+                                  );
+                                }}
+                                className={
+                                  submissionPage <= 1
+                                    ? "pointer-events-none opacity-50"
+                                    : ""
+                                }
+                              />
+                            </PaginationItem>
+                            {Array.from(
+                              { length: totalSubmissionPages },
+                              (_, index) => index + 1,
+                            ).map((pageNumber) => (
+                              <PaginationItem key={pageNumber}>
+                                <PaginationLink
+                                  href="#"
+                                  isActive={submissionPage === pageNumber}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    setSubmissionPage(pageNumber);
+                                  }}
+                                >
+                                  {pageNumber}
+                                </PaginationLink>
+                              </PaginationItem>
+                            ))}
+                            <PaginationItem>
+                              <PaginationNext
+                                href="#"
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  setSubmissionPage((current) =>
+                                    Math.min(totalSubmissionPages, current + 1),
+                                  );
+                                }}
+                                className={
+                                  submissionPage >= totalSubmissionPages
+                                    ? "pointer-events-none opacity-50"
+                                    : ""
+                                }
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
-          </div>
         </div>
       </div>
     </div>
