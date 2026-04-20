@@ -142,8 +142,17 @@ func SuperAdminCreateAdmin(c *fiber.Ctx) error {
 		})
 	}
 
+	normalizedEmail := strings.ToLower(strings.TrimSpace(req.Email))
+	if normalizedEmail == "" {
+		return c.Status(400).JSON(response.ResponseModel{
+			RetCode: "400",
+			Message: status.RetCode400,
+			Data:    errors.ErrorModel{Message: "Email is required", IsSuccess: false},
+		})
+	}
+
 	var existing model.Admin
-	if db.Table("public.admins").Where("email = ?", req.Email).First(&existing).Error == nil {
+	if db.Table("public.admins").Where("LOWER(TRIM(email)) = ?", normalizedEmail).First(&existing).Error == nil {
 		return c.Status(409).JSON(response.ResponseModel{
 			RetCode: "409",
 			Message: "Email already registered",
@@ -174,7 +183,7 @@ func SuperAdminCreateAdmin(c *fiber.Ctx) error {
 		ID:        fmt.Sprintf("ADMIN-%d", time.Now().UnixMilli()),
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
-		Email:     req.Email,
+		Email:     normalizedEmail,
 		Password:  string(hashedPassword),
 		Unit:      req.Unit,
 		CreatedAt: now,
@@ -202,7 +211,7 @@ func SuperAdminCreateAdmin(c *fiber.Ctx) error {
 	adminSetupMu.Lock()
 	cleanupExpiredAdminSetupTokens(nowTime)
 	adminSetupTokens[setupToken] = adminSetupEntry{
-		Email:     strings.ToLower(strings.TrimSpace(req.Email)),
+		Email:     normalizedEmail,
 		ExpiresAt: nowTime.Add(24 * time.Hour),
 	}
 	adminSetupMu.Unlock()
@@ -354,7 +363,6 @@ func SuperAdminUpdateAdmin(c *fiber.Ctx) error {
 		FirstName string `json:"firstName"`
 		LastName  string `json:"lastName"`
 		Email     string `json:"email"`
-		Password  string `json:"password"`
 		Unit      string `json:"unit"`
 	}
 	if err := c.BodyParser(&req); err != nil {
@@ -363,6 +371,30 @@ func SuperAdminUpdateAdmin(c *fiber.Ctx) error {
 			Message: status.RetCode400,
 			Data:    errors.ErrorModel{Message: "Invalid request body", IsSuccess: false, Error: err},
 		})
+	}
+
+	var existing model.Admin
+	if err := db.Table("public.admins").Where("id = ?", id).First(&existing).Error; err != nil {
+		return c.Status(404).JSON(response.ResponseModel{
+			RetCode: "404",
+			Message: "Admin not found",
+			Data:    errors.ErrorModel{Message: "Admin not found", IsSuccess: false, Error: err},
+		})
+	}
+
+	if strings.TrimSpace(req.Email) != "" {
+		incomingEmail := strings.ToLower(strings.TrimSpace(req.Email))
+		currentEmail := strings.ToLower(strings.TrimSpace(existing.Email))
+		if incomingEmail != currentEmail {
+			return c.Status(400).JSON(response.ResponseModel{
+				RetCode: "400",
+				Message: status.RetCode400,
+				Data: errors.ErrorModel{
+					Message:   "Admin email cannot be changed",
+					IsSuccess: false,
+				},
+			})
+		}
 	}
 
 	updates := map[string]any{
@@ -374,22 +406,8 @@ func SuperAdminUpdateAdmin(c *fiber.Ctx) error {
 	if req.LastName != "" {
 		updates["last_name"] = req.LastName
 	}
-	if req.Email != "" {
-		updates["email"] = req.Email
-	}
 	if req.Unit != "" {
 		updates["unit"] = req.Unit
-	}
-	if req.Password != "" {
-		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-		if err != nil {
-			return c.Status(500).JSON(response.ResponseModel{
-				RetCode: "500",
-				Message: status.RetCode500,
-				Data:    errors.ErrorModel{Message: "Failed to process password", IsSuccess: false, Error: err},
-			})
-		}
-		updates["password"] = string(hashed)
 	}
 
 	if err := db.Table("public.admins").Where("id = ?", id).Updates(updates).Error; err != nil {

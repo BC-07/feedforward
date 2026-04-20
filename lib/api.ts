@@ -206,7 +206,7 @@ export const createAdminBySuperAdmin = (data: {
 
 export const updateAdminBySuperAdmin = (
   id: string,
-  data: { firstName: string; lastName: string; email: string; password: string; unit: string },
+  data: { firstName: string; lastName: string; email: string; unit: string },
 ) =>
   superAdminRequest<Admin>(`/superadmin/admins/${id}`, {
     method: "PUT",
@@ -258,7 +258,7 @@ export const createFeedback = (data: {
   subject: string;
   message: string;
   status?: string;
-  userId: string;
+  userId?: string | null;
   userName: string;
   userEmail?: string;
   isAnonymous: boolean;

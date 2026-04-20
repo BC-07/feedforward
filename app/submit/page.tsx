@@ -1,8 +1,9 @@
 ﻿"use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createFeedback, listCategories } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,53 +21,56 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { AlertTriangle, ArrowRight, Send } from "lucide-react";
-import { submitFeedback, moderateFeedback, listCategories, type Category } from "@/frontend/api";
+import { ArrowRight, Send } from "lucide-react";
+import { useDraftStorage } from "@/lib/useDraftStorage";
+import { toastApiError } from "@/lib/errorHandling";
 
 interface FormData {
   type: string;
   category: string;
-  priority: string;
   subject: string;
   message: string;
-  isAnonymous: boolean;
 }
 
 export default function Submit() {
-  const [formData, setFormData] = useState<FormData>({
+  const router = useRouter();
+  const draftKey = "ff:submitDraft";
+  const {
+    value: formData,
+    setValue: setFormData,
+    clear: clearDraft,
+  } = useDraftStorage<FormData>(draftKey, {
     type: "",
     category: "",
-    priority: "Medium",
     subject: "",
     message: "",
-    isAnonymous: false,
   });
+  const userEmail =
+    typeof window !== "undefined"
+      ? localStorage.getItem("currentUserEmail") || ""
+      : "";
   const [trackingId, setTrackingId] = useState<string | null>(null);
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isCheckingModeration, setIsCheckingModeration] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [moderationNotice, setModerationNotice] = useState<{
-    severity: "warning" | "offensive";
-    message: string;
-  } | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
 
   useEffect(() => {
-    listCategories()
-      .then(setCategories)
-      .catch(() => {
-        toast.error("Failed to load categories.");
+    void listCategories()
+      .then((data) =>
+        setCategories(
+          data
+            .map((category) => category.name)
+            .filter((name) => {
+              const normalized = name.toLowerCase();
+              return normalized !== "disabled" && normalized !== "inactive";
+            }),
+        ),
+      )
+      .catch((error) => {
+        toastApiError(error, "Failed to load categories.");
       });
   }, []);
+
+  // Draft storage handled by useDraftStorage.
 
   const copyToClipboard = (text: string) => {
     const textArea = document.createElement("textarea");
@@ -86,74 +90,61 @@ export default function Submit() {
     document.body.removeChild(textArea);
   };
 
-  const submitFeedbackEntry = async () => {
-    setIsLoading(true);
-    try {
-      const userId = localStorage.getItem("currentUserId") || "";
-      const userName = localStorage.getItem("currentUserName") || "Guest User";
-
-      const res = await submitFeedback({
-        type: formData.type,
-        category: formData.category,
-        priority: formData.priority,
-        subject: formData.subject,
-        message: formData.message,
-        userId,
-        userName,
-        isAnonymous: formData.isAnonymous,
-      });
-
-      setIsConfirmOpen(false);
-      setTrackingId(res.data.id);
-      toast.success("Feedback submitted successfully!");
-      setModerationNotice(null);
-      setFormData({ type: "", category: "", priority: "Medium", subject: "", message: "", isAnonymous: false });
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Failed to submit feedback");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    setIsCheckingModeration(true);
+    const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
+
     try {
-      const moderationRes = await moderateFeedback({
-        subject: formData.subject,
-        message: formData.message,
+      const userId =
+        typeof window !== "undefined"
+          ? localStorage.getItem("currentUserId")
+          : null;
+      const userName =
+        typeof window !== "undefined"
+          ? localStorage.getItem("currentUserName") || "Guest"
+          : "Guest";
+
+      await createFeedback({
+        id: newTrackingId,
+        ...formData,
+        userId,
+        userName,
+        userEmail: userEmail || undefined,
+        status: "Pending",
+        priority: "Medium",
+        isAnonymous: true,
+        response: "",
       });
 
-      const words = moderationRes.data.matched_words.join(", ");
-      const detail = words ? ` Matched words: ${words}.` : "";
-      const message = `${moderationRes.data.reason}${detail}`;
-
-      if (moderationRes.data.severity === "offensive") {
-        setModerationNotice({ severity: "offensive", message });
-        toast.error(moderationRes.data.reason);
+      setTrackingId(newTrackingId);
+      toast.success("Feedback submitted successfully!");
+      setFormData({ type: "", category: "", subject: "", message: "" });
+      clearDraft();
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(draftKey);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to submit feedback.";
+      if (message.toLowerCase().includes("log in again")) {
+        localStorage.removeItem("isUserLoggedIn");
+        localStorage.removeItem("currentUserId");
+        localStorage.removeItem("currentUserName");
+        localStorage.removeItem("currentUserEmail");
+        toast.error("Your session is no longer valid. Please log in again.");
+        router.push("/login");
         return;
       }
-
-      if (moderationRes.data.severity === "warning") {
-        setModerationNotice({ severity: "warning", message });
-        toast.warning(moderationRes.data.reason);
-      } else {
-        setModerationNotice(null);
-      }
-    } catch {
-      setModerationNotice(null);
-      // If moderation pre-check fails, let the user continue.
-    } finally {
-      setIsCheckingModeration(false);
+      toast.error(
+        message,
+      );
     }
-
-    setIsConfirmOpen(true);
   };
 
   if (trackingId) {
     return (
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center bg-gradient-to-br from-white to-muted p-4">
+      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
         <Card className="max-w-lg w-full shadow-lg">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
@@ -175,16 +166,36 @@ export default function Submit() {
               Please save this tracking ID to check the status of your
               submission.
             </p>
-            <div className="flex gap-3">
+            {userEmail ? (
+              <p className="text-xs text-muted-foreground text-center">
+                A copy of this tracking ID was sent to {userEmail}.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground text-center">
+                Sign in to receive email updates when your feedback is resolved.
+              </p>
+            )}
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 variant="outline"
-                className="flex-1"
+                className="flex-1 w-full"
                 onClick={() => copyToClipboard(trackingId)}
               >
                 Copy ID
               </Button>
               <Button
-                className="flex-1 bg-accent hover:bg-accent/90"
+                variant="outline"
+                className="flex-1 w-full"
+                onClick={() =>
+                  router.push(
+                    `/track?trackingId=${encodeURIComponent(trackingId)}`,
+                  )
+                }
+              >
+                Track Submission
+              </Button>
+              <Button
+                className="flex-1 w-full bg-accent hover:bg-accent/90"
                 onClick={() => setTrackingId(null)}
               >
                 Submit Another
@@ -197,37 +208,22 @@ export default function Submit() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted p-4 py-12">
+    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
       <div className="container mx-auto max-w-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-3">Submit Your Feedback</h1>
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3">Submit Your Feedback</h1>
           <p className="text-muted-foreground">
-            Help us improve by sharing your feedback, concerns, requests, and
-            recommendations.
+            Help us improve by sharing your suggestions, complaints, and
+            inquiries.
           </p>
         </div>
 
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>Feedback Form</CardTitle>
-            <CardDescription>
-              Submissions are recorded with submitter identity for transparency
-            </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {moderationNotice && (
-                <Alert variant={moderationNotice.severity === "offensive" ? "destructive" : "default"}>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>
-                    {moderationNotice.severity === "offensive"
-                      ? "Offensive content detected"
-                      : "Warning: Mild negativity detected"}
-                  </AlertTitle>
-                  <AlertDescription>{moderationNotice.message}</AlertDescription>
-                </Alert>
-              )}
-
+            <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="type">Feedback Type *</Label>
                 <Select
@@ -238,20 +234,16 @@ export default function Submit() {
                   required
                 >
                   <SelectTrigger id="type">
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="suggestion">Suggestion</SelectItem>
-                    <SelectItem value="inquiry">Inquiry</SelectItem>
-                    <SelectItem value="concern">Concern</SelectItem>
-                    <SelectItem value="complaint">Complaint</SelectItem>
-                    <SelectItem value="compliment">Compliment</SelectItem>
-                    <SelectItem value="request">Request</SelectItem>
-                    <SelectItem value="recommendation">Recommendation</SelectItem>
-                    <SelectItem value="clarification">Clarification</SelectItem>
-                    <SelectItem value="report">Report</SelectItem>
-                  </SelectContent>
-                </Select>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="suggestion">Suggestion</SelectItem>
+                      <SelectItem value="complaint">Complaint</SelectItem>
+                      <SelectItem value="inquiry">Inquiry</SelectItem>
+                      <SelectItem value="request">Request</SelectItem>
+                      <SelectItem value="compliment">Compliment</SelectItem>
+                    </SelectContent>
+                  </Select>
               </div>
 
               <div className="space-y-2">
@@ -267,38 +259,11 @@ export default function Submit() {
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.length === 0 ? (
-                      <SelectItem value="__none" disabled>
-                        No categories available
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
                       </SelectItem>
-                    ) : (
-                      categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.name}>
-                          {cat.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="priority">Severity Level *</Label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, priority: value })
-                  }
-                  required
-                >
-                  <SelectTrigger id="priority">
-                    <SelectValue placeholder="Select severity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">Low</SelectItem>
-                    <SelectItem value="Medium">Medium</SelectItem>
-                    <SelectItem value="High">High</SelectItem>
-                    <SelectItem value="Urgent">Urgent</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -309,10 +274,9 @@ export default function Submit() {
                   id="subject"
                   placeholder="Brief summary of your feedback"
                   value={formData.subject}
-                  onChange={(e) => {
-                    if (moderationNotice) setModerationNotice(null);
-                    setFormData({ ...formData, subject: e.target.value });
-                  }}
+                  onChange={(e) =>
+                    setFormData({ ...formData, subject: e.target.value })
+                  }
                   required
                 />
               </div>
@@ -322,101 +286,26 @@ export default function Submit() {
                 <Textarea
                   id="message"
                   placeholder="Provide detailed information about your feedback..."
-                  rows={6}
+                  rows={5}
                   value={formData.message}
-                  onChange={(e) => {
-                    if (moderationNotice) setModerationNotice(null);
-                    setFormData({ ...formData, message: e.target.value });
-                  }}
+                  onChange={(e) =>
+                    setFormData({ ...formData, message: e.target.value })
+                  }
                   required
                 />
-              </div>
-
-              <div className="flex items-start gap-2">
-                <Checkbox
-                  id="is-anonymous"
-                  checked={formData.isAnonymous}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, isAnonymous: checked === true })
-                  }
-                />
-                <Label htmlFor="is-anonymous" className="text-sm text-muted-foreground leading-5">
-                  Submit anonymously
-                </Label>
               </div>
 
               <Button
                 type="submit"
                 className="w-full bg-accent hover:bg-accent/90"
                 size="lg"
-                disabled={isLoading || isCheckingModeration}
               >
                 <Send className="mr-2 h-4 w-4" />
-                {isLoading ? "Submitting..." : isCheckingModeration ? "Checking content..." : "Submit Feedback"}
+                Submit Feedback
               </Button>
             </form>
           </CardContent>
         </Card>
-
-        <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Confirm Feedback Submission</DialogTitle>
-              <DialogDescription>
-                Review your details below before sending.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-[140px_1fr] gap-2">
-                <p className="text-muted-foreground">Type</p>
-                <p className="font-medium capitalize">{formData.type || "-"}</p>
-              </div>
-              <div className="grid grid-cols-[140px_1fr] gap-2">
-                <p className="text-muted-foreground">Category</p>
-                <p className="font-medium">{formData.category || "-"}</p>
-              </div>
-              <div className="grid grid-cols-[140px_1fr] gap-2">
-                <p className="text-muted-foreground">Severity Level</p>
-                <p className="font-medium">{formData.priority || "-"}</p>
-              </div>
-              <div className="grid grid-cols-[140px_1fr] gap-2">
-                <p className="text-muted-foreground">Subject</p>
-                <p className="font-medium">{formData.subject || "-"}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground">Message</p>
-                <div className="rounded-md border bg-muted/30 px-3 py-2 max-h-40 overflow-auto">
-                  <p className="whitespace-pre-wrap break-all">{formData.message || "-"}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-[140px_1fr] gap-2">
-                <p className="text-muted-foreground">Anonymous</p>
-                <p className="font-medium">{formData.isAnonymous ? "Yes" : "No"}</p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={() => setIsConfirmOpen(false)}
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                className="flex-1 bg-accent hover:bg-accent/90"
-                onClick={submitFeedbackEntry}
-                disabled={isLoading}
-              >
-                {isLoading ? "Submitting..." : "Confirm & Submit"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </div>
   );

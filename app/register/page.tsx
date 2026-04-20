@@ -1,19 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { registerUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
@@ -21,79 +15,38 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserPlus, Mail, Lock, User } from "lucide-react";
-import { registerUser } from "@/frontend/api";
-
-function TermsContent() {
-  return (
-    <div className="space-y-5 text-sm leading-6 text-foreground">
-      <section>
-        <h2 className="text-base font-semibold">1. Account Responsibility</h2>
-        <p>
-          You are responsible for maintaining the confidentiality of your login credentials and
-          for activities performed using your account.
-        </p>
-      </section>
-
-      <section>
-        <h2 className="text-base font-semibold">2. Acceptable Use</h2>
-        <p>
-          You agree to use the platform only for lawful and legitimate feedback purposes. Misuse,
-          abuse, or any attempt to disrupt the system is prohibited.
-        </p>
-      </section>
-
-      <section>
-        <h2 className="text-base font-semibold">3. Data and Privacy</h2>
-        <p>
-          Submitted feedback and account details may be stored and processed for service delivery,
-          issue resolution, and system improvement.
-        </p>
-      </section>
-
-      <section>
-        <h2 className="text-base font-semibold">4. Administrative Control</h2>
-        <p>
-          The system administrators may manage account access, including disabling accounts when
-          required for policy compliance or security reasons.
-        </p>
-      </section>
-
-      <section>
-        <h2 className="text-base font-semibold">5. Changes to Terms</h2>
-        <p>
-          These terms may be updated from time to time. Continued use of the platform after
-          updates constitutes acceptance of the revised terms.
-        </p>
-      </section>
-    </div>
-  );
-}
+import { toastApiError } from "@/lib/errorHandling";
+import { UserPlus, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 
 export default function Signup() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
     password: "",
     confirmPassword: "",
-    termsAccepted: false,
   });
-
-  useEffect(() => {
-    const isUserLoggedIn = localStorage.getItem("isUserLoggedIn") === "true";
-    const currentUserId = localStorage.getItem("currentUserId");
-    if (isUserLoggedIn && currentUserId) {
-      router.replace("/user");
-    }
-  }, [router]);
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    if (!hasAcceptedTerms) {
+      toast.error("You must accept the Terms and Conditions");
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       toast.error("Passwords do not match");
       return;
@@ -102,42 +55,24 @@ export default function Signup() {
       toast.error("Password must be at least 6 characters");
       return;
     }
-    if (!formData.termsAccepted) {
-      toast.error("Please accept Terms & Conditions");
-      return;
-    }
 
-    setIsLoading(true);
     try {
       await registerUser({
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
         password: formData.password,
-        termsAccepted: formData.termsAccepted,
       });
       toast.success("Account created successfully!");
       router.push("/login");
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Registration failed");
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      toastApiError(error, "Failed to create account.");
     }
   };
 
   return (
-    <div
-      className="relative min-h-screen overflow-hidden bg-cover bg-center bg-no-repeat"
-      style={{ backgroundImage: "url('/login-bg.svg')" }}
-    >
-      <div className="absolute inset-0 bg-black/5" />
-
-      <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
-        <div className="relative w-full max-w-md">
-          <div className="pointer-events-none absolute -left-6 -top-6 h-16 w-16 rounded-full bg-accent/90 shadow-lg" />
-          <div className="pointer-events-none absolute -bottom-5 -right-5 h-10 w-10 rounded-full bg-accent/80 shadow-md" />
-
-          <Card className="relative w-full border-0 bg-card shadow-2xl rounded-3xl">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted p-4 sm:p-6">
+      <Card className="max-w-2xl w-full shadow-lg">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
             <UserPlus className="h-8 w-8 text-accent" />
@@ -150,7 +85,7 @@ export default function Signup() {
 
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="first-name">
                   First Name <span className="text-destructive">*</span>
@@ -159,11 +94,14 @@ export default function Signup() {
                   <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="first-name"
-                    placeholder="First name"
+                    placeholder="Enter your first name"
                     className="pl-10"
                     value={formData.firstName}
                     onChange={(e) =>
-                      setFormData({ ...formData, firstName: e.target.value })
+                      setFormData({
+                        ...formData,
+                        firstName: e.target.value,
+                      })
                     }
                     required
                   />
@@ -177,11 +115,14 @@ export default function Signup() {
                   <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="last-name"
-                    placeholder="Last name"
+                    placeholder="Enter your last name"
                     className="pl-10"
                     value={formData.lastName}
                     onChange={(e) =>
-                      setFormData({ ...formData, lastName: e.target.value })
+                      setFormData({
+                        ...formData,
+                        lastName: e.target.value,
+                      })
                     }
                     required
                   />
@@ -202,14 +143,17 @@ export default function Signup() {
                   className="pl-10"
                   value={formData.email}
                   onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
+                    setFormData({
+                      ...formData,
+                      email: e.target.value,
+                    })
                   }
                   required
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="password">
                   Password <span className="text-destructive">*</span>
@@ -218,16 +162,36 @@ export default function Signup() {
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     placeholder="Create a password"
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     value={formData.password}
                     onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
+                      setFormData({
+                        ...formData,
+                        password: e.target.value,
+                      })
                     }
                     required
                   />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
+                {formData.password.length > 0 && formData.password.length < 6 ? (
+                  <p className="text-xs text-muted-foreground">
+                    Password must be at least 6 characters
+                  </p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">
@@ -237,9 +201,9 @@ export default function Signup() {
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="confirm-password"
-                    type="password"
-                    placeholder="Confirm password"
-                    className="pl-10"
+                    type={showConfirm ? "text" : "password"}
+                    placeholder="Confirm your password"
+                    className="pl-10 pr-10"
                     value={formData.confirmPassword}
                     onChange={(e) =>
                       setFormData({
@@ -249,67 +213,113 @@ export default function Signup() {
                     }
                     required
                   />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowConfirm((prev) => !prev)}
+                    aria-label={showConfirm ? "Hide password" : "Show password"}
+                  >
+                    {showConfirm ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Password must be at least 6 characters
-            </p>
 
-            <div className="flex items-start gap-2">
+            <div className="flex items-start gap-3 rounded-md border border-border p-3">
               <Checkbox
-                id="terms"
-                checked={formData.termsAccepted}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, termsAccepted: checked === true })
-                }
+                id="accept-terms"
+                checked={hasAcceptedTerms}
+                onCheckedChange={(value) => setHasAcceptedTerms(Boolean(value))}
+                className="mt-1"
               />
-              <Label htmlFor="terms" className="text-xs text-muted-foreground leading-5">
-                I agree to the{" "}
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <button
-                      type="button"
-                      className="text-accent font-medium hover:underline"
-                    >
-                      Terms & Conditions
-                    </button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-2xl">
-                    <DialogTitle>Terms & Conditions</DialogTitle>
-                    <DialogDescription>
-                      By creating and using a FeedForward account, you agree to the following terms.
-                    </DialogDescription>
-                    <div className="max-h-[60vh] overflow-y-auto pr-1">
-                      <TermsContent />
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </Label>
+              <div className="space-y-1 text-sm">
+                <Label htmlFor="accept-terms" className="font-normal">
+                  I agree to the{" "}
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-accent font-medium hover:underline"
+                      >
+                        Terms and Conditions
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>FeedForward Terms and Conditions</DialogTitle>
+                        <DialogDescription>
+                          Please read these terms carefully before creating your account.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 text-sm text-muted-foreground leading-relaxed">
+                        <section className="space-y-2">
+                          <h4 className="text-foreground font-semibold">1. Account Use</h4>
+                          <p>
+                            You agree to provide accurate information and to keep your account
+                            credentials secure. You are responsible for all activity that occurs
+                            under your account.
+                          </p>
+                        </section>
+                        <section className="space-y-2">
+                          <h4 className="text-foreground font-semibold">2. Acceptable Use</h4>
+                          <p>
+                            You will use FeedForward only for lawful purposes and will not submit
+                            content that is harmful, abusive, or violates the rights of others.
+                          </p>
+                        </section>
+                        <section className="space-y-2">
+                          <h4 className="text-foreground font-semibold">3. Feedback Content</h4>
+                          <p>
+                            By submitting feedback, you grant the organization permission to review,
+                            store, and act on your submissions for service improvement and support.
+                          </p>
+                        </section>
+                        <section className="space-y-2">
+                          <h4 className="text-foreground font-semibold">4. Privacy</h4>
+                          <p>
+                            We collect and process your data to provide the service. Personal
+                            information is handled according to our internal privacy and data
+                            protection practices.
+                          </p>
+                        </section>
+                        <section className="space-y-2">
+                          <h4 className="text-foreground font-semibold">5. Changes to Terms</h4>
+                          <p>
+                            We may update these terms from time to time. Continued use of the service
+                            after changes means you accept the updated terms.
+                          </p>
+                        </section>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  .
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  You must accept the terms to create an account.
+                </p>
+              </div>
             </div>
-
             <Button
               type="submit"
               className="w-full bg-accent hover:bg-accent/90"
               size="lg"
-              disabled={isLoading}
+              disabled={!hasAcceptedTerms}
             >
-              {isLoading ? "Creating account..." : "Create Account"}
+              Create Account
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Link
-                href="/login"
-                className="text-accent font-medium hover:underline"
-              >
+              <Link href="/login" className="text-accent font-medium hover:underline">
                 Log in
               </Link>
             </p>
           </form>
         </CardContent>
-          </Card>
-        </div>
-      </div>
+      </Card>
     </div>
   );
 }

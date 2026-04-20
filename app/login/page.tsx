@@ -23,14 +23,18 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const isMounted = typeof window !== "undefined";
   const [expiredMessage] = useState(() => {
     if (typeof window === "undefined") return "";
-    return localStorage.getItem("sessionExpiredMessage") || "";
+    const storedMessage = localStorage.getItem("sessionExpiredMessage") || "";
+    if (storedMessage) {
+      localStorage.removeItem("sessionExpiredMessage");
+    }
+    return storedMessage;
   });
 
   useEffect(() => {
     if (expiredMessage) {
-      localStorage.removeItem("sessionExpiredMessage");
       toast.error(expiredMessage);
     }
   }, [expiredMessage]);
@@ -62,7 +66,7 @@ export default function Login() {
       localStorage.removeItem("superAdminName");
       localStorage.removeItem("superAdminExpiresAt");
       toast.success(`Welcome back, ${user.name}!`);
-      router.push("/user");
+      router.push("/user/submit-feedback");
       return;
     } catch {
       // Try admin login with the same form credentials.
@@ -123,7 +127,7 @@ export default function Login() {
           </CardHeader>
 
           <CardContent>
-            {expiredMessage ? (
+            {isMounted && expiredMessage ? (
               <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 {expiredMessage}
               </div>

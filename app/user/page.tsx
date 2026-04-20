@@ -1,5 +1,6 @@
 ﻿"use client";
 import {
+  Suspense,
   startTransition,
   useCallback,
   useEffect,
@@ -7,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   createFeedback,
   createFeedbackMessage,
@@ -61,6 +62,7 @@ import { useDraftStorage } from "@/lib/useDraftStorage";
 import { toastApiError } from "@/lib/errorHandling";
 import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
 import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
+import UserDashboard from "@/components/user/UserDashboard";
 import {
   ArrowRight,
   Send,
@@ -74,8 +76,9 @@ import {
   Copy,
 } from "lucide-react";
 
-export default function UserProfile() {
+function UserProfileContent() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const draftKey = "userFeedbackDraft";
   const emptyForm = {
@@ -115,8 +118,12 @@ export default function UserProfile() {
   const [messageDraft, setMessageDraft] = useState("");
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const activePanel =
-    searchParams.get("panel") === "feedback" ? "feedback" : "home";
+  const isSubmitFeedbackPage =
+    pathname === "/user" || pathname === "/user/submit-feedback";
+  const isTrackFeedbackPage = pathname === "/user/track-feedback";
+  const isMySubmissionsPage =
+    pathname === "/user/my-submissions" ||
+    searchParams.get("panel") === "feedback";
   const [submissionPage, setSubmissionPage] = useState(1);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
@@ -958,9 +965,9 @@ export default function UserProfile() {
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-6 sm:py-8">
+      <UserDashboard>
         <div ref={leftColumnRef} className="min-h-0">
-            {activePanel === "home" ? (
+            {isSubmitFeedbackPage && (
               <div className="mx-auto w-full max-w-3xl">
                 <h2 className="mb-3 text-xl font-bold sm:mb-4 sm:text-2xl">Submit Feedback</h2>
                 <Card className="shadow-lg">
@@ -1120,15 +1127,17 @@ export default function UserProfile() {
                   </CardContent>
                 </Card>
               </div>
-            ) : (
-              <Card className="shadow-lg h-full min-h-0 flex flex-col overflow-hidden">
+            )}
+
+            {isTrackFeedbackPage && (
+              <Card className="shadow-lg">
                 <CardHeader>
-                  <CardTitle>Feedback Submission</CardTitle>
+                  <CardTitle>Track Feedback</CardTitle>
                   <CardDescription>
-                    Track feedback and browse your recent submissions
+                    Search your feedback using a tracking ID.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-5 flex-1 min-h-0 overflow-hidden">
+                <CardContent>
                   <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
                     <h3 className="text-sm font-semibold">Track Feedback</h3>
                     <form onSubmit={handleSearch} className="flex flex-col gap-2 sm:flex-row">
@@ -1147,7 +1156,19 @@ export default function UserProfile() {
                       </Button>
                     </form>
                   </div>
+                </CardContent>
+              </Card>
+            )}
 
+            {isMySubmissionsPage && (
+              <Card className="shadow-lg h-full min-h-0 flex flex-col overflow-hidden">
+                <CardHeader>
+                  <CardTitle>My Submissions</CardTitle>
+                  <CardDescription>
+                    Browse your recent feedback submissions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5 flex-1 min-h-0 overflow-hidden">
                   {sortedFeedbacks.length === 0 ? (
                     <div className="rounded-lg border py-10 text-center">
                       <MessageCircle className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
@@ -1306,8 +1327,16 @@ export default function UserProfile() {
               </Card>
             )}
         </div>
-      </div>
+          </UserDashboard>
     </div>
   </>
+  );
+}
+
+export default function UserProfile() {
+  return (
+    <Suspense fallback={null}>
+      <UserProfileContent />
+    </Suspense>
   );
 }
