@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Search, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
-import { formatLocalTime } from "@/lib/time";
+import { formatLocalDateTime, formatLocalTime } from "@/lib/time";
 import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
 import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
 
@@ -131,13 +131,7 @@ function TrackFeedbackContent() {
   }, [feedback]);
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatLocalDateTime(dateString);
   };
 
   const formatAdminTime = formatLocalTime;

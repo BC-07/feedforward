@@ -57,7 +57,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
-import { formatLocalTime } from "@/lib/time";
+import { formatLocalDateTime, formatLocalTime } from "@/lib/time";
 import { useDraftStorage } from "@/lib/useDraftStorage";
 import { toastApiError } from "@/lib/errorHandling";
 import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
@@ -75,6 +75,8 @@ import {
   X,
   Copy,
 } from "lucide-react";
+
+const FEEDBACK_MESSAGE_MAX_LENGTH = 2000;
 
 function UserProfileContent() {
   const router = useRouter();
@@ -118,6 +120,7 @@ function UserProfileContent() {
   const [messageDraft, setMessageDraft] = useState("");
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const isSubmitFeedbackPage =
     pathname === "/user" || pathname === "/user/submit-feedback";
   const isTrackFeedbackPage = pathname === "/user/track-feedback";
@@ -130,6 +133,7 @@ function UserProfileContent() {
   const leftColumnRef = useRef<HTMLDivElement | null>(null);
   const submissionsScrollRef = useRef<HTMLDivElement | null>(null);
   const submissionsScrollTop = useRef(0);
+  const feedbackSubmitLockRef = useRef(false);
   const submissionsScrollKey = "userDashboardSubmissionsScrollTop";
 
   async function loadUserFeedbacks(userId: string) {
@@ -357,6 +361,10 @@ function UserProfileContent() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
+    if (formData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
+      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      return;
+    }
 
     setConfirmData({
       ...formData,
@@ -367,6 +375,13 @@ function UserProfileContent() {
 
   const handleConfirmSubmit = async () => {
     if (!currentUser) return;
+    if (feedbackSubmitLockRef.current) return;
+    if (confirmData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
+      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      return;
+    }
+    feedbackSubmitLockRef.current = true;
+    setIsSubmittingFeedback(true);
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
     try {
       await createFeedback({
@@ -400,6 +415,9 @@ function UserProfileContent() {
         return;
       }
       toast.error(message);
+    } finally {
+      feedbackSubmitLockRef.current = false;
+      setIsSubmittingFeedback(false);
     }
   };
 
@@ -515,13 +533,7 @@ function UserProfileContent() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatLocalDateTime(dateString);
   };
 
   const formatMessagePreview = (value: string) => {
@@ -702,15 +714,17 @@ function UserProfileContent() {
           <div className="mt-4 flex justify-end gap-2">
             <Button
               variant="outline"
+              disabled={isSubmittingFeedback}
               onClick={() => setIsConfirmOpen(false)}
             >
               Cancel
             </Button>
             <Button
               className="bg-accent hover:bg-accent/90"
+              disabled={isSubmittingFeedback}
               onClick={handleConfirmSubmit}
             >
-              Confirm & Submit
+              {isSubmittingFeedback ? "Submitting..." : "Confirm & Submit"}
             </Button>
           </div>
         </DialogContent>
@@ -1086,12 +1100,22 @@ function UserProfileContent() {
                           id="message"
                           placeholder="Provide detailed information about your feedback..."
                           rows={5}
+                          maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
                           value={formData.message}
                           onChange={(e) =>
-                            setFormData({ ...formData, message: e.target.value })
+                            setFormData({
+                              ...formData,
+                              message: e.target.value.slice(
+                                0,
+                                FEEDBACK_MESSAGE_MAX_LENGTH,
+                              ),
+                            })
                           }
                           required
                         />
+                        <p className="text-right text-xs text-muted-foreground">
+                          {formData.message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
+                        </p>
                       </div>
 
                       <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-4">

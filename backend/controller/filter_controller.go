@@ -65,6 +65,7 @@ var fallbackFeedbackWordRules = []feedbackWordRule{
 	{Word: "tanga", Severity: "offensive"},
 	{Word: "ulol", Severity: "offensive"},
 	{Word: "whore", Severity: "offensive"},
+	{Word: "67", Severity: "offensive"},
 }
 
 func normalizeFeedbackText(text string) string {
