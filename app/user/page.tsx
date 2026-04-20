@@ -65,6 +65,7 @@ import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
 import UserDashboard from "@/components/user/UserDashboard";
 import {
   ArrowRight,
+  ArrowUpDown,
   Send,
   Search,
   Clock,
@@ -121,6 +122,12 @@ function UserProfileContent() {
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const [submissionSortField, setSubmissionSortField] = useState<
+    "type" | "category" | "status" | "date"
+  >("date");
+  const [submissionSortDirection, setSubmissionSortDirection] = useState<
+    "asc" | "desc"
+  >("desc");
   const isSubmitFeedbackPage =
     pathname === "/user" || pathname === "/user/submit-feedback";
   const isTrackFeedbackPage = pathname === "/user/track-feedback";
@@ -533,7 +540,7 @@ function UserProfileContent() {
   };
 
   const formatDate = (dateString: string) => {
-    return formatLocalDateTime(dateString);
+    return formatLocalDateTime(dateString).replace(/\s+at\s+/i, " ");
   };
 
   const formatMessagePreview = (value: string) => {
@@ -545,15 +552,49 @@ function UserProfileContent() {
     return result;
   };
 
+  const toggleSubmissionSort = (
+    field: "type" | "category" | "status" | "date",
+  ) => {
+    setSubmissionPage(1);
+    setSubmissionSortField((currentField) => {
+      if (currentField === field) {
+        setSubmissionSortDirection((currentDirection) =>
+          currentDirection === "asc" ? "desc" : "asc",
+        );
+        return currentField;
+      }
+
+      setSubmissionSortDirection(field === "date" ? "desc" : "asc");
+      return field;
+    });
+  };
+
   const sortedFeedbacks = [...feedbacks].sort((a, b) => {
-    const order = ["pending", "in progress", "resolved"];
-    const aIndex = order.indexOf(a.status.toLowerCase());
-    const bIndex = order.indexOf(b.status.toLowerCase());
-    const safeA = aIndex === -1 ? order.length : aIndex;
-    const safeB = bIndex === -1 ? order.length : bIndex;
-    if (safeA !== safeB) {
-      return safeA - safeB;
+    const direction = submissionSortDirection === "asc" ? 1 : -1;
+
+    if (submissionSortField === "type") {
+      const compared = a.type.localeCompare(b.type, undefined, {
+        sensitivity: "base",
+      });
+      if (compared !== 0) return compared * direction;
+    } else if (submissionSortField === "category") {
+      const compared = a.category.localeCompare(b.category, undefined, {
+        sensitivity: "base",
+      });
+      if (compared !== 0) return compared * direction;
+    } else if (submissionSortField === "status") {
+      const order = ["pending", "in progress", "resolved"];
+      const aIndex = order.indexOf(normalizeStatus(a.status));
+      const bIndex = order.indexOf(normalizeStatus(b.status));
+      const safeA = aIndex === -1 ? order.length : aIndex;
+      const safeB = bIndex === -1 ? order.length : bIndex;
+      if (safeA !== safeB) return (safeA - safeB) * direction;
+    } else {
+      const aTime = new Date(a.createdAt).getTime();
+      const bTime = new Date(b.createdAt).getTime();
+      if (aTime !== bTime) return (aTime - bTime) * direction;
     }
+
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
 
@@ -1189,7 +1230,7 @@ function UserProfileContent() {
                 <CardHeader>
                   <CardTitle>My Submissions</CardTitle>
                   <CardDescription>
-                    Browse your recent feedback submissions
+                    Browse your recent feedback submissions.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5 flex-1 min-h-0 overflow-hidden">
@@ -1203,16 +1244,30 @@ function UserProfileContent() {
                     </div>
                   ) : (
                     <div className="flex min-h-0 flex-1 flex-col">
-                      <div className="mb-3">
-                        <h3 className="text-base font-semibold">My Submissions</h3>
-                        <p className="text-xs text-muted-foreground">
-                          Showing {showingStart}-{showingEnd} of {sortedFeedbacks.length}
-                        </p>
-                      </div>
-
-                      <div className="mb-2 grid grid-cols-[1fr_auto] rounded-md bg-muted/60 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                        <span>Submission</span>
-                        <span className="pr-10">Status / Date</span>
+                      <div className="mb-2 grid grid-cols-2 gap-2 rounded-md bg-muted/60 px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:grid-cols-[minmax(0,1fr)_120px_160px_120px_140px] md:gap-0">
+                        <span className="self-center">Submission</span>
+                        {([
+                          ["type", "Type"],
+                          ["category", "Category"],
+                          ["status", "Status"],
+                          ["date", "Date"],
+                        ] as const).map(([field, label]) => (
+                          <button
+                            key={field}
+                            type="button"
+                            onClick={() => toggleSubmissionSort(field)}
+                            className="inline-flex items-center justify-start gap-1 text-left text-[11px] font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground md:justify-center"
+                          >
+                            <span>{label}</span>
+                            {submissionSortField === field ? (
+                              <span>
+                                {submissionSortDirection === "asc" ? "↑" : "↓"}
+                              </span>
+                            ) : (
+                              <ArrowUpDown className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                        ))}
                       </div>
 
                       <div
@@ -1252,19 +1307,22 @@ function UserProfileContent() {
                                 <X className="h-3.5 w-3.5" />
                               </Button>
                             )}
-                            <div className="mb-1 flex items-start justify-between gap-3">
-                              <div className="min-w-0 flex-1 space-y-1">
+                            <div className="mb-1 grid gap-2 md:grid-cols-[minmax(0,1fr)_120px_160px_120px_140px] md:items-center">
+                              <div className="min-w-0 space-y-1">
                                 <p className="font-semibold break-words break-all">
                                   {feedback.subject}
                                 </p>
                                 <p className="font-mono text-xs text-muted-foreground break-all">
                                   {feedback.id}
                                 </p>
-                                <p className="text-xs text-muted-foreground capitalize">
-                                  {feedback.type} • {feedback.category}
-                                </p>
                               </div>
-                              <div className="mr-6 flex flex-col items-end gap-2">
+                              <p className="text-xs text-muted-foreground capitalize md:text-sm md:text-center">
+                                {feedback.type}
+                              </p>
+                              <p className="text-xs text-muted-foreground md:text-sm md:text-center">
+                                {feedback.category}
+                              </p>
+                              <div className="md:flex md:justify-center">
                                 <Badge
                                   variant="outline"
                                   className={`capitalize ${getStatusIndicatorClass(
@@ -1273,78 +1331,79 @@ function UserProfileContent() {
                                 >
                                   {feedback.status}
                                 </Badge>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  {(() => {
-                                    const StatusIcon = getStatusIcon(feedback.status);
-                                    return <StatusIcon className="h-4 w-4" />;
-                                  })()}
-                                  <span>
-                                    {new Date(feedback.createdAt).toLocaleDateString(
-                                      "en-US",
-                                    )}
-                                  </span>
-                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground md:justify-center md:text-sm">
+                                {(() => {
+                                  const StatusIcon = getStatusIcon(feedback.status);
+                                  return <StatusIcon className="h-4 w-4" />;
+                                })()}
+                                <span>{formatDate(feedback.createdAt)}</span>
                               </div>
                             </div>
                           </div>
                         ))}
                       </div>
 
-                      {totalSubmissionPages > 1 && (
-                        <Pagination className="mt-4 justify-end">
-                          <PaginationContent>
-                            <PaginationItem>
-                              <PaginationPrevious
-                                href="#"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  setSubmissionPage((current) =>
-                                    Math.max(1, current - 1),
-                                  );
-                                }}
-                                className={
-                                  submissionPage <= 1
-                                    ? "pointer-events-none opacity-50"
-                                    : ""
-                                }
-                              />
-                            </PaginationItem>
-                            {Array.from(
-                              { length: totalSubmissionPages },
-                              (_, index) => index + 1,
-                            ).map((pageNumber) => (
-                              <PaginationItem key={pageNumber}>
-                                <PaginationLink
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-xs text-muted-foreground">
+                          Showing {showingStart}-{showingEnd} of {sortedFeedbacks.length}
+                        </p>
+                        {totalSubmissionPages > 1 && (
+                          <Pagination className="justify-end">
+                            <PaginationContent>
+                              <PaginationItem>
+                                <PaginationPrevious
                                   href="#"
-                                  isActive={submissionPage === pageNumber}
                                   onClick={(event) => {
                                     event.preventDefault();
-                                    setSubmissionPage(pageNumber);
+                                    setSubmissionPage((current) =>
+                                      Math.max(1, current - 1),
+                                    );
                                   }}
-                                >
-                                  {pageNumber}
-                                </PaginationLink>
+                                  className={
+                                    submissionPage <= 1
+                                      ? "pointer-events-none opacity-50"
+                                      : ""
+                                  }
+                                />
                               </PaginationItem>
-                            ))}
-                            <PaginationItem>
-                              <PaginationNext
-                                href="#"
-                                onClick={(event) => {
-                                  event.preventDefault();
-                                  setSubmissionPage((current) =>
-                                    Math.min(totalSubmissionPages, current + 1),
-                                  );
-                                }}
-                                className={
-                                  submissionPage >= totalSubmissionPages
-                                    ? "pointer-events-none opacity-50"
-                                    : ""
-                                }
-                              />
-                            </PaginationItem>
-                          </PaginationContent>
-                        </Pagination>
-                      )}
+                              {Array.from(
+                                { length: totalSubmissionPages },
+                                (_, index) => index + 1,
+                              ).map((pageNumber) => (
+                                <PaginationItem key={pageNumber}>
+                                  <PaginationLink
+                                    href="#"
+                                    isActive={submissionPage === pageNumber}
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      setSubmissionPage(pageNumber);
+                                    }}
+                                  >
+                                    {pageNumber}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              ))}
+                              <PaginationItem>
+                                <PaginationNext
+                                  href="#"
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    setSubmissionPage((current) =>
+                                      Math.min(totalSubmissionPages, current + 1),
+                                    );
+                                  }}
+                                  className={
+                                    submissionPage >= totalSubmissionPages
+                                      ? "pointer-events-none opacity-50"
+                                      : ""
+                                  }
+                                />
+                              </PaginationItem>
+                            </PaginationContent>
+                          </Pagination>
+                        )}
+                      </div>
                     </div>
                   )}
                 </CardContent>

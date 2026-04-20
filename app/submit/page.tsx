@@ -33,6 +33,8 @@ interface FormData {
   message: string;
 }
 
+const FEEDBACK_MESSAGE_MAX_LENGTH = 2000;
+
 export default function Submit() {
   const router = useRouter();
   const draftKey = "ff:submitDraft";
@@ -92,6 +94,10 @@ export default function Submit() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (formData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
+      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      return;
+    }
 
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
 
@@ -287,12 +293,19 @@ export default function Submit() {
                   id="message"
                   placeholder="Provide detailed information about your feedback..."
                   rows={5}
+                  maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
                   value={formData.message}
                   onChange={(e) =>
-                    setFormData({ ...formData, message: e.target.value })
+                    setFormData({
+                      ...formData,
+                      message: e.target.value.slice(0, FEEDBACK_MESSAGE_MAX_LENGTH),
+                    })
                   }
                   required
                 />
+                <p className="text-right text-xs text-muted-foreground">
+                  {formData.message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
+                </p>
               </div>
 
               <Button
