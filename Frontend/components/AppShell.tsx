@@ -983,11 +983,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </SheetTrigger>
                   <SheetContent
                     side="left"
-<<<<<<< HEAD
-                    className="w-[320px] overflow-hidden rounded-r-3xl ff-sheet-anim sm:max-w-sm"
-=======
                     className="z-[80] w-[320px] sm:max-w-sm md:hidden"
->>>>>>> 2d58189118e596c02bfcb4e724a9f994c37094d9
                   >
                     <SheetHeader>
                       <div className="flex items-center gap-3">
