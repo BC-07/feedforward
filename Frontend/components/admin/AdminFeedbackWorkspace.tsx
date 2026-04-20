@@ -73,6 +73,7 @@ import {
   Download,
   MessageSquare,
   Pencil,
+  X,
 } from "lucide-react";
 import {
   OPEN_FEEDBACK_EVENT,
@@ -85,6 +86,26 @@ interface AdminFeedbackWorkspaceProps {
 }
 
 const FEEDBACKS_PER_PAGE = 8;
+const EXPORT_LOGO_PATH = "/favicon.ico";
+
+function formatFilterChipLabel(value: string) {
+  return value
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function ActiveFilterChip({ label }: { label: string }) {
+  return (
+    <Badge
+      variant="outline"
+      className="rounded-full border-border bg-muted/60 px-3 py-1 text-[11px] font-medium text-muted-foreground"
+    >
+      {label}
+    </Badge>
+  );
+}
 
 function markAdminNotificationAsRead(
   adminId: string,
@@ -152,6 +173,7 @@ export function AdminFeedbackWorkspace({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const deferredSearchQuery = useDeferredValue(searchQuery);
+  const trimmedSearchQuery = searchQuery.trim();
 
   const loadMessages = useCallback(async (feedbackId: string) => {
     setIsMessagesLoading(true);
@@ -346,6 +368,37 @@ export function AdminFeedbackWorkspace({
     }
   };
 
+  const searchFilterLabel = trimmedSearchQuery || null;
+  const nameFilterLabel = filterName === "desc" ? "Z - A" : null;
+  const dateFilterLabel = filterDate === "oldest" ? "Oldest" : null;
+  const typeFilterLabel =
+    filterType !== "all" ? formatFilterChipLabel(filterType) : null;
+  const priorityFilterLabel =
+    filterPriority !== "all" ? formatFilterChipLabel(filterPriority) : null;
+  const statusFilterLabel =
+    filterStatus !== "all"
+      ? filterStatus === "inprogress"
+        ? "In Progress"
+        : formatFilterChipLabel(filterStatus)
+      : null;
+  const hasActiveFilters = Boolean(
+    searchFilterLabel ||
+      nameFilterLabel ||
+      dateFilterLabel ||
+      typeFilterLabel ||
+      priorityFilterLabel ||
+      statusFilterLabel,
+  );
+
+  const clearAllFilters = useCallback(() => {
+    setSearchQuery("");
+    setFilterName("asc");
+    setFilterDate("recent");
+    setFilterType("all");
+    setFilterPriority("all");
+    setFilterStatus("all");
+  }, []);
+
   const visibleFeedbacks = useMemo(() => {
     const items = [...feedbacks];
     items.sort((a, b) => {
@@ -413,6 +466,38 @@ export function AdminFeedbackWorkspace({
     return `${datePart} ${timePart}`;
   };
 
+  const getExportLogoDataUrl = useCallback(async () => {
+    const image = new Image();
+
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        const size = 256;
+        canvas.width = size;
+        canvas.height = size;
+
+        const context = canvas.getContext("2d");
+        if (!context) {
+          reject(new Error("Unable to prepare export logo."));
+          return;
+        }
+
+        context.imageSmoothingEnabled = true;
+        context.clearRect(0, 0, size, size);
+        context.drawImage(image, 0, 0, size, size);
+        resolve(canvas.toDataURL("image/png"));
+      };
+
+      image.onerror = () => {
+        reject(new Error("Failed to load export logo."));
+      };
+
+      image.src = EXPORT_LOGO_PATH;
+    });
+
+    return dataUrl;
+  }, []);
+
   const buildFileNameBase = () => {
     const now = new Date();
     const pad2 = (value: number) => String(value).padStart(2, "0");
@@ -457,7 +542,7 @@ export function AdminFeedbackWorkspace({
     return filterParts.length ? filterParts.join(" | ") : "No filters applied";
   };
 
-  const exportFeedbacksPdf = () => {
+  const exportFeedbacksPdf = async () => {
     const rows = visibleFeedbacks.map((feedback) => ({
       id: feedback.id,
       type: feedback.type,
@@ -479,33 +564,12 @@ export function AdminFeedbackWorkspace({
     const pageWidth = doc.internal.pageSize.getWidth();
     const centerX = pageWidth / 2;
 
-    // Draw a black right-pointing arrow and a yellow right-pointing head.
-    const logoMid = 46;
-    const stemX = centerX - 98;
-    const stemY = logoMid - 7;
-    const stemWidth = 56;
-    const stemHeight = 14;
-    const blackHeadLeftX = centerX - 42;
-    const blackTipX = centerX - 8;
-    const yellowLeftX = centerX + 8;
-    const yellowTipX = centerX + 40;
-
-    doc.setFillColor(0, 0, 0);
-    doc.rect(stemX, stemY, stemWidth, stemHeight, "F");
-    doc.triangle(blackHeadLeftX, 18, blackTipX, logoMid, blackHeadLeftX, 74, "F");
-
-    doc.setFillColor(255, 149, 0);
-    doc.triangle(yellowLeftX, 14, yellowTipX, logoMid, yellowLeftX, 78, "F");
-    doc.setFillColor(255, 255, 255);
-    doc.triangle(
-      yellowLeftX + 12,
-      28,
-      yellowTipX - 10,
-      logoMid,
-      yellowLeftX + 12,
-      64,
-      "F",
-    );
+    try {
+      const logoDataUrl = await getExportLogoDataUrl();
+      doc.addImage(logoDataUrl, "PNG", centerX - 40, 12, 80, 80);
+    } catch {
+      // Continue export without the image if logo loading fails.
+    }
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(24);
@@ -568,7 +632,7 @@ export function AdminFeedbackWorkspace({
         },
       ],
     ]);
-    const tableWidth = 92 + 78 + 100 + 84 + 136 + 248;
+    const tableWidth = 132 + 78 + 100 + 84 + 136 + 248;
     const tableMargin = Math.max(30, (pageWidth - tableWidth) / 2);
 
     autoTable(doc, {
@@ -603,7 +667,7 @@ export function AdminFeedbackWorkspace({
         lineWidth: 0,
       },
       columnStyles: {
-        0: { cellWidth: 92 },
+        0: { cellWidth: 132 },
         1: { cellWidth: 78 },
         2: { cellWidth: 100 },
         3: { cellWidth: 84 },
@@ -651,33 +715,29 @@ export function AdminFeedbackWorkspace({
     ];
 
     worksheet.mergeCells("B1:G1");
-    worksheet.getCell("B1").value = {
-      richText: [
-        {
-          text: "➜",
-          font: {
-            size: 34,
-            bold: true,
-            color: { argb: "FF000000" },
-            name: "Arial",
-          },
-        },
-        {
-          text: "▷",
-          font: {
-            size: 34,
-            bold: true,
-            color: { argb: "FFFF9500" },
-            name: "Arial",
-          },
-        },
-      ],
-    };
+    worksheet.getCell("B1").value = "";
     worksheet.getCell("B1").alignment = {
       horizontal: "center",
       vertical: "middle",
     };
-    worksheet.getRow(1).height = 42;
+    worksheet.getRow(1).height = 64;
+
+    try {
+      const logoDataUrl = await getExportLogoDataUrl();
+      const logoImageId = workbook.addImage({
+        base64: logoDataUrl,
+        extension: "png",
+      });
+      const logoWidth = 84;
+      const logoHeight = 84;
+
+      worksheet.addImage(logoImageId, {
+        tl: { col: 5, row: 0.08 },
+        ext: { width: logoWidth, height: logoHeight },
+      });
+    } catch {
+      // Continue export without the image if logo loading fails.
+    }
 
     worksheet.mergeCells("B3:G3");
     worksheet.getCell("B3").value = "FeedForward - Feedback Report";
@@ -872,23 +932,45 @@ export function AdminFeedbackWorkspace({
                 <DropdownMenuItem onSelect={() => void exportFeedbacksXlsx()}>
                   Export XLSX
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={exportFeedbacksPdf}>
+                <DropdownMenuItem onSelect={() => void exportFeedbacksPdf()}>
                   Export PDF
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2 xl:grid-cols-6">
-            <div className="flex flex-col gap-2 sm:col-span-2 lg:flex-row lg:items-end">
-              <div className="flex-1">
-                <Input
-                  placeholder="Search by ID, subject, or message..."
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                />
-              </div>
+          <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2 xl:grid-cols-7">
+            <div
+              className={`sm:col-span-2 xl:col-span-2 ${searchFilterLabel || hasActiveFilters ? "space-y-2" : ""}`}
+            >
+              <Input
+                placeholder="Search by ID, subject, or message..."
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+              {searchFilterLabel || hasActiveFilters ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {searchFilterLabel ? (
+                    <ActiveFilterChip label={searchFilterLabel} />
+                  ) : null}
+                  {hasActiveFilters ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearAllFilters}
+                      className="h-7 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Clear all
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
+            <div className={nameFilterLabel ? "space-y-2" : undefined}>
               <Select value={filterName} onValueChange={setFilterName}>
-                <SelectTrigger className="w-full lg:w-[120px]">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Name" />
                 </SelectTrigger>
                 <SelectContent>
@@ -896,9 +978,10 @@ export function AdminFeedbackWorkspace({
                   <SelectItem value="desc">Z - A</SelectItem>
                 </SelectContent>
               </Select>
+              {nameFilterLabel ? <ActiveFilterChip label={nameFilterLabel} /> : null}
             </div>
 
-            <div>
+            <div className={dateFilterLabel ? "space-y-2" : undefined}>
               <Select value={filterDate} onValueChange={setFilterDate}>
                 <SelectTrigger>
                   <SelectValue placeholder="Date" />
@@ -908,9 +991,10 @@ export function AdminFeedbackWorkspace({
                   <SelectItem value="oldest">Oldest</SelectItem>
                 </SelectContent>
               </Select>
+              {dateFilterLabel ? <ActiveFilterChip label={dateFilterLabel} /> : null}
             </div>
 
-            <div>
+            <div className={typeFilterLabel ? "space-y-2" : undefined}>
               <Select value={filterType} onValueChange={setFilterType}>
                 <SelectTrigger>
                   <SelectValue placeholder="Type" />
@@ -924,9 +1008,10 @@ export function AdminFeedbackWorkspace({
                   <SelectItem value="compliment">Compliment</SelectItem>
                 </SelectContent>
               </Select>
+              {typeFilterLabel ? <ActiveFilterChip label={typeFilterLabel} /> : null}
             </div>
 
-            <div>
+            <div className={priorityFilterLabel ? "space-y-2" : undefined}>
               <Select value={filterPriority} onValueChange={setFilterPriority}>
                 <SelectTrigger>
                   <SelectValue placeholder="Priority" />
@@ -938,9 +1023,12 @@ export function AdminFeedbackWorkspace({
                   <SelectItem value="high">High</SelectItem>
                 </SelectContent>
               </Select>
+              {priorityFilterLabel ? (
+                <ActiveFilterChip label={priorityFilterLabel} />
+              ) : null}
             </div>
 
-            <div>
+            <div className={statusFilterLabel ? "space-y-2" : undefined}>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger>
                   <SelectValue placeholder="Status" />
@@ -952,6 +1040,7 @@ export function AdminFeedbackWorkspace({
                   <SelectItem value="resolved">Resolved</SelectItem>
                 </SelectContent>
               </Select>
+              {statusFilterLabel ? <ActiveFilterChip label={statusFilterLabel} /> : null}
             </div>
           </div>
         </CardHeader>
