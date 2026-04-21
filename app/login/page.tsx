@@ -66,7 +66,7 @@ export default function Login() {
       localStorage.removeItem("superAdminName");
       localStorage.removeItem("superAdminExpiresAt");
       toast.success(`Welcome back, ${user.name}!`);
-      router.push("/user/submit-feedback");
+      router.push("/user/home");
       return;
     } catch {
       // Try admin login with the same form credentials.
@@ -132,23 +132,18 @@ export default function Login() {
                 {expiredMessage}
               </div>
             ) : null}
-            <form onSubmit={handleLogin} className="space-y-4" autoComplete="on">
+            <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
-                    name="email"
                     type="email"
                     placeholder="Enter your email"
                     className="pl-10"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
                     required
                   />
                 </div>
@@ -160,7 +155,6 @@ export default function Login() {
                   <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
-                    name="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     className="pl-10 pr-10"

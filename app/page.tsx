@@ -1,67 +1,85 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Shield, MessageSquare, BarChart3, Eye } from "lucide-react";
+import type { ReactNode } from "react";
+import { ArrowRight, Shield, MessageSquare, BarChart3, Eye } from "lucide-react";
 
 export default function Home() {
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
 
   useEffect(() => {
-    const loggedIn = localStorage.getItem("isUserLoggedIn") === "true";
-    const userId = localStorage.getItem("currentUserId");
-    setIsUserLoggedIn(loggedIn && !!userId);
+    if (typeof window === "undefined") return;
+    const syncLoginState = () => {
+      setIsUserLoggedIn(localStorage.getItem("isUserLoggedIn") === "true");
+    };
+
+    syncLoginState();
+    window.addEventListener("storage", syncLoginState);
+    window.addEventListener("focus", syncLoginState);
+    document.addEventListener("visibilitychange", syncLoginState);
+    const interval = window.setInterval(syncLoginState, 1000);
+
+    return () => {
+      window.removeEventListener("storage", syncLoginState);
+      window.removeEventListener("focus", syncLoginState);
+      document.removeEventListener("visibilitychange", syncLoginState);
+      window.clearInterval(interval);
+    };
   }, []);
 
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-white via-orange-50 to-white py-20">
+      <section className="bg-gradient-to-br from-white via-orange-50 to-white pt-8 pb-4 sm:py-20 min-h-[55vh] sm:min-h-0 flex items-center">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-5xl md:text-6xl mb-6 text-black">
-              Your Voice Matters
-            </h1>
-            <p className="text-xl text-gray-700 mb-10 max-w-3xl mx-auto leading-relaxed">
-              FeedForward enables transparent feedback, suggestions, and concerns through an organized system.
-              Help us create a better environment for everyone.
-            </p>
+          <div className="text-center max-w-4xl mx-auto flex flex-col items-center -mt-4 sm:mt-0">
+            <div className="relative -translate-y-[15px] sm:translate-y-0">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl mb-4 sm:mb-6 text-black">
+                Your Voice Matters
+              </h1>
+              <p className="text-lg sm:text-xl text-gray-700 mb-10 sm:mb-10 max-w-3xl mx-auto leading-relaxed">
+                FeedForward enables feedback, suggestions, and complaints through an organized system.
+                Help us create a better environment for everyone.
+              </p>
+            </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex w-full flex-col sm:flex-row gap-3 sm:gap-4 justify-center sm:w-auto">
               <Link
                 href="/submit"
-                className="px-8 py-4 bg-orange-500 text-white hover:bg-orange-600 rounded-lg transition-colors text-lg text-center"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-orange-500 text-white hover:bg-orange-600 rounded-lg transition-colors text-base sm:text-lg inline-flex items-center justify-center gap-2"
               >
                 Submit Feedback
+                <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
-                href={isUserLoggedIn ? "/user" : "/login"}
-                className="px-8 py-4 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-lg text-center"
+                href={isUserLoggedIn ? "/user/home" : "/login"}
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-base sm:text-lg text-center"
               >
                 {isUserLoggedIn ? "Go to Dashboard" : "Login / Sign Up"}
               </Link>
             </div>
-
-            <div className="mt-4 text-center">
-              <Link href="/track" className="text-sm text-gray-700 hover:text-orange-600 transition-colors">
-                Want to track your feedback
-              </Link>
-            </div>
+            <Link
+              href="/track"
+              className="mt-4 text-sm text-orange-600 underline underline-offset-4 hover:text-orange-700 transition-colors"
+            >
+              Already submitted? Track your feedback here.
+            </Link>
           </div>
         </div>
       </section>
 
       {/* Why Use FeedForward */}
-      <section className="py-20 bg-white">
+      <section className="pt-6 pb-12 sm:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl text-center mb-16 text-black">
+          <h2 className="text-2xl sm:text-4xl text-center mb-10 sm:mb-16 text-black">
             Why Use FeedForward?
           </h2>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             <Feature
               icon={<Shield className="w-8 h-8 text-orange-500" />}
-              title="Transparent Feedback"
-              text="Submit suggestions, complaints, or compliments with the option to stay anonymous."
+              title="Secure Feedback"
+              text="Submit suggestions, complaints, or compliments through a trusted channel."
             />
             <Feature
               icon={<MessageSquare className="w-8 h-8 text-orange-500" />}
@@ -83,13 +101,13 @@ export default function Home() {
       </section>
 
       {/* Benefits */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-12 sm:py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl text-center mb-16 text-black">
+          <h2 className="text-2xl sm:text-4xl text-center mb-10 sm:mb-16 text-black">
             Benefits for Everyone
           </h2>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             <Benefit
               title="For Users"
               items={[
@@ -119,25 +137,38 @@ export default function Home() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 bg-gradient-to-br from-orange-500 to-orange-600 text-center text-white">
-        <h2 className="text-4xl mb-6">
+      <section className="py-12 sm:py-20 bg-gradient-to-br from-orange-500 to-orange-600 text-center text-white">
+        <h2 className="text-2xl sm:text-4xl mb-4 sm:mb-6">
           Ready to Make Your Voice Heard?
         </h2>
-        <p className="text-xl text-white/90 mb-8">
+        <p className="text-base sm:text-xl text-white/90 mb-6 sm:mb-8">
           Join our community in building a better organization together through sambayanihan.
         </p>
         <Link
-          href="/submit"
-          className="px-8 py-4 bg-white text-orange-600 hover:bg-gray-200 rounded-lg transition-colors text-lg inline-flex items-center gap-2"
+          href="/register"
+          className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-orange-600 hover:bg-gray-200 rounded-lg transition-colors text-base sm:text-lg inline-flex items-center gap-2"
         >
-          Submit Feedback
+          Join Now
+          <ArrowRight className="w-5 h-5" />
         </Link>
+
       </section>
     </div>
   );
 }
 
-const Feature = ({ icon, title, text }: any) => (
+type FeatureProps = {
+  icon: ReactNode;
+  title: string;
+  text: string;
+};
+
+type BenefitProps = {
+  title: string;
+  items: string[];
+};
+
+const Feature = ({ icon, title, text }: FeatureProps) => (
   <div className="text-center p-6">
     <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
       {icon}
@@ -147,7 +178,7 @@ const Feature = ({ icon, title, text }: any) => (
   </div>
 );
 
-const Benefit = ({ title, items }: any) => (
+const Benefit = ({ title, items }: BenefitProps) => (
   <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
     <h3 className="text-2xl mb-4 text-black">{title}</h3>
     <ul className="space-y-3 text-gray-700">
