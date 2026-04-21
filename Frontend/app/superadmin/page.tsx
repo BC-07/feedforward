@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   createCategoryBySuperAdmin,
@@ -51,6 +51,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
 import { Shield, UserCog, UserPlus, Trash2, Pencil, Tag, Save, Ban, UserCheck, Eye, EyeOff, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { getErrorMessage, toastApiError } from "@/lib/errorHandling";
@@ -84,6 +91,29 @@ const emptyEditForm: EditAdminForm = {
   password: "",
   unit: "",
 };
+
+const unitDistributionChartConfig = {
+  admins: {
+    label: "Admins",
+    color: "#f59e0b",
+  },
+} satisfies ChartConfig;
+
+const categoryCoverageChartConfig = {
+  covered: {
+    label: "Covered",
+    color: "#16a34a",
+  },
+  vacant: {
+    label: "Vacant",
+    color: "#f97316",
+  },
+} satisfies ChartConfig;
+
+function getDateKey(value: string | number | Date) {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
 
 async function fetchAdmins(
   onSuccess: (admins: Admin[]) => void,
@@ -199,12 +229,112 @@ export default function SuperAdminDashboard() {
         !admin.isDisabled && admin.unit.trim().toLowerCase() === name,
     );
   });
-  const activeAdminsCount = admins.filter((admin) => !admin.isDisabled).length;
+  const activeAdmins = useMemo(
+    () => admins.filter((admin) => !admin.isDisabled),
+    [admins],
+  );
+  const activeAdminsCount = activeAdmins.length;
   const disabledAdminsCount = admins.filter((admin) => Boolean(admin.isDisabled)).length;
-  const manageableCategoriesCount = categories.filter((category) => {
-    const name = category.name.trim().toLowerCase();
-    return name !== "disabled" && name !== "inactive";
-  }).length;
+  const manageableCategories = useMemo(
+    () =>
+      categories.filter((category) => {
+        const name = category.name.trim().toLowerCase();
+        return name !== "disabled" && name !== "inactive";
+      }),
+    [categories],
+  );
+  const manageableCategoriesCount = manageableCategories.length;
+  const manageableCategoryNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    manageableCategories.forEach((category) => {
+      const label = category.name.trim();
+      if (!label) return;
+      map.set(label.toLowerCase(), label);
+    });
+    return map;
+  }, [manageableCategories]);
+  const unitCoverageRows = useMemo(() => {
+    return [...manageableCategoryNameMap.entries()]
+      .map(([normalizedUnit, unitLabel]) => {
+        const assignedAdmin = activeAdmins.find(
+          (admin) => admin.unit.trim().toLowerCase() === normalizedUnit,
+        );
+        return {
+          unit: unitLabel,
+          adminName: assignedAdmin?.name ?? "Unassigned",
+          adminEmail: assignedAdmin?.email ?? "No active admin assigned",
+          covered: Boolean(assignedAdmin),
+        };
+      })
+      .sort((a, b) => {
+        if (a.covered !== b.covered) {
+          return a.covered ? -1 : 1;
+        }
+        return a.unit.localeCompare(b.unit);
+      });
+  }, [activeAdmins, manageableCategoryNameMap]);
+  const coveredCategoryCount = unitCoverageRows.filter((row) => row.covered).length;
+  const vacantCategoryCount = Math.max(manageableCategoriesCount - coveredCategoryCount, 0);
+  const categoryCoverageRate = manageableCategoriesCount
+    ? Math.round((coveredCategoryCount / manageableCategoriesCount) * 100)
+    : 0;
+  const unitDistributionData = useMemo(() => {
+    const totalsByUnit = activeAdmins.reduce<Record<string, number>>((accumulator, admin) => {
+      const label = admin.unit.trim() || "Unassigned";
+      accumulator[label] = (accumulator[label] || 0) + 1;
+      return accumulator;
+    }, {});
+    const rows = Object.entries(totalsByUnit)
+      .map(([unit, admins]) => ({ unit, admins }))
+      .sort((a, b) => b.admins - a.admins);
+    if (rows.length <= 6) {
+      return rows;
+    }
+    const topRows = rows.slice(0, 6);
+    const othersTotal = rows.slice(6).reduce((total, row) => total + row.admins, 0);
+    return [...topRows, { unit: "Others", admins: othersTotal }];
+  }, [activeAdmins]);
+  const recentSignups7DaysData = useMemo(() => {
+    const totalsByDay = new Map<string, number>();
+    admins.forEach((admin) => {
+      const key = getDateKey(admin.createdAt);
+      totalsByDay.set(key, (totalsByDay.get(key) || 0) + 1);
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(today);
+      day.setDate(today.getDate() - (6 - index));
+      const key = getDateKey(day);
+      return {
+        day: day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        admins: totalsByDay.get(key) || 0,
+      };
+    });
+  }, [admins]);
+  const categoryCoverageData = [
+    {
+      name: "covered",
+      value: coveredCategoryCount,
+      fill: "var(--color-covered)",
+    },
+    {
+      name: "vacant",
+      value: vacantCategoryCount,
+      fill: "var(--color-vacant)",
+    },
+  ];
+  const latestAdmins = useMemo(
+    () =>
+      [...admins]
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
+        .slice(0, 7),
+    [admins],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -568,33 +698,223 @@ export default function SuperAdminDashboard() {
         */}
         <div className="space-y-6">
           {isAdminDashboardPage && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Admin Dashboard
-              </CardTitle>
-              <CardDescription>
-                Overview of admin accounts and category coverage.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-lg border bg-background p-4">
-                  <p className="text-sm text-muted-foreground">Active Admins</p>
-                  <p className="mt-2 text-3xl font-semibold">{activeAdminsCount}</p>
-                </div>
-                <div className="rounded-lg border bg-background p-4">
-                  <p className="text-sm text-muted-foreground">Disabled Admins</p>
-                  <p className="mt-2 text-3xl font-semibold">{disabledAdminsCount}</p>
-                </div>
-                <div className="rounded-lg border bg-background p-4">
-                  <p className="text-sm text-muted-foreground">Categories</p>
-                  <p className="mt-2 text-3xl font-semibold">{manageableCategoriesCount}</p>
-                </div>
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Admin Dashboard
+                  </CardTitle>
+                  <CardDescription>
+                    Operations snapshot for admin accounts, unit ownership, and category coverage.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Accounts</p>
+                      <p className="mt-2 text-3xl font-semibold">{admins.length}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Active Admins</p>
+                      <p className="mt-2 text-3xl font-semibold">{activeAdminsCount}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Disabled Admins</p>
+                      <p className="mt-2 text-3xl font-semibold">{disabledAdminsCount}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Manageable Categories</p>
+                      <p className="mt-2 text-3xl font-semibold">{manageableCategoriesCount}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Covered Categories</p>
+                      <p className="mt-2 text-3xl font-semibold">{coveredCategoryCount}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Coverage Rate</p>
+                      <p className="mt-2 text-3xl font-semibold">{categoryCoverageRate}%</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-6 xl:grid-cols-5">
+                <Card className="xl:col-span-3">
+                  <CardHeader>
+                    <CardTitle className="text-base">Active Admins by Unit</CardTitle>
+                    <CardDescription>
+                      Distribution of active admins across assigned units.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer config={unitDistributionChartConfig} className="h-[290px] w-full">
+                      <BarChart data={unitDistributionData} margin={{ top: 8, right: 14, left: 0, bottom: 0 }}>
+                        <CartesianGrid vertical={false} />
+                        <XAxis dataKey="unit" tickLine={false} axisLine={false} tickMargin={8} />
+                        <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                        <Bar
+                          dataKey="admins"
+                          fill="var(--color-admins)"
+                          radius={[8, 8, 0, 0]}
+                          maxBarSize={58}
+                          isAnimationActive={false}
+                        />
+                      </BarChart>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+
+                <Card className="xl:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="text-base">Category Coverage</CardTitle>
+                    <CardDescription>
+                      Coverage status across manageable category units.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer config={categoryCoverageChartConfig} className="h-[290px] w-full">
+                      <PieChart>
+                        <ChartTooltip
+                          cursor={false}
+                          content={<ChartTooltipContent nameKey="name" />}
+                        />
+                        <Pie
+                          data={categoryCoverageData}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={58}
+                          outerRadius={96}
+                          paddingAngle={3}
+                          isAnimationActive={false}
+                        >
+                          {categoryCoverageData.map((entry) => (
+                            <Cell key={entry.name} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+
+              <div className="grid gap-6 xl:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Category Assignment Table</CardTitle>
+                    <CardDescription>
+                      Live view of which categories currently have an active admin assigned.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="rounded-lg border overflow-x-auto">
+                      <Table className="min-w-[640px]">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Category</TableHead>
+                            <TableHead>Assigned Admin</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {unitCoverageRows.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
+                                No manageable categories available.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            unitCoverageRows.map((row) => (
+                              <TableRow key={row.unit}>
+                                <TableCell className="font-medium">{row.unit}</TableCell>
+                                <TableCell>
+                                  <div>
+                                    <p>{row.adminName}</p>
+                                    <p className="text-xs text-muted-foreground">{row.adminEmail}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={row.covered ? "default" : "outline"}>
+                                    {row.covered ? "Covered" : "Vacant"}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Recent Account Activity</CardTitle>
+                    <CardDescription>
+                      New admin accounts created over the last 7 days and latest created accounts.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <ChartContainer config={unitDistributionChartConfig} className="h-[190px] w-full">
+                      <BarChart data={recentSignups7DaysData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                        <CartesianGrid vertical={false} />
+                        <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} />
+                        <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                        <Bar
+                          dataKey="admins"
+                          fill="var(--color-admins)"
+                          radius={[6, 6, 0, 0]}
+                          maxBarSize={42}
+                          isAnimationActive={false}
+                        />
+                      </BarChart>
+                    </ChartContainer>
+
+                    <div className="rounded-lg border overflow-x-auto">
+                      <Table className="min-w-[620px]">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Unit</TableHead>
+                            <TableHead>Created</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {latestAdmins.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
+                                No admin accounts available yet.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            latestAdmins.map((admin) => (
+                              <TableRow key={admin.id}>
+                                <TableCell>
+                                  <div>
+                                    <p className="font-medium">{admin.name}</p>
+                                    <p className="text-xs text-muted-foreground">{admin.email}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell>{admin.unit}</TableCell>
+                                <TableCell>
+                                  {new Date(admin.createdAt).toLocaleDateString("en-US", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  })}
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
           )}
 
           {isAdminControlPage && (

@@ -20,10 +20,8 @@ export function AdminDashboardShell({
   void currentAdmin;
 
   return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted">
-      <div className="container mx-auto px-4 py-6 sm:py-8">
-        {children}
-      </div>
+    <div className="min-h-[calc(100vh-200px)]">
+      {children}
     </div>
   );
 }

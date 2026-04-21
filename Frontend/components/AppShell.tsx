@@ -860,6 +860,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setIsDesktopSidebarExpanded(false);
   };
 
+  const handleSidebarShortcutClick = (
+    event: React.MouseEvent<HTMLAnchorElement> | React.PointerEvent<HTMLAnchorElement>,
+  ) => {
+    event.stopPropagation();
+  };
+
   const AppFooter = () => (
     <footer className="border-t border-muted bg-white mt-auto">
       <div className="container mx-auto px-4 py-6">
@@ -939,11 +945,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     title={item.label}
                     aria-label={item.label}
-                    onClick={() => {
-                      if (!isDesktopSidebarExpanded) {
-                        setIsDesktopSidebarExpanded(true);
-                      }
-                    }}
+                    onPointerDown={handleSidebarShortcutClick}
+                    onClick={handleSidebarShortcutClick}
                     className={`${isDesktopSidebarExpanded && index === 0 ? "mt-2" : ""} mb-0.5 flex h-10 items-center justify-center rounded-lg border transition-all duration-300 ${
                       isDesktopSidebarExpanded
                         ? "mx-auto w-[calc(100%-1.5rem)] justify-start px-4"

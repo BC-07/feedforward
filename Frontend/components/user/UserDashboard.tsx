@@ -39,6 +39,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
@@ -55,6 +56,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
@@ -147,6 +158,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [messageDraft, setMessageDraft] = useState("");
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isMiniChatOpen, setIsMiniChatOpen] = useState(false);
+  const [isUnsentMessageDialogOpen, setIsUnsentMessageDialogOpen] =
+    useState(false);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const leftColumnRef = useRef<HTMLDivElement | null>(null);
@@ -228,6 +242,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     if (!selectedFeedback) {
       setMessages([]);
       setMessageDraft("");
+      setIsMiniChatOpen(false);
       return;
     }
 
@@ -563,6 +578,51 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const closeSelectedFeedback = useCallback(() => {
+    setMessageDraft("");
+    setSelectedFeedback(null);
+  }, []);
+
+  const handleAttemptCloseSelectedFeedback = useCallback(() => {
+    if (messageDraft.trim().length > 0) {
+      setIsUnsentMessageDialogOpen(true);
+      return;
+    }
+    closeSelectedFeedback();
+  }, [closeSelectedFeedback, messageDraft]);
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority?.toLowerCase()) {
+      case "low":
+        return "bg-gray-500/10 text-gray-700 border-gray-500/20";
+      case "medium":
+        return "bg-yellow-500/10 text-yellow-700 border-yellow-500/20";
+      case "high":
+        return "bg-orange-500/10 text-orange-700 border-orange-500/20";
+      default:
+        return "bg-gray-500/10 text-gray-700 border-gray-500/20";
+    }
+  };
+
+  const formatSubmittedAt = (dateValue: string) => {
+    const date = new Date(dateValue);
+    const datePart = date.toLocaleDateString("en-US", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+    const timePart = date
+      .toLocaleTimeString("en-US", {
+        timeZone: "Asia/Manila",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+      .replace(" ", "")
+      .toLowerCase();
+    return `${datePart} ${timePart}`;
   };
 
   const formatMessagePreview = (value: string) => {
@@ -1086,7 +1146,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         }
       }}
     >
-      <DialogContent className="w-[calc(100%-1.5rem)] max-w-2xl p-5 sm:w-full sm:p-6">
+      <DialogContent className="ff-modal-panel w-[calc(100%-1.5rem)] max-w-2xl p-5 sm:w-full sm:p-6">
         {createSubmissionStep === "form" ? (
           <>
             <DialogHeader>
@@ -1418,6 +1478,30 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           </div>
         </DialogContent>
       </Dialog>
+      <AlertDialog
+        open={isUnsentMessageDialogOpen}
+        onOpenChange={setIsUnsentMessageDialogOpen}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard unsent message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have a message that has not been sent yet.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setIsUnsentMessageDialogOpen(false);
+                closeSelectedFeedback();
+              }}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <div
         className={`mx-auto w-full px-4 ${
           isHomeView ? "pt-4 pb-4 sm:px-6 sm:pt-5 sm:pb-5" : "py-6 sm:px-6 sm:py-8"
@@ -1447,7 +1531,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           {(isMySubmissionsView || isHomeView) && (
           <div
             className={`flex flex-col ${
-              isMySubmissionsView ? "min-h-0 h-full overflow-hidden" : ""
+              isMySubmissionsView ? "min-h-0 h-full overflow-visible" : ""
             }`}
             style={
               isMySubmissionsView && leftColumnHeight
@@ -1549,7 +1633,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             ) : isMySubmissionsView && feedbacks.length > 0 ? (
               <div className="h-full min-h-0 flex flex-col bg-background">
                 <div className="px-1 pb-1">
-                  <div className="mt-0 pb-1 sm:pb-2">
+                  <div className="-mt-2 pb-1 sm:pb-2">
                     <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex w-full gap-2 sm:max-w-md">
                         <div className="relative flex-1">
@@ -1558,7 +1642,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                             placeholder="Search by ID, subject, message, or category"
                             value={searchQuery}
                             onChange={(event) => setSearchQuery(event.target.value)}
-                            className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-foreground/40"
+                            className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
                           />
                         </div>
                         <HoverFilterPopover
@@ -1575,7 +1659,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           setIsAnonymous(false);
                           setIsCreateSubmissionOpen(true);
                         }}
-                        className="h-9 sm:w-auto bg-accent hover:bg-accent/90 transition-colors duration-150 hover:-translate-x-px"
+                        className="h-9 sm:w-auto bg-accent hover:bg-accent/90 transition-colors duration-150 hover:-translate-y-px"
                       >
                         <Plus className="mr-2 h-4 w-4" />
                         New Submission
@@ -1623,8 +1707,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     <Table className="w-full min-w-[980px] table-fixed text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
                       <TableHeader className="bg-muted/50 sticky top-0 z-10">
                         <TableRow className="bg-muted/50 hover:bg-muted/50">
-                          <TableHead className="w-[170px]">Tracking ID</TableHead>
-                          <TableHead className="w-[340px]">Subject</TableHead>
+                          <TableHead className="w-[150px]">Tracking ID</TableHead>
+                          <TableHead className="w-[300px]">Subject</TableHead>
                           <TableHead className="w-[220px]">Category</TableHead>
                           <TableHead className="w-[110px]">Priority</TableHead>
                           <TableHead className="w-[150px]">Status</TableHead>
@@ -1658,7 +1742,14 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               <TableCell className="truncate" title={feedback.category}>
                                 {feedback.category}
                               </TableCell>
-                              <TableCell className="truncate">{feedback.priority}</TableCell>
+                              <TableCell className="truncate">
+                                <Badge
+                                  className={getPriorityColor(feedback.priority)}
+                                  variant="outline"
+                                >
+                                  {feedback.priority}
+                                </Badge>
+                              </TableCell>
                               <TableCell>
                                 <span className="inline-flex items-center gap-2">
                                   {(() => {
@@ -1681,7 +1772,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                 </span>
                               </TableCell>
                               <TableCell className="whitespace-nowrap text-muted-foreground">
-                                {new Date(feedback.createdAt).toLocaleDateString("en-US")}
+                                {formatSubmittedAt(feedback.createdAt)}
                               </TableCell>
                               <TableCell className="w-[88px] text-center">
                                 {feedback.status.toLowerCase() === "pending" ? (
@@ -1787,9 +1878,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   type="button"
                   aria-label="Close feedback details"
                   className="ff-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px]"
-                  onClick={() => {
-                    setSelectedFeedback(null);
-                  }}
+                  onClick={handleAttemptCloseSelectedFeedback}
                 />
                 <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
                   <CardHeader className="space-y-3">
@@ -1800,9 +1889,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                         size="icon"
                         className="h-9 w-9"
                         aria-label="Close feedback details"
-                        onClick={() => {
-                          setSelectedFeedback(null);
-                        }}
+                        onClick={handleAttemptCloseSelectedFeedback}
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -1830,162 +1917,336 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   </div>
 
                   <Card className="shadow-lg bg-muted/40 border-border">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-foreground">
-                        <MessageCircle className="h-5 w-5" />
-                        Conversation
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="max-h-[320px] overflow-y-auto rounded-lg border border-border bg-white/70 p-4">
-                        {isMessagesLoading && (
-                          <p className="text-sm text-muted-foreground">
-                            Loading conversation...
-                          </p>
-                        )}
-                        {!isMessagesLoading && messages.length === 0 && (
-                          <p className="text-sm text-muted-foreground">
-                            No messages yet. Updates from the admin team will appear here.
-                          </p>
-                        )}
-                        <div className="space-y-4">
-                          {(() => {
-                            let lastDayLabel = "";
-                            return messages.map((entry, index, allMessages) => {
-                              const createdAt = entry.createdAt
-                                ? new Date(entry.createdAt)
-                                : null;
-                              const today = new Date();
-                              const dayLabel = createdAt
-                                ? createdAt.toDateString() ===
-                                  today.toDateString()
-                                  ? "Today"
-                                  : createdAt.toLocaleDateString(undefined, {
-                                      month: "short",
-                                      day: "numeric",
-                                      year: "numeric",
-                                    })
-                                : "";
-                              const showDayLabel =
-                                dayLabel && dayLabel !== lastDayLabel;
-                              if (showDayLabel) {
-                                lastDayLabel = dayLabel;
-                              }
+                    <CardContent className="pt-6">
+                      <div className="grid max-h-[420px] min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-xl border border-border bg-white/70">
+                        <div className="ff-hide-scrollbar min-h-0 overflow-y-auto p-4">
+                          {isMessagesLoading && (
+                            <p className="text-sm text-muted-foreground">
+                              Loading conversation...
+                            </p>
+                          )}
+                          {!isMessagesLoading && messages.length === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                              No messages yet. Updates from the admin team will appear here.
+                            </p>
+                          )}
+                          <div className="space-y-4">
+                            {(() => {
+                              let lastDayLabel = "";
+                              return messages.map((entry, index, allMessages) => {
+                                const createdAt = entry.createdAt
+                                  ? new Date(entry.createdAt)
+                                  : null;
+                                const today = new Date();
+                                const yesterday = new Date();
+                                yesterday.setDate(today.getDate() - 1);
 
-                              const isUser = entry.senderRole === "user";
-                              const name = isUser ? "You" : entry.senderName;
-                              const prev = index > 0 ? allMessages[index - 1] : null;
-                              const prevIsUser = prev ? prev.senderRole === "user" : false;
-                              const prevName = prev
-                                ? prevIsUser
-                                  ? "You"
-                                  : prev.senderName
-                                : "";
-                              const showName =
-                                !prev ||
-                                showDayLabel ||
-                                prev.senderRole !== entry.senderRole ||
-                                prevName !== name;
-                              const hasVeryLongToken = /\S{24,}/.test(
-                                entry.message || "",
-                              );
-                              const isLikelyMultiLine =
-                                (entry.message || "").includes("\n") ||
-                                (entry.message || "").length > 60;
-                              return (
-                                <div key={entry.id} className="space-y-3">
-                                  {showDayLabel && (
-                                    <div className="flex justify-center">
-                                      <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                                        {dayLabel}
-                                      </span>
-                                    </div>
-                                  )}
-                                  <div
-                                    className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                                  >
-                                    <div
-                                      className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUser ? "text-right" : "text-left"}`}
-                                    >
-                                      {showName && (
-                                        <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
-                                          {name}
-                                        </p>
-                                      )}
-                                      <div
-                                        className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                                          isUser
-                                            ? "bg-accent text-white"
-                                            : "bg-white text-foreground border border-border"
-                                        }`}
-                                      >
-                                        <p
-                                          className={`whitespace-pre-line leading-relaxed ${
-                                            hasVeryLongToken
-                                              ? "break-all"
-                                              : "break-words"
-                                          }`}
-                                        >
-                                          {entry.message}
-                                        </p>
-                                      </div>
-                                      {entry.createdAt && (
-                                        <span
-                                          className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-4 py-3 text-sm text-white shadow-sm group-hover:inline-flex ${
-                                            isUser
-                                              ? "-left-1 -translate-x-full"
-                                              : "-right-1 translate-x-full"
-                                          } ${
-                                            isLikelyMultiLine
-                                              ? "top-1/2"
-                                              : "top-[68%]"
-                                          }`}
-                                        >
-                                          {new Date(entry.createdAt).toLocaleDateString(
-                                            "en-US",
-                                            { weekday: "long" },
-                                          )}{" "}
-                                          {formatLocalTime(entry.createdAt)}
+                                const dayLabel = createdAt
+                                  ? createdAt.toDateString() === today.toDateString()
+                                    ? "Today"
+                                    : createdAt.toDateString() === yesterday.toDateString()
+                                      ? "Yesterday"
+                                      : createdAt.toLocaleDateString(undefined, {
+                                          month: "short",
+                                          day: "numeric",
+                                          year: "numeric",
+                                        })
+                                  : "";
+                                const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
+                                if (showDayLabel) {
+                                  lastDayLabel = dayLabel;
+                                }
+
+                                const isUser = entry.senderRole === "user";
+                                const name = isUser ? "You" : entry.senderName || "Admin";
+                                const prev = index > 0 ? allMessages[index - 1] : null;
+                                const prevIsUser = prev ? prev.senderRole === "user" : false;
+                                const prevName = prev
+                                  ? prevIsUser
+                                    ? "You"
+                                    : prev.senderName || "Admin"
+                                  : "";
+                                const showName =
+                                  !prev ||
+                                  showDayLabel ||
+                                  prev.senderRole !== entry.senderRole ||
+                                  prevName !== name;
+                                const hasVeryLongToken = /\S{24,}/.test(
+                                  entry.message || "",
+                                );
+                                const isLikelyMultiLine =
+                                  (entry.message || "").includes("\n") ||
+                                  (entry.message || "").length > 60;
+
+                                return (
+                                  <div key={entry.id} className="space-y-3">
+                                    {showDayLabel ? (
+                                      <div className="flex justify-center">
+                                        <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                          {dayLabel}
                                         </span>
-                                      )}
+                                      </div>
+                                    ) : null}
+                                    <div
+                                      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                                    >
+                                      <div
+                                        className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUser ? "text-right" : "text-left"}`}
+                                      >
+                                        {showName ? (
+                                          <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
+                                            {name}
+                                          </p>
+                                        ) : null}
+                                        <div
+                                          className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                                            isUser
+                                              ? "bg-accent text-white"
+                                              : "border border-border bg-white text-foreground"
+                                          }`}
+                                        >
+                                          <p
+                                            className={`whitespace-pre-line leading-relaxed ${
+                                              hasVeryLongToken
+                                                ? "break-all"
+                                                : "break-words"
+                                            }`}
+                                          >
+                                            {entry.message}
+                                          </p>
+                                        </div>
+                                        {entry.createdAt ? (
+                                          <span
+                                            className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-3 py-1.5 text-xs text-white shadow-sm group-hover:inline-flex ${
+                                              isUser
+                                                ? "-left-1 -translate-x-full"
+                                                : "-right-1 translate-x-full"
+                                            } ${
+                                              isLikelyMultiLine
+                                                ? "top-1/2"
+                                                : "top-[68%]"
+                                            }`}
+                                          >
+                                            {formatLocalTime(entry.createdAt)}
+                                          </span>
+                                        ) : null}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            });
-                          })()}
+                                );
+                              });
+                            })()}
+                          </div>
                         </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="reply-message">Send a reply</Label>
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <Textarea
-                            id="reply-message"
-                            placeholder="Type your message..."
-                            rows={2}
-                            value={messageDraft}
-                            onChange={(e) => setMessageDraft(e.target.value)}
-                            disabled={isSendingMessage}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter" && !event.shiftKey) {
-                                event.preventDefault();
-                                void handleSendMessage();
-                              }
-                            }}
-                          />
-                          <Button
-                            type="button"
-                            onClick={handleSendMessage}
-                            className="bg-accent hover:bg-accent/90"
-                            disabled={isSendingMessage}
-                          >
-                            {isSendingMessage ? "Sending..." : "Send"}
-                          </Button>
+                        <div className="space-y-2 bg-background/85 p-4 backdrop-blur-sm">
+                          <div className="flex items-end gap-2">
+                            <Textarea
+                              id="reply-message"
+                              placeholder="Type your message..."
+                              rows={1}
+                              value={messageDraft}
+                              onChange={(e) => setMessageDraft(e.target.value)}
+                              disabled={isSendingMessage}
+                              className="max-h-28 min-h-8 resize-none rounded-xl border border-border/70 bg-background px-4 py-2 leading-relaxed shadow-sm focus-visible:ring-2 focus-visible:ring-accent/30"
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" && !event.shiftKey) {
+                                  event.preventDefault();
+                                  void handleSendMessage();
+                                }
+                              }}
+                            />
+                            <Button
+                              type="button"
+                              onClick={handleSendMessage}
+                              size="icon"
+                              variant="secondary"
+                              className="h-12 w-12 shrink-0 rounded-xl border border-border/70 bg-muted/80 text-muted-foreground hover:bg-accent hover:text-white"
+                              disabled={isSendingMessage}
+                            >
+                              <Send className="h-5 w-5" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                   </CardContent>
+
+                  <div className="pointer-events-none absolute bottom-0 right-5 z-20 flex flex-col items-end gap-2">
+                    {isMiniChatOpen ? (
+                      <div className="pointer-events-auto h-[360px] w-[320px] overflow-hidden rounded-xl border border-border bg-white shadow-xl">
+                        <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-2">
+                          <p className="text-sm font-semibold text-foreground">
+                            Quick Chat
+                          </p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => setIsMiniChatOpen(false)}
+                            aria-label="Collapse quick chat"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="grid h-[calc(100%-40px)] grid-rows-[minmax(0,1fr)_auto]">
+                          <div className="ff-hide-scrollbar min-h-0 overflow-y-auto p-3">
+                            {isMessagesLoading ? (
+                              <p className="text-sm text-muted-foreground">
+                                Loading conversation...
+                              </p>
+                            ) : null}
+                            {!isMessagesLoading && messages.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">
+                                No messages yet.
+                              </p>
+                            ) : null}
+                            <div className="space-y-3">
+                              {(() => {
+                                let lastDayLabel = "";
+                                return messages.map((entry, index, allMessages) => {
+                                  const createdAt = entry.createdAt
+                                    ? new Date(entry.createdAt)
+                                    : null;
+                                  const today = new Date();
+                                  const yesterday = new Date();
+                                  yesterday.setDate(today.getDate() - 1);
+                                  const dayLabel = createdAt
+                                    ? createdAt.toDateString() === today.toDateString()
+                                      ? "Today"
+                                      : createdAt.toDateString() === yesterday.toDateString()
+                                        ? "Yesterday"
+                                        : createdAt.toLocaleDateString(undefined, {
+                                            month: "short",
+                                            day: "numeric",
+                                            year: "numeric",
+                                          })
+                                    : "";
+                                  const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
+                                  if (showDayLabel) {
+                                    lastDayLabel = dayLabel;
+                                  }
+
+                                  const isUser = entry.senderRole === "user";
+                                  const name = isUser ? "You" : entry.senderName || "Admin";
+                                  const prev = index > 0 ? allMessages[index - 1] : null;
+                                  const prevIsUser = prev ? prev.senderRole === "user" : false;
+                                  const prevName = prev
+                                    ? prevIsUser
+                                      ? "You"
+                                      : prev.senderName || "Admin"
+                                    : "";
+                                  const showName =
+                                    !prev ||
+                                    showDayLabel ||
+                                    prev.senderRole !== entry.senderRole ||
+                                    prevName !== name;
+                                  const isLikelyMultiLine =
+                                    (entry.message || "").includes("\n") ||
+                                    (entry.message || "").length > 50;
+
+                                  return (
+                                    <div key={`mini-${entry.id}`} className="space-y-2">
+                                      {showDayLabel ? (
+                                        <div className="flex justify-center">
+                                          <span className="rounded-full border border-border bg-white/80 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                                            {dayLabel}
+                                          </span>
+                                        </div>
+                                      ) : null}
+                                      <div
+                                        className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                                      >
+                                        <div
+                                          className={`group relative w-fit min-w-0 max-w-[85%] ${isUser ? "text-right" : "text-left"}`}
+                                        >
+                                          {showName ? (
+                                            <p className="mb-1 px-1 text-[11px] font-semibold text-muted-foreground">
+                                              {name}
+                                            </p>
+                                          ) : null}
+                                          <div
+                                            className={`rounded-2xl px-3 py-2 text-xs ${
+                                              isUser
+                                                ? "bg-accent text-white"
+                                                : "border border-border bg-white text-foreground"
+                                            }`}
+                                          >
+                                            <p className="whitespace-pre-line break-words">
+                                              {entry.message}
+                                            </p>
+                                          </div>
+                                          {entry.createdAt ? (
+                                            <span
+                                              className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-black/50 px-2.5 py-1 text-[10px] text-white shadow-sm group-hover:inline-flex ${
+                                                isUser
+                                                  ? "-left-1 -translate-x-full"
+                                                  : "-right-1 translate-x-full"
+                                              } ${
+                                                isLikelyMultiLine
+                                                  ? "top-1/2"
+                                                  : "top-[68%]"
+                                              }`}
+                                            >
+                                              {formatLocalTime(entry.createdAt)}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                });
+                              })()}
+                            </div>
+                          </div>
+                          <div className="border-t border-border bg-background/90 p-2">
+                            <div className="flex items-end gap-2">
+                              <Textarea
+                                id="mini-reply-message"
+                                placeholder="Type your message..."
+                                rows={1}
+                                value={messageDraft}
+                                onChange={(e) => setMessageDraft(e.target.value)}
+                                disabled={isSendingMessage}
+                                className="max-h-24 min-h-8 resize-none rounded-lg border border-border/70 bg-background px-3 py-2 text-xs leading-relaxed"
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" && !event.shiftKey) {
+                                    event.preventDefault();
+                                    void handleSendMessage();
+                                  }
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                onClick={handleSendMessage}
+                                size="icon"
+                                variant="secondary"
+                                className="h-9 w-9 shrink-0 rounded-lg border border-border/70 bg-muted/80 text-muted-foreground hover:bg-accent hover:text-white"
+                                disabled={isSendingMessage}
+                                aria-label="Send quick chat message"
+                              >
+                                <Send className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      aria-label={
+                        isMiniChatOpen
+                          ? "Hide quick chat"
+                          : "Open quick chat"
+                      }
+                      onClick={() => setIsMiniChatOpen((prev) => !prev)}
+                      className="pointer-events-auto h-8 rounded-t-xl border border-b-0 border-border bg-muted/90 px-4 text-xs font-semibold text-foreground shadow-md transition-colors hover:bg-muted"
+                    >
+                      {isMiniChatOpen ? "Hide Chat" : "Quick Chat"}
+                    </button>
+                  </div>
                 </Card>
               </div>
             ) : null}
