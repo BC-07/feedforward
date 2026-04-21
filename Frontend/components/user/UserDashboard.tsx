@@ -78,6 +78,7 @@ import {
   MessageCircle,
   ChevronLeft,
   ChevronRight,
+  Trash2,
   X,
   Copy,
   Plus,
@@ -1599,7 +1600,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                 {renderCreateSubmissionDialog()}
                 <div
                   ref={submissionsScrollRef}
-                  className="flex-1 min-h-0 overflow-y-auto max-h-[calc(100vh-260px)]"
+                  className="flex-1 min-h-0 w-full max-w-full overflow-y-scroll overflow-x-hidden [scrollbar-gutter:stable_both-edges] max-h-[calc(100vh-260px)]"
                   onScroll={(event) => {
                     const top = event.currentTarget.scrollTop;
                     submissionsScrollTop.current = top;
@@ -1611,17 +1612,17 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     }
                   }}
                 >
-                  <div className="overflow-x-auto">
-                    <Table className="min-w-[980px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
+                  <div className="w-full max-w-full overflow-x-auto">
+                    <Table className="w-full min-w-[980px] table-fixed text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
                       <TableHeader className="bg-muted/50 sticky top-0 z-10">
                         <TableRow className="bg-muted/50 hover:bg-muted/50">
-                          <TableHead>Tracking ID</TableHead>
-                          <TableHead>Subject</TableHead>
-                          <TableHead>Category</TableHead>
-                          <TableHead>Priority</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="whitespace-nowrap">Date</TableHead>
-                          <TableHead className="w-[80px] text-center">Actions</TableHead>
+                          <TableHead className="w-[170px]">Tracking ID</TableHead>
+                          <TableHead className="w-[340px]">Subject</TableHead>
+                          <TableHead className="w-[220px]">Category</TableHead>
+                          <TableHead className="w-[110px]">Priority</TableHead>
+                          <TableHead className="w-[150px]">Status</TableHead>
+                          <TableHead className="w-[130px] whitespace-nowrap">Date</TableHead>
+                          <TableHead className="w-[88px] text-center">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1641,12 +1642,16 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               className="cursor-pointer"
                               onClick={() => handleViewFeedback(feedback)}
                             >
-                              <TableCell className="font-mono text-xs text-muted-foreground">
+                              <TableCell className="font-mono text-xs text-muted-foreground truncate">
                                 {feedback.id}
                               </TableCell>
-                              <TableCell className="font-medium">{feedback.subject}</TableCell>
-                              <TableCell>{feedback.category}</TableCell>
-                              <TableCell>{feedback.priority}</TableCell>
+                              <TableCell className="font-medium truncate" title={feedback.subject}>
+                                {feedback.subject}
+                              </TableCell>
+                              <TableCell className="truncate" title={feedback.category}>
+                                {feedback.category}
+                              </TableCell>
+                              <TableCell className="truncate">{feedback.priority}</TableCell>
                               <TableCell>
                                 <span className="inline-flex items-center gap-2">
                                   {(() => {
@@ -1671,7 +1676,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               <TableCell className="whitespace-nowrap text-muted-foreground">
                                 {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                               </TableCell>
-                              <TableCell className="text-center">
+                              <TableCell className="w-[88px] text-center">
                                 {feedback.status.toLowerCase() === "pending" ? (
                                   <Button
                                     type="button"
@@ -1686,10 +1691,12 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                       setIsDeleteOpen(true);
                                     }}
                                   >
-                                    <X className="h-3.5 w-3.5" />
+                                    <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 ) : (
-                                  <span className="text-xs text-muted-foreground">-</span>
+                                  <span className="inline-flex h-7 w-7 items-center justify-center text-xs text-muted-foreground">
+                                    -
+                                  </span>
                                 )}
                               </TableCell>
                             </TableRow>

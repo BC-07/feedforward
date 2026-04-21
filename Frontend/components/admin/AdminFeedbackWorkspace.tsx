@@ -1062,9 +1062,7 @@ export function AdminFeedbackWorkspace({
                     <TableHead>Category</TableHead>
                     <TableHead>Priority</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="w-[150px] whitespace-nowrap">
-                      Date
-                    </TableHead>
+                    <TableHead className="w-[150px] whitespace-nowrap">Date</TableHead>
                     <TableHead className="w-[110px] text-center">
                       Actions
                     </TableHead>
