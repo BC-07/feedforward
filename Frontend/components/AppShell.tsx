@@ -63,8 +63,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  OPEN_FEEDBACK_EVENT,
-  PENDING_ADMIN_FEEDBACK_KEY,
 } from "@/components/admin/constants";
 
 const SESSION_EVENT = "feedforward:session-change";
@@ -459,15 +457,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       saveReadNotificationIds(next);
     }
     setIsNotificationsOpen(false);
-    sessionStorage.setItem(PENDING_ADMIN_FEEDBACK_KEY, feedback.id);
-    router.push("/dashboard/feedback-submission");
-    window.setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent(OPEN_FEEDBACK_EVENT, {
-          detail: { feedbackId: feedback.id },
-        }),
-      );
-    }, 120);
+    router.push(
+      `/dashboard/feedback-submission?feedbackId=${encodeURIComponent(
+        feedback.id,
+      )}&open=${Date.now()}`,
+    );
   };
 
   const sortedAdminNotifications = [...adminNotifications].sort(
@@ -791,7 +785,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         },
         {
           href: "/dashboard/feedback-submission",
-          label: "Submission List",
+          label: "Feedback Submission ",
           icon: ClipboardList,
           isActive: (path) => path.startsWith("/dashboard/feedback-submission"),
         },
@@ -1021,7 +1015,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             onClick={() => setIsMobileMenuOpen(false)}
                           >
                             <ClipboardList className="h-4 w-4" />
-                            <span>Submission List</span>
+                            <span>Feedback Submission</span>
                           </Link>
                         </>
                       )}
@@ -1222,7 +1216,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       )}
                     </Button>
                   </SheetTrigger>
-                <SheetContent className="w-[360px] sm:w-[400px] overflow-hidden rounded-l-3xl ff-sheet-anim">
+                <SheetContent
+                  className="w-[360px] sm:w-[400px] overflow-hidden rounded-l-3xl ff-sheet-anim"
+                  onInteractOutside={(event) => {
+                    event.preventDefault();
+                  }}
+                >
                   <SheetHeader className="px-3 pb-0 pt-4">
                     <SheetTitle className="text-center text-lg font-semibold">
                       Notifications
@@ -1509,7 +1508,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Admin Profile Sheet */}
       <Sheet open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <SheetContent className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl ff-sheet-anim">
+        <SheetContent
+          className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl ff-sheet-anim"
+          onInteractOutside={(event) => {
+            event.preventDefault();
+          }}
+        >
           <SheetHeader className="px-2 flex items-center justify-center text-center">
             <SheetTitle className="text-center w-full">Admin Profile</SheetTitle>
             <SheetDescription className="text-center w-full">Your account information</SheetDescription>
@@ -1534,7 +1538,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   onChange={handleAdminAvatarChange}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">Hover photo to change</p>
 
               <div className="text-center">
                 <p className="text-xl font-bold">{adminName}</p>
@@ -1580,10 +1583,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   value={adminProfileEdit.lastName}
                   onChange={(e) => {
                     const next = e.target.value;
-                    if (containsEmailLike(next)) {
-                      toast.error("Last name must not contain an email");
-                      return;
-                    }
                     setAdminProfileEdit({ ...adminProfileEdit, lastName: next });
                   }}
                 />

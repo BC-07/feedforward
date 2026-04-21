@@ -1,11 +1,13 @@
 "use client";
 
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   startTransition,
   useCallback,
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -73,11 +75,11 @@ import {
   Download,
   MessageSquare,
   Pencil,
+  SendHorizontal,
   X,
 } from "lucide-react";
 import {
   OPEN_FEEDBACK_EVENT,
-  PENDING_ADMIN_FEEDBACK_KEY,
 } from "./constants";
 import type { AdminSessionInfo } from "./useAdminSession";
 
@@ -153,6 +155,8 @@ function normalizeStatusFilterValue(value: string) {
 export function AdminFeedbackWorkspace({
   currentAdmin,
 }: AdminFeedbackWorkspaceProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [isFeedbacksLoading, setIsFeedbacksLoading] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
@@ -171,9 +175,21 @@ export function AdminFeedbackWorkspace({
   const [filterName, setFilterName] = useState("asc");
   const [filterDate, setFilterDate] = useState("recent");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [activeEditTab, setActiveEditTab] = useState<"details" | "manage">(
+    "details",
+  );
   const [currentPage, setCurrentPage] = useState(1);
+  const openedFeedbackRequestRef = useRef("");
+  const messageScrollRef = useRef<HTMLDivElement>(null);
+  const replyInputRef = useRef<HTMLTextAreaElement>(null);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const trimmedSearchQuery = searchQuery.trim();
+  const requestedFeedbackId = searchParams.get("feedbackId")?.trim() || "";
+  const requestedFeedbackOpenToken = searchParams.get("open")?.trim() || "";
+  const hasFeedbackChanges = selectedFeedback
+    ? newStatus !== selectedFeedback.status ||
+      newPriority !== selectedFeedback.priority
+    : false;
 
   const loadMessages = useCallback(async (feedbackId: string) => {
     setIsMessagesLoading(true);
@@ -185,6 +201,18 @@ export function AdminFeedbackWorkspace({
     } finally {
       setIsMessagesLoading(false);
     }
+  }, []);
+
+  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const container = messageScrollRef.current;
+    if (!container) return;
+
+    window.requestAnimationFrame(() => {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior,
+      });
+    });
   }, []);
 
   const loadFeedbacks = useCallback(async () => {
@@ -224,6 +252,7 @@ export function AdminFeedbackWorkspace({
       setSelectedFeedback(feedback);
       setNewStatus(feedback.status);
       setNewPriority(feedback.priority);
+      setActiveEditTab("details");
       setIsEditDialogOpen(true);
       await loadMessages(feedback.id);
       if (currentAdmin?.id && currentAdmin.unit) {
@@ -286,35 +315,68 @@ export function AdminFeedbackWorkspace({
   }, [openFeedbackById]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !currentAdmin?.unit) return;
+    if (!currentAdmin?.unit || !requestedFeedbackId) return;
+    const requestKey = requestedFeedbackOpenToken
+      ? `${requestedFeedbackId}:${requestedFeedbackOpenToken}`
+      : requestedFeedbackId;
+    if (openedFeedbackRequestRef.current === requestKey) return;
 
-    const pendingFeedbackId = sessionStorage.getItem(PENDING_ADMIN_FEEDBACK_KEY);
-    if (!pendingFeedbackId) return;
-
-    sessionStorage.removeItem(PENDING_ADMIN_FEEDBACK_KEY);
-    void openFeedbackById(pendingFeedbackId);
-  }, [currentAdmin?.unit, openFeedbackById]);
+    openedFeedbackRequestRef.current = requestKey;
+    void openFeedbackById(requestedFeedbackId);
+    router.replace("/dashboard/feedback-submission", { scroll: false });
+  }, [
+    currentAdmin?.unit,
+    openFeedbackById,
+    requestedFeedbackId,
+    requestedFeedbackOpenToken,
+    router,
+  ]);
 
   const handleSendMessage = useCallback(async () => {
     if (!selectedFeedback) return;
+    if (isSendingMessage) return;
     const trimmed = messageDraft.trim();
-    if (!trimmed) return;
+    if (!trimmed) {
+      toast.error("Please enter a message.");
+      return;
+    }
 
     setIsSendingMessage(true);
     try {
-      await createFeedbackMessage(selectedFeedback.id, { message: trimmed });
+      const created = await createFeedbackMessage(selectedFeedback.id, {
+        message: trimmed,
+      });
+      setMessages((prev) => [...prev, created]);
       setMessageDraft("");
-      await loadMessages(selectedFeedback.id);
-      await loadFeedbacks();
+      scrollMessagesToBottom("smooth");
+      window.requestAnimationFrame(() => {
+        replyInputRef.current?.focus();
+      });
     } catch (error) {
       toastApiError(error, "Failed to send message.");
     } finally {
       setIsSendingMessage(false);
     }
-  }, [loadFeedbacks, loadMessages, messageDraft, selectedFeedback]);
+  }, [isSendingMessage, messageDraft, scrollMessagesToBottom, selectedFeedback]);
+
+  useEffect(() => {
+    if (!isEditDialogOpen || activeEditTab !== "manage") return;
+    if (isMessagesLoading) return;
+    scrollMessagesToBottom();
+  }, [
+    activeEditTab,
+    isEditDialogOpen,
+    isMessagesLoading,
+    messages.length,
+    scrollMessagesToBottom,
+  ]);
 
   const handleUpdateFeedback = async () => {
     if (!selectedFeedback) return;
+    if (!hasFeedbackChanges) {
+      toast("No changes to update.");
+      return;
+    }
 
     try {
       const payload: Partial<Feedback> = {
@@ -368,7 +430,6 @@ export function AdminFeedbackWorkspace({
     }
   };
 
-  const searchFilterLabel = trimmedSearchQuery || null;
   const nameFilterLabel = filterName === "desc" ? "Z - A" : null;
   const dateFilterLabel = filterDate === "oldest" ? "Oldest" : null;
   const typeFilterLabel =
@@ -382,7 +443,7 @@ export function AdminFeedbackWorkspace({
         : formatFilterChipLabel(filterStatus)
       : null;
   const hasActiveFilters = Boolean(
-    searchFilterLabel ||
+    trimmedSearchQuery ||
       nameFilterLabel ||
       dateFilterLabel ||
       typeFilterLabel ||
@@ -940,30 +1001,25 @@ export function AdminFeedbackWorkspace({
           </div>
           <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2 xl:grid-cols-7">
             <div
-              className={`sm:col-span-2 xl:col-span-2 ${searchFilterLabel || hasActiveFilters ? "space-y-2" : ""}`}
+              className={`sm:col-span-2 xl:col-span-2 ${hasActiveFilters ? "space-y-2" : ""}`}
             >
               <Input
                 placeholder="Search by ID, subject, or message..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
               />
-              {searchFilterLabel || hasActiveFilters ? (
+              {hasActiveFilters ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  {searchFilterLabel ? (
-                    <ActiveFilterChip label={searchFilterLabel} />
-                  ) : null}
-                  {hasActiveFilters ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearAllFilters}
-                      className="h-7 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                      Clear all
-                    </Button>
-                  ) : null}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllFilters}
+                    className="h-7 rounded-full px-3 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Clear all
+                  </Button>
                 </div>
               ) : null}
             </div>
@@ -1125,6 +1181,7 @@ export function AdminFeedbackWorkspace({
                             onOpenChange={(open) => {
                               if (!open) {
                                 setIsEditDialogOpen(false);
+                                setActiveEditTab("details");
                                 setSelectedFeedback(null);
                                 setMessages([]);
                                 setMessageDraft("");
@@ -1142,7 +1199,11 @@ export function AdminFeedbackWorkspace({
                               </Button>
                             </DialogTrigger>
                             <DialogContent
-                              className="max-h-[90vh] max-w-2xl overflow-y-auto"
+                              className={
+                                activeEditTab === "manage"
+                                  ? "flex h-[85vh] max-h-[85vh] max-w-2xl flex-col overflow-hidden"
+                                  : "max-h-[80vh] max-w-2xl overflow-y-auto"
+                              }
                               onInteractOutside={(event) => event.preventDefault()}
                               onEscapeKeyDown={(event) => event.preventDefault()}
                             >
@@ -1153,8 +1214,18 @@ export function AdminFeedbackWorkspace({
                               </DialogDescription>
                             </DialogHeader>
                             {selectedFeedback ? (
-                              <Tabs defaultValue="details" className="w-full">
-                                <TabsList className="grid w-full grid-cols-2">
+                              <Tabs
+                                value={activeEditTab}
+                                onValueChange={(value) =>
+                                  setActiveEditTab(value as "details" | "manage")
+                                }
+                                className={
+                                  activeEditTab === "manage"
+                                    ? "flex min-h-0 w-full flex-1 flex-col"
+                                    : "w-full"
+                                }
+                              >
+                                <TabsList className="grid w-full shrink-0 grid-cols-2">
                                   <TabsTrigger value="details">
                                     Details
                                   </TabsTrigger>
@@ -1254,7 +1325,10 @@ export function AdminFeedbackWorkspace({
                                   ) : null}
                                 </TabsContent>
 
-                                <TabsContent value="manage" className="space-y-4">
+                                <TabsContent
+                                  value="manage"
+                                  className="flex min-h-0 flex-1 flex-col space-y-4"
+                                >
                                   <div className="space-y-2">
                                     <Label htmlFor="status">Update Status</Label>
                                     <Select
@@ -1299,7 +1373,7 @@ export function AdminFeedbackWorkspace({
                                     </Select>
                                   </div>
 
-                                  <div className="space-y-3">
+                                  <div className="flex min-h-0 flex-1 flex-col space-y-3">
                                     <div className="flex items-center gap-2">
                                       <MessageSquare className="h-5 w-5 text-foreground" />
                                       <p className="text-base font-semibold">
@@ -1307,124 +1381,132 @@ export function AdminFeedbackWorkspace({
                                       </p>
                                     </div>
 
-                                    <div className="overflow-hidden rounded-lg border border-border bg-white/70">
-                                      <div className="max-h-[300px] overflow-y-auto p-4">
-                                        {isMessagesLoading ? (
-                                          <p className="text-sm text-muted-foreground">
-                                            Loading conversation...
-                                          </p>
-                                        ) : null}
-                                        {!isMessagesLoading &&
-                                        messages.length === 0 ? (
-                                          <p className="text-sm text-muted-foreground">
-                                            No messages yet.
-                                          </p>
-                                        ) : null}
-                                        <div className="space-y-4">
-                                          {messages.map((entry) => {
-                                            const isAdminMessage =
-                                              entry.senderRole !== "user";
-                                            const hasVeryLongToken =
-                                              /\S{24,}/.test(entry.message || "");
-                                            return (
-                                              <div
-                                                key={entry.id}
-                                                className={`flex ${isAdminMessage ? "justify-end" : "justify-start"}`}
-                                              >
+                                    <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-white/70">
+                                      <div className="flex h-full min-h-0 flex-col">
+                                        <div
+                                          ref={messageScrollRef}
+                                          className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto p-4"
+                                        >
+                                          {isMessagesLoading ? (
+                                            <p className="text-sm text-muted-foreground">
+                                              Loading conversation...
+                                            </p>
+                                          ) : null}
+                                          {!isMessagesLoading &&
+                                          messages.length === 0 ? (
+                                            <p className="text-sm text-muted-foreground">
+                                              No messages yet.
+                                            </p>
+                                          ) : null}
+                                          <div className="space-y-4">
+                                            {messages.map((entry) => {
+                                              const isAdminMessage =
+                                                entry.senderRole !== "user";
+                                              const hasVeryLongToken =
+                                                /\S{24,}/.test(entry.message || "");
+                                              return (
                                                 <div
-                                                  className={`max-w-[78%] sm:max-w-md ${isAdminMessage ? "text-right" : "text-left"}`}
+                                                  key={entry.id}
+                                                  className={`flex ${isAdminMessage ? "justify-end" : "justify-start"}`}
                                                 >
-                                                  <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
-                                                    {isAdminMessage
-                                                      ? "You"
-                                                      : entry.senderName || "User"}
-                                                  </p>
                                                   <div
-                                                    className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                                                      isAdminMessage
-                                                        ? "bg-accent text-white"
-                                                        : "border border-border bg-white text-foreground"
-                                                    }`}
+                                                    className={`max-w-[62%] sm:max-w-[12rem] ${isAdminMessage ? "text-right" : "text-left"}`}
                                                   >
-                                                    <p
-                                                      className={`whitespace-pre-line leading-relaxed ${
-                                                        hasVeryLongToken
-                                                          ? "break-all"
-                                                          : "break-words"
+                                                    <p className="mb-0.5 px-1 text-[11px] font-semibold text-muted-foreground">
+                                                      {isAdminMessage
+                                                        ? "You"
+                                                        : entry.senderName || "User"}
+                                                    </p>
+                                                    <div
+                                                      className={`rounded-2xl px-2.5 py-1.5 text-[13px] shadow-sm ${
+                                                        isAdminMessage
+                                                          ? "bg-accent text-white"
+                                                          : "border border-border bg-white text-foreground"
                                                       }`}
                                                     >
-                                                      {entry.message}
-                                                    </p>
+                                                      <p
+                                                        className={`whitespace-pre-line leading-relaxed ${
+                                                          hasVeryLongToken
+                                                            ? "break-all"
+                                                            : "break-words"
+                                                        }`}
+                                                      >
+                                                        {entry.message}
+                                                      </p>
+                                                    </div>
+                                                    {entry.createdAt ? (
+                                                      <p className="mt-0.5 px-1 text-[10px] text-muted-foreground">
+                                                        {formatLocalTime(
+                                                          entry.createdAt,
+                                                        )}
+                                                      </p>
+                                                    ) : null}
                                                   </div>
-                                                  {entry.createdAt ? (
-                                                    <p className="mt-1 px-1 text-xs text-muted-foreground">
-                                                      {formatLocalTime(
-                                                        entry.createdAt,
-                                                      )}
-                                                    </p>
-                                                  ) : null}
                                                 </div>
-                                              </div>
-                                            );
-                                          })}
+                                              );
+                                            })}
+                                          </div>
                                         </div>
-                                      </div>
-                                    </div>
 
-                                    <div className="space-y-2">
-                                      <Label
-                                        htmlFor="message"
-                                        className="text-sm font-semibold"
-                                      >
-                                        Send a reply
-                                      </Label>
-                                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                                        <Textarea
-                                          id="message"
-                                          placeholder="Type your message..."
-                                          rows={2}
-                                          value={messageDraft}
-                                          onChange={(event) =>
-                                            setMessageDraft(event.target.value)
-                                          }
-                                          onKeyDown={(event) => {
-                                            if (
-                                              event.key === "Enter" &&
-                                              !event.shiftKey
-                                            ) {
-                                              event.preventDefault();
-                                              void handleSendMessage();
-                                            }
-                                          }}
-                                          className="min-h-[44px] rounded-lg bg-muted/50 sm:flex-1"
-                                        />
-                                        <Button
-                                          type="button"
-                                          className="h-11 px-6 sm:shrink-0"
-                                          onClick={() => void handleSendMessage()}
-                                          disabled={
-                                            isSendingMessage ||
-                                            !messageDraft.trim()
-                                          }
-                                        >
-                                          {isSendingMessage
-                                            ? "Sending..."
-                                            : "Send"}
-                                        </Button>
+                                        <div className="shrink-0 bg-background/85 px-4 pb-4 pt-2 backdrop-blur-sm">
+                                          <div className="flex items-center gap-2">
+                                            <div className="flex min-h-[40px] flex-1 items-center rounded-full bg-[#eef4ff] px-4">
+                                            <Textarea
+                                              ref={replyInputRef}
+                                              id="message"
+                                              placeholder="Type your reply..."
+                                              rows={1}
+                                                value={messageDraft}
+                                                onChange={(event) =>
+                                                  setMessageDraft(event.target.value)
+                                                }
+                                                onKeyDown={(event) => {
+                                                  if (
+                                                    event.key === "Enter" &&
+                                                    !event.shiftKey
+                                                  ) {
+                                                    event.preventDefault();
+                                                    void handleSendMessage();
+                                                  }
+                                                }}
+                                                className="max-h-16 min-h-0 flex-1 resize-none border-0 bg-transparent px-0 py-1.5 text-sm shadow-none focus-visible:ring-0"
+                                              />
+                                            </div>
+                                            <Button
+                                              type="button"
+                                              size="icon"
+                                              className="h-10 w-10 shrink-0 rounded-2xl bg-[#eef4ff] text-muted-foreground hover:bg-[#e1ebff]"
+                                              onMouseDown={(event) => event.preventDefault()}
+                                              onClick={() => void handleSendMessage()}
+                                              disabled={
+                                                isSendingMessage ||
+                                                !messageDraft.trim()
+                                              }
+                                              aria-label={
+                                                isSendingMessage
+                                                  ? "Sending reply"
+                                                  : "Send reply"
+                                              }
+                                            >
+                                              <SendHorizontal className="h-5 w-5" />
+                                            </Button>
+                                          </div>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
 
-                                  <p className="text-xs text-muted-foreground">
-                                    Marking a submission as Resolved will email
-                                    the user if they registered an account.
-                                  </p>
                                   <Button
                                     onClick={handleUpdateFeedback}
-                                    className="w-full bg-accent hover:bg-accent/90"
+                                    className="mt--8 w-full bg-accent hover:bg-accent/90"
+                                    disabled={!hasFeedbackChanges}
                                   >
                                     Update Feedback
                                   </Button>
+                                  <p className="pt-1 text-center text-xs text-muted-foreground">
+                                    Marking a submission as Resolved will email
+                                    the user if they registered an account.
+                                  </p>
                                 </TabsContent>
                               </Tabs>
                             ) : null}

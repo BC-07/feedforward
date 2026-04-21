@@ -345,3 +345,12 @@
     transform: translateY(0) scale(1);
   }
 }
+
+.ff-hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.ff-hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
