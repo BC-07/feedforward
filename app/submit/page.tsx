@@ -34,6 +34,7 @@ interface FormData {
 }
 
 const FEEDBACK_MESSAGE_MAX_LENGTH = 2000;
+const FEEDBACK_SUBJECT_MAX_LENGTH = 100;
 
 export default function Submit() {
   const router = useRouter();
@@ -290,9 +291,13 @@ export default function Submit() {
                   id="subject"
                   placeholder="Brief summary of your feedback"
                   value={formData.subject}
+                  maxLength={FEEDBACK_SUBJECT_MAX_LENGTH}
                   disabled={isSubmittingFeedback}
                   onChange={(e) =>
-                    setFormData({ ...formData, subject: e.target.value })
+                    setFormData({
+                      ...formData,
+                      subject: e.target.value.slice(0, FEEDBACK_SUBJECT_MAX_LENGTH),
+                    })
                   }
                   required
                 />
