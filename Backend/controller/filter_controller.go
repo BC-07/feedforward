@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -333,4 +334,88 @@ func ModerateFeedback(c *fiber.Ctx) error {
 
 	result := analyzeFeedbackLanguage(req.Subject, req.Message)
 	return success(c, fiber.StatusOK, result)
+}
+
+func buildFeedbackMaskPattern(word string) (*regexp.Regexp, error) {
+	trimmed := strings.TrimSpace(word)
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	parts := strings.Fields(trimmed)
+	if len(parts) == 0 {
+		return nil, nil
+	}
+
+	escaped := make([]string, len(parts))
+	for i, part := range parts {
+		escaped[i] = regexp.QuoteMeta(part)
+	}
+
+	pattern := `\b` + strings.Join(escaped, `\s+`) + `\b`
+	return regexp.Compile(`(?i)` + pattern)
+}
+
+func maskAlnumToken(token []rune) string {
+	if len(token) == 0 {
+		return ""
+	}
+	if len(token) == 1 {
+		return "*"
+	}
+	return string(token[0]) + strings.Repeat("*", len(token)-1)
+}
+
+func maskMatchedFeedbackFragment(fragment string) string {
+	if fragment == "" {
+		return fragment
+	}
+
+	var result strings.Builder
+	token := make([]rune, 0, len(fragment))
+
+	flushToken := func() {
+		if len(token) == 0 {
+			return
+		}
+		result.WriteString(maskAlnumToken(token))
+		token = token[:0]
+	}
+
+	for _, r := range fragment {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			token = append(token, r)
+			continue
+		}
+		flushToken()
+		result.WriteRune(r)
+	}
+	flushToken()
+
+	return result.String()
+}
+
+func maskFeedbackLanguage(subject string, message string, matchedWords []string) (string, string) {
+	if len(matchedWords) == 0 {
+		return subject, message
+	}
+
+	words := append([]string(nil), matchedWords...)
+	sort.Slice(words, func(i, j int) bool {
+		return len(words[i]) > len(words[j])
+	})
+
+	maskText := func(text string) string {
+		masked := text
+		for _, word := range words {
+			pattern, err := buildFeedbackMaskPattern(word)
+			if err != nil || pattern == nil {
+				continue
+			}
+			masked = pattern.ReplaceAllStringFunc(masked, maskMatchedFeedbackFragment)
+		}
+		return masked
+	}
+
+	return maskText(subject), maskText(message)
 }

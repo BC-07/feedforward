@@ -66,7 +66,7 @@ export default function Login() {
       localStorage.removeItem("superAdminName");
       localStorage.removeItem("superAdminExpiresAt");
       toast.success(`Welcome back, ${user.name}!`);
-      router.push("/user/submit-feedback");
+      router.push("/user/home");
       return;
     } catch {
       // Try admin login with the same form credentials.

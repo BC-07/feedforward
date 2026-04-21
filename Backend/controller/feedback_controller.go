@@ -176,8 +176,12 @@ func CreateFeedback(c *fiber.Ctx) error {
 	}
 
 	moderation := analyzeFeedbackLanguage(feedback.Subject, feedback.Message)
-	if moderation.IsFlagged && moderation.Severity == "offensive" {
-		return invalidRequest(c, moderation.Reason)
+	if len(moderation.MatchedWords) > 0 {
+		feedback.Subject, feedback.Message = maskFeedbackLanguage(
+			feedback.Subject,
+			feedback.Message,
+			moderation.MatchedWords,
+		)
 	}
 
 	if feedback.UserID == nil && feedback.UserEmail != nil {

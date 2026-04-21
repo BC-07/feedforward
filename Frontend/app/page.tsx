@@ -52,7 +52,7 @@ export default function Home() {
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <Link
-                href={isUserLoggedIn ? "/user/submit-feedback" : "/login"}
+                href={isUserLoggedIn ? "/user/home" : "/login"}
                 className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-base sm:text-lg text-center"
               >
                 {isUserLoggedIn ? "Go to Dashboard" : "Login / Sign Up"}
