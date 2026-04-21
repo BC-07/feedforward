@@ -758,6 +758,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       startIndex + MY_SUBMISSIONS_PER_PAGE,
     );
   }, [filteredFeedbacks, mySubmissionsPage]);
+  const mySubmissionsPlaceholderRowCount = Math.max(
+    0,
+    MY_SUBMISSIONS_PER_PAGE - paginatedFilteredFeedbacks.length,
+  );
 
   useEffect(() => {
     setMySubmissionsPage(1);
@@ -1087,6 +1091,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           <>
             <DialogHeader>
               <DialogTitle>Feedback Form</DialogTitle>
+              <DialogDescription>
+                Fill out the details below to create a new submission.
+              </DialogDescription>
             </DialogHeader>
             {renderSubmissionForm(
               "modal",
@@ -1541,17 +1548,17 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               </div>
             ) : isMySubmissionsView && feedbacks.length > 0 ? (
               <div className="h-full min-h-0 flex flex-col bg-background">
-                <div className="px-1 pb-2">
-                  <div className="mt-2 pb-2 sm:pb-3">
-                    <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex w-full gap-2 sm:max-w-xl">
+                <div className="px-1 pb-1">
+                  <div className="mt-0 pb-1 sm:pb-2">
+                    <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex w-full gap-2 sm:max-w-md">
                         <div className="relative flex-1">
-                          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
                           <Input
                             placeholder="Search by ID, subject, message, or category"
                             value={searchQuery}
                             onChange={(event) => setSearchQuery(event.target.value)}
-                            className="h-9 border-border/60 bg-background pl-9 transition-colors duration-200 focus-visible:border-foreground/40"
+                            className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-foreground/40"
                           />
                         </div>
                         <HoverFilterPopover
@@ -1568,7 +1575,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           setIsAnonymous(false);
                           setIsCreateSubmissionOpen(true);
                         }}
-                        className="h-9 sm:w-auto bg-accent hover:bg-accent/90 transition-all duration-150 hover:-translate-y-px"
+                        className="h-9 sm:w-auto bg-accent hover:bg-accent/90 transition-colors duration-150 hover:-translate-x-px"
                       >
                         <Plus className="mr-2 h-4 w-4" />
                         New Submission
@@ -1600,7 +1607,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                 {renderCreateSubmissionDialog()}
                 <div
                   ref={submissionsScrollRef}
-                  className="flex-1 min-h-0 w-full max-w-full overflow-y-scroll overflow-x-hidden [scrollbar-gutter:stable_both-edges] max-h-[calc(100vh-260px)]"
+                  className="flex-1 min-h-0 w-full max-w-full overflow-y-scroll overflow-x-hidden [scrollbar-gutter:stable_both-edges] h-[calc(100vh-260px)]"
                   onScroll={(event) => {
                     const top = event.currentTarget.scrollTop;
                     submissionsScrollTop.current = top;
@@ -1639,7 +1646,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           paginatedFilteredFeedbacks.map((feedback) => (
                             <TableRow
                               key={feedback.id}
-                              className="cursor-pointer"
+                              className="h-14 cursor-pointer"
                               onClick={() => handleViewFeedback(feedback)}
                             >
                               <TableCell className="font-mono text-xs text-muted-foreground truncate">
@@ -1702,6 +1709,20 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                             </TableRow>
                           ))
                         )}
+                        {filteredFeedbacks.length > 0 &&
+                          mySubmissionsPlaceholderRowCount > 0
+                          ? Array.from({
+                              length: mySubmissionsPlaceholderRowCount,
+                            }).map((_, index) => (
+                              <TableRow
+                                key={`submission-placeholder-row-${index}`}
+                                className="h-14"
+                                aria-hidden="true"
+                              >
+                                <TableCell colSpan={7} />
+                              </TableRow>
+                            ))
+                          : null}
                       </TableBody>
                     </Table>
                   </div>
