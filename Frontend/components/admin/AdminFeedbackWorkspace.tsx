@@ -62,6 +62,7 @@ import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
 import { toastApiError } from "@/lib/errorHandling";
+import { formatFilterChipLabel } from "@/lib/filterUtils";
 import ExcelJS from "exceljs";
 import { jsPDF } from "jspdf";
 import autoTable, { type RowInput } from "jspdf-autotable";
@@ -87,14 +88,6 @@ interface AdminFeedbackWorkspaceProps {
 
 const FEEDBACKS_PER_PAGE = 8;
 const EXPORT_LOGO_PATH = "/favicon.ico";
-
-function formatFilterChipLabel(value: string) {
-  return value
-    .split(/[\s_-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(" ");
-}
 
 function ActiveFilterChip({ label }: { label: string }) {
   return (

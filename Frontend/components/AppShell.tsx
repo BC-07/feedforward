@@ -353,11 +353,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     adminUnit,
     adminAvatar,
   } = effectiveSession;
+  const isAdminSetPasswordRoute = pathname.startsWith("/admin/set-password");
   const shouldShowSidebar =
-    pathname.startsWith("/user") ||
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/superadmin") ||
-    pathname.startsWith("/admin");
+    !isAdminSetPasswordRoute &&
+    (pathname.startsWith("/user") ||
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/superadmin"));
   const topBarHeightClass = "h-16";
   const collapsedSidebarOffsetClass = shouldShowSidebar ? "md:pl-14" : "";
 
@@ -766,13 +767,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ? "Feedback Submission"
       : "Admin Dashboard";
   const userPageTitle =
-    pathname === "/user/track-feedback"
-      ? "Track Feedback"
+    pathname === "/user/home"
+      ? "Home"
       : pathname === "/user/my-submissions"
-        ? "My Submissions"
-        : pathname === "/user/submit-feedback"
-          ? "Submit Feedback"
-          : "User";
+      ? "My Submissions"
+      : pathname === "/user/submit-feedback"
+        ? "Submit Feedback"
+        : "User";
   const superAdminPageTitle =
     pathname === "/superadmin" || pathname === "/superadmin/admin-dashboard"
       ? "Admin Dashboard"
@@ -799,22 +800,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     : isUserLoggedIn
       ? [
           {
-            href: "/user/submit-feedback",
-            label: "Submit Feedback",
-            icon: Send,
-            isActive: (path) => path === "/user/submit-feedback",
+            href: "/user/home",
+            label: "Home",
+            icon: House,
+            isActive: (path) => path === "/user/home",
           },
           {
             href: "/user/my-submissions",
             label: "My Submissions",
             icon: ListChecks,
             isActive: (path) => path === "/user/my-submissions",
-          },
-          {
-            href: "/user/track-feedback",
-            label: "Track Feedback",
-            icon: Search,
-            isActive: (path) => path === "/user/track-feedback",
           },
         ]
       : isSuperAdminLoggedIn
@@ -855,6 +850,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ];
   const expandedSidebarTitle = "FEED FORWARD";
   const expandedSidebarSubtitle = "SMART. FAST. SAFE.";
+  const handleSidebarExpandClick = (
+    event?: React.MouseEvent<HTMLButtonElement> | React.PointerEvent<HTMLButtonElement>,
+  ) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    setIsDesktopSidebarExpanded(true);
+  };
+
+  const handleSidebarCollapseClick = (
+    event?: React.MouseEvent<HTMLButtonElement> | React.PointerEvent<HTMLButtonElement>,
+  ) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    setIsDesktopSidebarExpanded(false);
+  };
 
   const AppFooter = () => (
     <footer className="border-t border-muted bg-white mt-auto">
@@ -904,7 +914,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     size="icon"
                     className="h-7 w-7 shrink-0 text-foreground hover:bg-muted/80"
                     aria-label="Collapse sidebar menu"
-                    onClick={() => setIsDesktopSidebarExpanded(false)}
+                    onPointerDown={handleSidebarCollapseClick}
+                    onClick={handleSidebarCollapseClick}
                   >
                     <Menu className="h-4 w-4 text-foreground" />
                   </Button>
@@ -918,7 +929,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   size="icon"
                   className="h-9 w-9 text-foreground hover:bg-muted/80"
                   aria-label="Expand sidebar menu"
-                  onClick={() => setIsDesktopSidebarExpanded(true)}
+                  onPointerDown={handleSidebarExpandClick}
+                  onClick={handleSidebarExpandClick}
                 >
                   <Menu className="h-5 w-5 text-foreground" />
                 </Button>
@@ -933,6 +945,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     title={item.label}
                     aria-label={item.label}
+                    onClick={() => {
+                      if (!isDesktopSidebarExpanded) {
+                        setIsDesktopSidebarExpanded(true);
+                      }
+                    }}
                     className={`${isDesktopSidebarExpanded && index === 0 ? "mt-2" : ""} mb-0.5 flex h-10 items-center justify-center rounded-lg border transition-all duration-300 ${
                       isDesktopSidebarExpanded
                         ? "mx-auto w-[calc(100%-1.5rem)] justify-start px-4"
@@ -1029,12 +1046,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       {isUserLoggedIn && !isAdminLoggedIn && (
                         <>
                           <Link
-                            href="/user/submit-feedback"
+                            href="/user/home"
                             className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
                             onClick={() => setIsMobileMenuOpen(false)}
                           >
-                            <Send className="h-4 w-4" />
-                            <span>Submit Feedback</span>
+                            <House className="h-4 w-4" />
+                            <span>Home</span>
                           </Link>
                           <div className="h-px bg-border" />
                           <Link
@@ -1044,15 +1061,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                           >
                             <ListChecks className="h-4 w-4" />
                             <span>My Submissions</span>
-                          </Link>
-                          <div className="h-px bg-border" />
-                          <Link
-                            href="/user/track-feedback"
-                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
-                            onClick={() => setIsMobileMenuOpen(false)}
-                          >
-                            <Search className="h-4 w-4" />
-                            <span>Track Feedback</span>
                           </Link>
                         </>
                       )}

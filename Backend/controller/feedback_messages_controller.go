@@ -64,6 +64,11 @@ func CreateFeedbackMessage(c *fiber.Ctx) error {
 	if message == "" {
 		return invalidRequest(c, "message is required")
 	}
+	moderation := analyzeFeedbackLanguage("", message)
+	if len(moderation.MatchedWords) > 0 {
+		_, maskedMessage := maskFeedbackLanguage("", message, moderation.MatchedWords)
+		message = maskedMessage
+	}
 
 	sessionID := strings.TrimSpace(c.Cookies(sessionCookieName))
 	senderRole := sessionRoleUser

@@ -1,5 +1,5 @@
-import { UserDashboard } from "@/components/user/UserDashboard";
+import { redirect } from "next/navigation";
 
 export default function UserTrackFeedbackPage() {
-  return <UserDashboard view="track-feedback" />;
+  redirect("/user/my-submissions");
 }
