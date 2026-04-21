@@ -22,80 +22,60 @@ interface AdminFeedbackStatusChartProps {
   feedbacks: Feedback[];
 }
 
-const STATUS_ORDER = ["pending", "inProgress", "resolved", "other"] as const;
+const VISIBILITY_ORDER = ["anonymous", "notAnonymous"] as const;
 
-type StatusKey = (typeof STATUS_ORDER)[number];
+type VisibilityKey = (typeof VISIBILITY_ORDER)[number];
 
 const chartConfig = {
-  pending: {
-    label: "Pending",
+  anonymous: {
+    label: "Anonymous",
     color: "#ff9500",
   },
-  inProgress: {
-    label: "In Progress",
-    color: "#ffb347",
-  },
-  resolved: {
-    label: "Resolved",
+  notAnonymous: {
+    label: "Not Anonymous",
     color: "#cc6f00",
   },
-  other: {
-    label: "Other",
-    color: "#ffd8a8",
-  },
 } satisfies ChartConfig;
-
-function normalizeStatus(status: string): StatusKey {
-  switch (status.trim().toLowerCase()) {
-    case "pending":
-      return "pending";
-    case "in progress":
-    case "inprogress":
-      return "inProgress";
-    case "resolved":
-      return "resolved";
-    default:
-      return "other";
-  }
-}
 
 export function AdminFeedbackStatusChart({
   feedbacks,
 }: AdminFeedbackStatusChartProps) {
   const chartData = useMemo(() => {
-    const totals: Record<StatusKey, number> = {
-      pending: 0,
-      inProgress: 0,
-      resolved: 0,
-      other: 0,
+    const totals: Record<VisibilityKey, number> = {
+      anonymous: 0,
+      notAnonymous: 0,
     };
 
     feedbacks.forEach((feedback) => {
-      totals[normalizeStatus(feedback.status)] += 1;
+      const visibilityKey: VisibilityKey = feedback.isAnonymous
+        ? "anonymous"
+        : "notAnonymous";
+      totals[visibilityKey] += 1;
     });
 
-    return STATUS_ORDER.map((statusKey) => ({
-      statusKey,
-      total: totals[statusKey],
-      fill: `var(--color-${statusKey})`,
+    return VISIBILITY_ORDER.map((visibilityKey) => ({
+      visibilityKey,
+      total: totals[visibilityKey],
+      fill: `var(--color-${visibilityKey})`,
     })).filter((item) => item.total > 0);
   }, [feedbacks]);
 
   const totalFeedbacks = feedbacks.length;
-  const activeStatuses = chartData.length;
+  const activeVisibilityTypes = chartData.length;
 
   return (
     <Card className="h-full shadow-lg">
       <CardHeader>
-        <CardTitle>Feedback Status Donut Graph</CardTitle>
+        <CardTitle>Feedback Anonymity Donut Graph</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <div className="rounded-full bg-accent/10 px-3 py-1 font-medium text-accent">
-            Status Mix
+            Visibility Mix
           </div>
           <div className="text-muted-foreground">
-            {activeStatuses} active status{activeStatuses === 1 ? "" : "es"}{" "}
+            {activeVisibilityTypes} visibility type
+            {activeVisibilityTypes === 1 ? "" : "s"}{" "}
             across {totalFeedbacks} submission
             {totalFeedbacks === 1 ? "" : "s"}
           </div>
@@ -108,12 +88,12 @@ export function AdminFeedbackStatusChart({
                 <>
                   <ChartTooltip
                     cursor={false}
-                    content={<ChartTooltipContent nameKey="statusKey" />}
+                    content={<ChartTooltipContent nameKey="visibilityKey" />}
                   />
                   <Pie
                     data={chartData}
                     dataKey="total"
-                    nameKey="statusKey"
+                    nameKey="visibilityKey"
                     innerRadius={70}
                     outerRadius={96}
                     paddingAngle={4}
@@ -139,14 +119,14 @@ export function AdminFeedbackStatusChart({
                           >
                             <tspan
                               x={viewBox.cx}
-                              y={viewBox.cy - 10}
+                              y={viewBox.cy - 30}
                               className="fill-foreground text-3xl font-semibold"
                             >
                               {totalFeedbacks}
                             </tspan>
                             <tspan
                               x={viewBox.cx}
-                              y={viewBox.cy + 22}
+                              y={viewBox.cy + -5}
                               className="fill-muted-foreground text-xs tracking-[0.24em]"
                             >
                               TOTAL
@@ -157,7 +137,7 @@ export function AdminFeedbackStatusChart({
                     />
                     {chartData.map((entry) => (
                       <Cell
-                        key={entry.statusKey}
+                        key={entry.visibilityKey}
                         fill={entry.fill}
                         stroke="transparent"
                       />
@@ -166,7 +146,7 @@ export function AdminFeedbackStatusChart({
                   <ChartLegend
                     content={
                       <ChartLegendContent
-                        nameKey="statusKey"
+                        nameKey="visibilityKey"
                         className="flex-wrap gap-4 pt-6"
                       />
                     }
@@ -185,8 +165,8 @@ export function AdminFeedbackStatusChart({
                   </div>
                 </div>
                 <span className="max-w-[14rem] text-sm text-muted-foreground">
-                  Feedback statuses will appear here once submissions are
-                  available.
+                  Anonymous and non-anonymous feedback totals will appear here
+                  once submissions are available.
                 </span>
               </div>
             </div>
