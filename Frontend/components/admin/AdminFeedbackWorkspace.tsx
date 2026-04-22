@@ -48,6 +48,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,19 +69,17 @@ import { toast } from "sonner";
 import { formatLocalTime } from "@/lib/time";
 import { toastApiError } from "@/lib/errorHandling";
 import { formatFilterChipLabel } from "@/lib/filterUtils";
-import {
-  HoverFilterPopover,
-  type HoverFilterItem,
-} from "@/components/filters/HoverFilterPopover";
 import { formatFeedbackText } from "@/lib/textFormat";
 import ExcelJS from "exceljs";
 import { jsPDF } from "jspdf";
 import autoTable, { type RowInput } from "jspdf-autotable";
 import {
   AlertCircle,
+  BarChart3,
   ChevronLeft,
   ChevronRight,
   Download,
+  MessageSquare,
   Pencil,
   Search,
   SendHorizontal,
@@ -105,6 +104,12 @@ interface ReplyComposerProps {
 const FEEDBACKS_PER_PAGE = 7;
 const EXPORT_LOGO_PATH = "/favicon.ico";
 type AdminHoverFilterKey = "name" | "date" | "type" | "priority" | "status";
+const ADMIN_FILTER_TEXT_COLOR = "#171717";
+const ADMIN_FILTER_MUTED_COLOR = "#fffdfb";
+const ADMIN_FILTER_CONTROL_CLASS =
+  "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
+const ADMIN_FILTER_CHIP_CLASS =
+  "inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-medium leading-none text-[#6f6255]";
 
 function markAdminNotificationAsRead(
   adminId: string,
@@ -162,7 +167,7 @@ const ReplyComposer = memo(function ReplyComposer({
     if (!input) return;
 
     input.style.height = "0px";
-    const nextHeight = Math.min(Math.max(input.scrollHeight, 32), 112);
+    const nextHeight = Math.min(Math.max(input.scrollHeight, 36), 88);
     input.style.height = `${nextHeight}px`;
   }, [draft]);
 
@@ -177,12 +182,12 @@ const ReplyComposer = memo(function ReplyComposer({
   }, [draft, onDraftChange, onSend]);
 
   return (
-    <div className="space-y-2 bg-background/85 p-4 backdrop-blur-sm">
-      <div className="flex items-end gap-2">
+    <div className="bg-background/90 px-3 pb-3 pt-2 backdrop-blur-sm">
+      <div className="flex items-end gap-2 rounded-[24px] bg-white/80">
         <Textarea
           ref={replyInputRef}
           id="message"
-          placeholder="Type your message..."
+          placeholder="Type your reply..."
           rows={1}
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
@@ -192,18 +197,18 @@ const ReplyComposer = memo(function ReplyComposer({
               void submitMessage();
             }
           }}
-          className="min-h-[40px] max-h-[112px] flex-1 resize-none overflow-y-auto"
+          className="ff-hide-scrollbar min-h-9 max-h-[88px] flex-1 resize-none overflow-y-auto rounded-full border-0 bg-[#eef4ff] px-4 py-2 text-sm shadow-none placeholder:text-[#6b7280] focus-visible:ring-0 focus-visible:ring-transparent"
           disabled={isSendingMessage}
         />
         <Button
           type="button"
-          size="icon"
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => void submitMessage()}
           disabled={isSendingMessage || !draft.trim()}
           aria-label={isSendingMessage ? "Sending reply" : "Send reply"}
+          className="h-9 w-9 shrink-0 rounded-full border-0 bg-[#eef4ff] p-0 text-[#9ca3af] shadow-none hover:bg-[#e4edff] hover:text-[#6b7280] disabled:bg-[#eef4ff] disabled:text-[#c4cad4]"
         >
-          <SendHorizontal className="h-5 w-5" />
+          <SendHorizontal className="h-4 w-4" />
         </Button>
       </div>
     </div>
@@ -238,7 +243,6 @@ export function AdminFeedbackWorkspace({
   const [activeEditTab, setActiveEditTab] = useState<"details" | "manage">(
     "details",
   );
-  const [isDetailMessageExpanded, setIsDetailMessageExpanded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const openedFeedbackRequestRef = useRef("");
   const messageScrollRef = useRef<HTMLDivElement>(null);
@@ -261,16 +265,6 @@ export function AdminFeedbackWorkspace({
   const detailMessageHasVeryLongToken = /\S{24,}/.test(
     selectedFeedback?.message ?? "",
   );
-  const detailMessageNeedsExpansion = useMemo(
-    () =>
-      detailMessageParagraphs.length > 3 ||
-      detailMessageParagraphs.some((paragraph) => paragraph.length > 180),
-    [detailMessageParagraphs],
-  );
-
-  useEffect(() => {
-    setIsDetailMessageExpanded(false);
-  }, [selectedFeedback?.id]);
 
   const loadMessages = useCallback(async (feedbackId: string) => {
     setIsMessagesLoading(true);
@@ -549,87 +543,45 @@ export function AdminFeedbackWorkspace({
     setFilterStatus("all");
   }, []);
 
-  const clearSingleFilter = useCallback((key: AdminHoverFilterKey) => {
-    switch (key) {
-      case "name":
-        setFilterName("asc");
-        break;
-      case "date":
-        setFilterDate("recent");
-        break;
-      case "type":
-        setFilterType("all");
-        break;
-      case "priority":
-        setFilterPriority("all");
-        break;
-      case "status":
-        setFilterStatus("all");
-        break;
-      default:
-        break;
-    }
-  }, []);
+  const hasActiveFilters =
+    trimmedSearchQuery.length > 0 ||
+    filterName !== "asc" ||
+    filterDate !== "recent" ||
+    filterType !== "all" ||
+    filterPriority !== "all" ||
+    filterStatus !== "all";
 
-  const activeFilterCount = [
-    filterName !== "asc",
-    filterDate !== "recent",
-    filterType !== "all",
-    filterPriority !== "all",
-    filterStatus !== "all",
-  ].filter(Boolean).length;
-
-  const activeFilterChips = [
-    filterName !== "asc" ? { key: "name", label: "Sort: Z - A" } : null,
-    filterDate !== "recent" ? { key: "date", label: "Date: Oldest" } : null,
-    filterType !== "all"
-      ? { key: "type", label: `Type: ${formatFilterChipLabel(filterType)}` }
-      : null,
-    filterPriority !== "all"
-      ? {
-          key: "priority",
-          label: `Priority: ${formatFilterChipLabel(filterPriority)}`,
-        }
-      : null,
-    filterStatus !== "all"
-      ? {
-          key: "status",
-          label:
-            filterStatus === "inprogress"
-              ? "Status: In Progress"
-              : `Status: ${formatFilterChipLabel(filterStatus)}`,
-        }
-      : null,
-  ].filter(
-    (chip): chip is { key: AdminHoverFilterKey; label: string } => Boolean(chip),
-  );
-
-  const hoverFilterItems = useMemo(
+  const inlineFilterChips = useMemo(
     () =>
       [
         {
           key: "name" as const,
-          label: filterName === "desc" ? "Z - A" : "A - Z",
+          value: filterName,
+          chipLabel: filterName === "desc" ? "Z - A" : "A - Z",
+          showChip: filterName !== "asc",
           options: [
             { value: "asc", label: "A - Z" },
             { value: "desc", label: "Z - A" },
           ],
-          isSelected: (value: string) => filterName === value,
-          onSelect: setFilterName,
+          onChange: setFilterName,
         },
         {
           key: "date" as const,
-          label: filterDate === "oldest" ? "Oldest" : "Most Recent",
+          value: filterDate,
+          chipLabel: filterDate === "oldest" ? "Oldest" : "Most Recent",
+          showChip: filterDate !== "recent",
           options: [
             { value: "recent", label: "Most Recent" },
             { value: "oldest", label: "Oldest" },
           ],
-          isSelected: (value: string) => filterDate === value,
-          onSelect: setFilterDate,
+          onChange: setFilterDate,
         },
         {
           key: "type" as const,
-          label: filterType === "all" ? "All Types" : formatFilterChipLabel(filterType),
+          value: filterType,
+          chipLabel:
+            filterType === "all" ? "All Types" : formatFilterChipLabel(filterType),
+          showChip: filterType !== "all",
           options: [
             { value: "all", label: "All Types" },
             { value: "suggestion", label: "Suggestion" },
@@ -638,42 +590,50 @@ export function AdminFeedbackWorkspace({
             { value: "request", label: "Request" },
             { value: "compliment", label: "Compliment" },
           ],
-          isSelected: (value: string) => filterType === value,
-          onSelect: setFilterType,
+          onChange: setFilterType,
         },
         {
           key: "priority" as const,
-          label:
+          value: filterPriority,
+          chipLabel:
             filterPriority === "all"
               ? "All Priorities"
               : formatFilterChipLabel(filterPriority),
+          showChip: filterPriority !== "all",
           options: [
             { value: "all", label: "All Priorities" },
             { value: "low", label: "Low" },
             { value: "medium", label: "Medium" },
             { value: "high", label: "High" },
           ],
-          isSelected: (value: string) => filterPriority === value,
-          onSelect: setFilterPriority,
+          onChange: setFilterPriority,
         },
         {
           key: "status" as const,
-          label:
+          value: filterStatus,
+          chipLabel:
             filterStatus === "all"
               ? "All Status"
               : filterStatus === "inprogress"
                 ? "In Progress"
                 : formatFilterChipLabel(filterStatus),
+          showChip: filterStatus !== "all",
           options: [
             { value: "all", label: "All Status" },
             { value: "pending", label: "Pending" },
             { value: "inprogress", label: "In Progress" },
             { value: "resolved", label: "Resolved" },
           ],
-          isSelected: (value: string) => filterStatus === value,
-          onSelect: setFilterStatus,
+          onChange: setFilterStatus,
         },
-      ] satisfies HoverFilterItem<AdminHoverFilterKey>[],
+      ] satisfies Array<{
+        key: AdminHoverFilterKey;
+        value: string;
+        chipLabel: string;
+        showChip: boolean;
+        options: { value: string; label: string }[];
+        onChange: (value: string) => void;
+      }>,
     [filterDate, filterName, filterPriority, filterStatus, filterType],
   );
 
@@ -836,7 +796,7 @@ export function AdminFeedbackWorkspace({
       filterPriority !== "all" ? `Priority = ${filterPriority}` : null,
       filterDate === "recent" ? "Date = Most Recent" : "Date = Oldest",
       currentAdmin?.unit ? `Category = ${currentAdmin.unit}` : null,
-      searchQuery ? `Search = "${searchQuery}"` : null,
+      trimmedSearchQuery ? `Search = "${trimmedSearchQuery}"` : null,
     ].filter(Boolean);
 
     return filterParts.length ? filterParts.join(" | ") : "No filters applied";
@@ -1238,99 +1198,136 @@ export function AdminFeedbackWorkspace({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <div className="px-3 pb-1 sm:px-7">
-        <div className="mt-0 pb-1 pt-4 sm:pb-2 sm:pt-5">
-          <div className="space-y-2">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex w-full gap-2 sm:max-w-md">
-                <div className="relative flex-1">
-                  <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by ID, subject, message, or category"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    className="h-8 border-border/60 bg-background pl-8.5 text-sm transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
-                  />
-                </div>
-                <HoverFilterPopover
-                  items={hoverFilterItems}
-                  activeCount={activeFilterCount}
-                  onReset={clearAllFilters}
+      <div className="px-4 pb-6 pt-4 sm:px-7 sm:pt-6">
+        <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-4 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex h-9 items-center gap-3">
+              <div className="flex h-9 w-11 items-center justify-center rounded-2xl bg-muted/50 text-[#171717]">
+                <BarChart3 className="h-5 w-5" />
+              </div>
+              <div className="flex h-9 items-center">
+                <h2 className="text-[21px] font-semibold leading-none tracking-[-0.02em] text-[#171717]">
+                  Submission History
+                </h2>
+              </div>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-9 rounded-[12px] border-[#eceae5] bg-white px-5 text-[14px] font-semibold text-[#171717] shadow-none hover:bg-[#f7f3ee]"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => void exportFeedbacksXlsx()}>
+                  Export XLSX
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void exportFeedbacksPdf()}>
+                  Export PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <div className="grid gap-x-3 gap-y-2 xl:grid-cols-[minmax(0,1.9fr)_repeat(5,minmax(0,1fr))]">
+            <div className="space-y-1.5">
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2"
+                  style={{ color: ADMIN_FILTER_MUTED_COLOR }}
+                />
+                <Input
+                  placeholder="Search by ID, subject, or message..."
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className={`${ADMIN_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}
+                  style={{
+                    color: ADMIN_FILTER_TEXT_COLOR,
+                    paddingLeft: "2.75rem",
+                  }}
                 />
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="h-9 sm:self-start">
-                    <Download className="h-4 w-4" />
-                    Download
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => void exportFeedbacksXlsx()}>
-                    Export XLSX
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => void exportFeedbacksPdf()}>
-                    Export PDF
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            {activeFilterChips.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {activeFilterChips.map((chip) => (
-                  <span
-                    key={chip.key}
-                    className="inline-flex items-center gap-1 rounded-full border border-foreground/20 bg-background px-3 py-1 text-xs text-foreground shadow-sm"
+              {hasActiveFilters ? (
+                <div className="min-h-5">
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:text-[#4d463e]"
+                    style={{ color: ADMIN_FILTER_TEXT_COLOR }}
                   >
-                    {chip.label}
-                    <button
-                      type="button"
-                      onClick={() => clearSingleFilter(chip.key)}
-                      className="rounded-full p-0.5 text-red-600 hover:bg-red-50 hover:text-red-700"
-                      aria-label={`Remove ${chip.label} filter`}
-                      title={`Remove ${chip.label} filter`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
+                    <X className="h-3.5 w-3.5" />
+                    Clear all
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            {inlineFilterChips.map((filter) => (
+              <div key={filter.key} className="space-y-1.5">
+                <Select value={filter.value} onValueChange={filter.onChange}>
+                  <SelectTrigger
+                    className={`${ADMIN_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`}
+                    style={{ color: ADMIN_FILTER_TEXT_COLOR }}
+                  >
+                    <SelectValue placeholder={filter.chipLabel} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filter.options.map((option) => (
+                      <SelectItem key={`${filter.key}-${option.value}`} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {filter.showChip ? (
+                  <div className="min-h-5">
+                    <span className={ADMIN_FILTER_CHIP_CLASS}>
+                      {filter.chipLabel}
+                    </span>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
+            ))}
           </div>
-        </div>
-      </div>
-          <div className="px-3 sm:px-4">
-            {isFeedbacksLoading ? (
-              <div className="py-12 text-center text-sm text-muted-foreground">
-                Loading feedback submissions...
-              </div>
-            ) : visibleFeedbacks.length === 0 ? (
-              <div className="py-12 text-center">
-                <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-                <h3 className="mb-2 text-lg font-semibold">No Feedback Found</h3>
-                <p className="text-muted-foreground">
-                  Try adjusting your search or filters for this unit.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-              <div className="w-full max-w-full overflow-x-auto pl-2 sm:pl-5">
-              <Table className="min-w-[900px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
-                <TableHeader className="sticky top-0 z-10 bg-muted/50">
-                  <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead>Name</TableHead>
-                    <TableHead>Tracking ID</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="w-[260px] px-2">Category</TableHead>
-                    <TableHead className="w-[100px] px-2">Priority</TableHead>
-                    <TableHead className="w-[120px] px-2">Status</TableHead>
-                    <TableHead className="w-[118px] whitespace-nowrap px-2">Date</TableHead>
-                    <TableHead className="w-[88px] text-center">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+
+          {isFeedbacksLoading ? (
+            <div className="flex min-h-[420px] items-center justify-center rounded-[24px] border border-dashed border-[#e6ddd1] bg-[#fcfaf7] text-sm text-muted-foreground">
+              Loading feedback submissions...
+            </div>
+          ) : visibleFeedbacks.length === 0 ? (
+            <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[24px] border border-dashed border-[#e6ddd1] bg-[#fcfaf7] px-6 text-center">
+              <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground" />
+              <h3 className="mb-2 text-lg font-semibold text-[#171717]">
+                No Feedback Found
+              </h3>
+              <p className="text-muted-foreground">
+                Try adjusting your search or filters for this unit.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="w-full overflow-x-auto">
+                <Table className="w-full min-w-[980px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
+                  <TableHeader className="sticky top-0 z-10 bg-muted/50">
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead>Name</TableHead>
+                      <TableHead>Tracking ID</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="w-[260px] px-2">Category</TableHead>
+                      <TableHead className="w-[100px] px-2">Priority</TableHead>
+                      <TableHead className="w-[120px] px-2">Status</TableHead>
+                      <TableHead className="w-[118px] whitespace-nowrap px-2">
+                        Date
+                      </TableHead>
+                      <TableHead className="w-[88px] text-center">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                   {paginatedFeedbacks.map((feedback) => (
                     <TableRow key={feedback.id} className="h-14">
                       <TableCell
@@ -1347,7 +1344,10 @@ export function AdminFeedbackWorkspace({
                             ? feedback.userName.split(" ")[0]
                             : "*****"}
                       </TableCell>
-                      <TableCell className="truncate font-mono text-xs text-muted-foreground" title={feedback.id}>
+                      <TableCell
+                        className="truncate font-mono text-xs text-muted-foreground"
+                        title={feedback.id}
+                      >
                         {feedback.id}
                       </TableCell>
                       <TableCell className="truncate">
@@ -1355,7 +1355,10 @@ export function AdminFeedbackWorkspace({
                           {feedback.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="w-[260px] max-w-[260px] truncate px-2" title={feedback.category}>
+                      <TableCell
+                        className="w-[260px] max-w-[260px] truncate px-2"
+                        title={feedback.category}
+                      >
                         {feedback.category}
                       </TableCell>
                       <TableCell className="w-[100px] truncate px-2">
@@ -1403,80 +1406,41 @@ export function AdminFeedbackWorkspace({
                               </Button>
                             </DialogTrigger>
                             <DialogContent
-                              className="flex h-[88vh] max-h-[88vh] w-[67vw] max-w-[67vw] flex-col overflow-hidden sm:max-w-[67vw] lg:w-[64vw] lg:max-w-[64vw] xl:w-[62vw] xl:max-w-[62vw] 2xl:w-[59vw] 2xl:max-w-[59vw]"
                               className={
                                 activeEditTab === "manage"
                                   ? "flex h-[85vh] max-h-[85vh] max-w-2xl flex-col overflow-hidden"
-                                  : "max-h-[80vh] max-w-2xl overflow-x-hidden overflow-y-auto"
+                                  : "flex max-h-[80vh] max-w-2xl flex-col overflow-hidden"
                               }
                               onInteractOutside={(event) => event.preventDefault()}
                               onEscapeKeyDown={(event) => event.preventDefault()}
                             >
-                            <DialogHeader>
-                              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                <div>
-                                  <DialogTitle>Feedback Details</DialogTitle>
-                                  <DialogDescription>
-                                    Tracking ID: {selectedFeedback?.id}
-                                  </DialogDescription>
-                                </div>
-                                {selectedFeedback ? (
-                                  <div className="grid w-full shrink-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:w-[52%]">
-                                    <div className="space-y-1">
-                                      <Label htmlFor="status" className="text-sm">
-                                        Update Status
-                                      </Label>
-                                      <Select
-                                        value={newStatus}
-                                        onValueChange={setNewStatus}
-                                      >
-                                        <SelectTrigger id="status" className="h-9">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="Pending">
-                                            Pending
-                                          </SelectItem>
-                                          <SelectItem value="In Progress">
-                                            In Progress
-                                          </SelectItem>
-                                          <SelectItem value="Resolved">
-                                            Resolved
-                                          </SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
+                              <DialogHeader>
+                                <DialogTitle>Feedback Details</DialogTitle>
+                                <DialogDescription>
+                                  Tracking ID: {selectedFeedback?.id}
+                                </DialogDescription>
+                              </DialogHeader>
+                              {selectedFeedback ? (
+                                <Tabs
+                                  value={activeEditTab}
+                                  onValueChange={(value) =>
+                                    setActiveEditTab(value as "details" | "manage")
+                                  }
+                                  className="flex min-h-0 w-full flex-1 flex-col"
+                                >
+                                  <TabsList className="grid w-full shrink-0 grid-cols-2 rounded-full">
+                                    <TabsTrigger value="details">
+                                      Details
+                                    </TabsTrigger>
+                                    <TabsTrigger value="manage">Manage</TabsTrigger>
+                                  </TabsList>
 
-                                    <div className="space-y-1">
-                                      <Label htmlFor="priority" className="text-sm">
-                                        Update Priority
-                                      </Label>
-                                      <Select
-                                        value={newPriority}
-                                        onValueChange={setNewPriority}
-                                      >
-                                        <SelectTrigger id="priority" className="h-9">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="Low">Low</SelectItem>
-                                          <SelectItem value="Medium">
-                                            Medium
-                                          </SelectItem>
-                                          <SelectItem value="High">High</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  </div>
-                                ) : null}
-                              </div>
-                            </DialogHeader>
-                            {selectedFeedback ? (
-                              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                                <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-hidden lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]">
-                                  <div className="min-h-0 space-y-4 overflow-y-auto rounded-lg border border-border bg-muted/20 p-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div>
+                                  <TabsContent
+                                    value="details"
+                                    className="ff-hide-scrollbar flex min-h-0 flex-1 flex-col space-y-4 overflow-x-hidden overflow-y-auto pr-1"
+                                  >
+                                    <div className="grid grid-cols-2 gap-4 [&>div]:min-w-0">
+                                      <div className="min-w-0">
                                         <Label className="text-muted-foreground">
                                           Type
                                         </Label>
@@ -1484,7 +1448,7 @@ export function AdminFeedbackWorkspace({
                                           {selectedFeedback.type}
                                         </p>
                                       </div>
-                                      <div>
+                                      <div className="min-w-0">
                                         <Label className="text-muted-foreground">
                                           Category
                                         </Label>
@@ -1492,7 +1456,7 @@ export function AdminFeedbackWorkspace({
                                           {selectedFeedback.category}
                                         </p>
                                       </div>
-                                      <div>
+                                      <div className="min-w-0">
                                         <Label className="text-muted-foreground">
                                           Status
                                         </Label>
@@ -1505,7 +1469,7 @@ export function AdminFeedbackWorkspace({
                                           {selectedFeedback.status}
                                         </Badge>
                                       </div>
-                                      <div>
+                                      <div className="min-w-0">
                                         <Label className="text-muted-foreground">
                                           Submitted By
                                         </Label>
@@ -1516,258 +1480,78 @@ export function AdminFeedbackWorkspace({
                                         </p>
                                       </div>
                                     </div>
-                              <DialogTitle>Feedback Details</DialogTitle>
-                              <DialogDescription>
-                                Tracking ID: {selectedFeedback?.id}
-                              </DialogDescription>
-                            </DialogHeader>
-                            {selectedFeedback ? (
-                              <Tabs
-                                value={activeEditTab}
-                                onValueChange={(value) =>
-                                  setActiveEditTab(value as "details" | "manage")
-                                }
-                                className="flex min-h-0 w-full flex-1 flex-col"
-                              >
-                                <TabsList className="grid w-full shrink-0 grid-cols-2 rounded-full">
-                                  <TabsTrigger value="details">
-                                    Details
-                                  </TabsTrigger>
-                                  <TabsTrigger value="manage">Manage</TabsTrigger>
-                                </TabsList>
 
-                                <TabsContent
-                                  value="details"
-                                  className="flex min-h-0 flex-1 flex-col space-y-4 overflow-x-hidden"
-                                >
-                                  <div className="grid grid-cols-2 gap-4 [&>div]:min-w-0">
-                                    <div className="min-w-0">
-                                      <Label className="text-muted-foreground">
-                                        Type
-                                      </Label>
-                                      <p className="font-medium capitalize">
-                                        {selectedFeedback.type}
-                                      </p>
-                                    </div>
-                                    <div className="min-w-0">
-                                      <Label className="text-muted-foreground">
-                                        Category
-                                      </Label>
-                                      <p className="font-medium">
-                                        {selectedFeedback.category}
-                                      </p>
-                                    </div>
-                                    <div className="min-w-0">
-                                      <Label className="text-muted-foreground">
-                                        Status
-                                      </Label>
-                                      <Badge
-                                        className={getStatusColor(
-                                          selectedFeedback.status,
-                                        )}
-                                        variant="outline"
-                                      >
-                                        {selectedFeedback.status}
-                                      </Badge>
-                                    </div>
-                                    <div className="min-w-0">
-                                      <Label className="text-muted-foreground">
-                                        Submitted By
-                                      </Label>
-                                      <p className="font-medium">
-                                        {selectedFeedback.isAnonymous
-                                          ? "*****"
-                                          : selectedFeedback.userName || "*****"}
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                    <div className="space-y-1">
-                                      <p className="text-sm font-semibold text-muted-foreground">
-                                        Subject
-                                      </p>
-                                      <p className="text-base font-semibold break-words">
-                                        {selectedFeedback.subject}
-                                      </p>
-                                      <p className="mt-0.5 max-h-40 overflow-y-auto pr-1 text-sm leading-relaxed [text-align:justify] [text-justify:inter-word] [text-indent:1rem] [overflow-wrap:anywhere] break-words hyphens-auto">
-                                        {selectedFeedback.message}
-                                      </p>
-                                    </div>
-                                  <div>
-                                    <Label className="text-muted-foreground">
-                                      Subject
-                                    </Label>
-                                    <p className="font-medium break-words [overflow-wrap:anywhere]">
-                                      {formatFeedbackText(selectedFeedback.subject)}
-                                    </p>
-                                  </div>
-
-                                  <div>
-                                    <Label className="text-muted-foreground">
-                                      Message
-                                    </Label>
-                                    <div
-                                      className={`mt-2 overflow-hidden rounded-lg border border-border bg-white/70 ${
-                                        detailMessageNeedsExpansion &&
-                                        !isDetailMessageExpanded
-                                          ? "max-h-56"
-                                          : ""
-                                      }`}
-                                    >
-                                      <div className="space-y-4 p-4">
-                                        {detailMessageParagraphs.length > 0 ? (
-                                          detailMessageParagraphs.map((paragraph, index) => (
-                                            <p
-                                              key={`${selectedFeedback.id}-paragraph-${index}`}
-                                              className={`text-sm leading-7 text-foreground/90 whitespace-pre-wrap ${
-                                                detailMessageHasVeryLongToken
-                                                  ? "break-all"
-                                                  : "break-words"
-                                              }`}
-                                            >
-                                              {paragraph}
-                                            </p>
-                                          ))
-                                        ) : (
-                                          <p className="text-sm leading-7 text-muted-foreground">
-                                            No message provided.
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {detailMessageNeedsExpansion ? (
-                                      <button
-                                        type="button"
-                                        className="mt-2 text-sm font-semibold text-accent transition-colors hover:text-accent/80"
-                                        onClick={() =>
-                                          setIsDetailMessageExpanded((current) => !current)
-                                        }
-                                      >
-                                        {isDetailMessageExpanded ? "See Less" : "See All"}
-                                      </button>
-                                    ) : null}
-                                  </div>
-                                  <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden pr-px">
-                                    <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-t-xl border border-b-0 border-border bg-white/70">
-                                      <div
-                                        ref={messageScrollRef}
-                                        className="ff-hide-scrollbar min-h-0 overflow-y-auto p-4"
-                                      >
-                                        {isMessagesLoading ? (
-                                          <p className="text-sm text-muted-foreground">
-                                            Loading conversation...
-                                          </p>
-                                        ) : null}
-                                        {!isMessagesLoading &&
-                                        messages.length === 0 ? (
-                                          <p className="text-sm text-muted-foreground">
-                                            No messages yet. Updates from the user will appear here.
-                                          </p>
-                                        ) : null}
-                                        <div className="space-y-4">
-                                          {messages.map((entry) => {
-                                            const normalizedSenderRole = (
-                                              entry.senderRole || ""
-                                            )
-                                              .trim()
-                                              .toLowerCase();
-                                            const normalizedSenderName = (
-                                              entry.senderName || ""
-                                            )
-                                              .trim()
-                                              .toLowerCase();
-                                            const normalizedAdminName = (
-                                              currentAdmin?.name || ""
-                                            )
-                                              .trim()
-                                              .toLowerCase();
-                                            const isAdminMessage =
-                                              normalizedSenderRole === "admin" ||
-                                              normalizedSenderRole === "superadmin" ||
-                                              (!!currentAdmin?.id &&
-                                                entry.senderId?.trim() ===
-                                                  currentAdmin.id.trim()) ||
-                                              (!!normalizedAdminName &&
-                                                normalizedSenderName === normalizedAdminName);
-                                            const hasVeryLongToken = /\S{24,}/.test(
-                                              entry.message || "",
-                                            );
-                                            return (
-                                              <div
-                                                key={entry.id}
-                                                className={`flex ${isAdminMessage ? "justify-end" : "justify-start"}`}
-                                              >
-                                                <div
-                                                  className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isAdminMessage ? "text-right" : "text-left"}`}
-                                                >
-                                                  <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
-                                                    {isAdminMessage
-                                                      ? "You"
-                                                      : entry.senderName || "User"}
-                                                  </p>
-                                                  <div
-                                                    className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                                                      isAdminMessage
-                                                        ? "bg-accent text-white"
-                                                        : "border border-border bg-white text-foreground"
-                                                    }`}
-                                                  >
-                                                    <p
-                                                      className={`whitespace-pre-line leading-relaxed ${
-                                                        hasVeryLongToken
-                                                          ? "break-all"
-                                                          : "break-words"
-                                                      }`}
-                                                    >
-                                                      {entry.message}
-                                                    </p>
-                                                  </div>
-                                                  {entry.createdAt ? (
-                                                    <p className="mt-1 px-1 text-[11px] text-muted-foreground">
-                                                      {formatLocalTime(entry.createdAt)}
-                                                    </p>
-                                                  ) : null}
-                                                </div>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-
-                                  {selectedFeedback.response ? (
                                     <div>
                                       <Label className="text-muted-foreground">
-                                        Current Response
+                                        Subject
                                       </Label>
-                                      <div className="mt-2 max-h-[260px] overflow-y-auto rounded-lg border border-accent/20 bg-accent/5 p-4">
-                                        <div className="space-y-3">
-                                          {parseAdminResponses(
-                                            selectedFeedback.response,
-                                          ).map((entry, index) => (
-                                            <div
-                                              key={`${entry.time ?? "note"}-${index}`}
-                                            >
-                                              <p className="text-[10px] font-semibold text-muted-foreground">
-                                                {entry.author || "Admin"}{" "}
-                                                {entry.time
-                                                  ? formatLocalTime(entry.time)
-                                                  : ""}
+                                      <p className="font-medium break-words [overflow-wrap:anywhere]">
+                                        {formatFeedbackText(selectedFeedback.subject)}
+                                      </p>
+                                    </div>
+
+                                    <div>
+                                      <Label className="text-muted-foreground">
+                                        Message
+                                      </Label>
+                                      <div className="ff-hide-scrollbar mt-2 max-h-48 overflow-y-auto rounded-lg border border-border bg-white/70">
+                                        <div className="space-y-4 p-4">
+                                          {detailMessageParagraphs.length > 0 ? (
+                                            detailMessageParagraphs.map((paragraph, index) => (
+                                              <p
+                                                key={`${selectedFeedback.id}-paragraph-${index}`}
+                                                className={`text-sm leading-7 text-foreground/90 whitespace-pre-wrap ${
+                                                  detailMessageHasVeryLongToken
+                                                    ? "break-all"
+                                                    : "break-words"
+                                                }`}
+                                              >
+                                                {paragraph}
                                               </p>
-                                              <p className="text-sm leading-relaxed text-foreground/90">
-                                                {entry.message}
-                                              </p>
-                                            </div>
-                                          ))}
+                                            ))
+                                          ) : (
+                                            <p className="text-sm leading-7 text-muted-foreground">
+                                              No message provided.
+                                            </p>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
-                                  ) : null}
-                                </TabsContent>
 
-                                <TabsContent
-                                  value="manage"
-                                  className="flex min-h-0 flex-1 flex-col space-y-4"
-                                >
+                                    {selectedFeedback.response ? (
+                                      <div>
+                                        <Label className="text-muted-foreground">
+                                          Current Response
+                                        </Label>
+                                        <div className="mt-2 max-h-[260px] overflow-y-auto rounded-lg border border-accent/20 bg-accent/5 p-4">
+                                          <div className="space-y-3">
+                                            {parseAdminResponses(
+                                              selectedFeedback.response,
+                                            ).map((entry, index) => (
+                                              <div
+                                                key={`${entry.time ?? "note"}-${index}`}
+                                              >
+                                                <p className="text-[10px] font-semibold text-muted-foreground">
+                                                  {entry.author || "Admin"}{" "}
+                                                  {entry.time
+                                                    ? formatLocalTime(entry.time)
+                                                    : ""}
+                                                </p>
+                                                <p className="text-sm leading-relaxed text-foreground/90">
+                                                  {entry.message}
+                                                </p>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </TabsContent>
+
+                                  <TabsContent
+                                    value="manage"
+                                    className="flex min-h-0 flex-1 flex-col space-y-4"
+                                  >
                                   <div className="space-y-2">
                                     <Label htmlFor="status">Update Status</Label>
                                     <Select
@@ -1902,20 +1686,21 @@ export function AdminFeedbackWorkspace({
                                   </div>
                                 </div>
 
-                                <div className="-mt-px shrink-0 rounded-b-lg border-x border-b border-border bg-muted/30 px-3 pb-3 pt-6">
-                                  <Button
-                                    onClick={handleUpdateFeedback}
-                                    className="mx-auto block w-3/5 bg-accent hover:bg-accent/90"
-                                    disabled={!hasFeedbackChanges}
-                                  >
-                                    Update Feedback
-                                  </Button>
-                                  <p className="pt-2 text-center text-xs text-muted-foreground">
-                                    Marking a submission as Resolved will email
-                                    the user if they registered an account.
-                                  </p>
-                                </div>
-                              </div>
+                                  <div className="-mt-px shrink-0 rounded-b-lg border-x border-b border-border bg-muted/30 px-3 pb-3 pt-6">
+                                    <Button
+                                      onClick={handleUpdateFeedback}
+                                      className="mx-auto block w-3/5 bg-accent hover:bg-accent/90"
+                                      disabled={!hasFeedbackChanges}
+                                    >
+                                      Update Feedback
+                                    </Button>
+                                    <p className="pt-2 text-center text-xs text-muted-foreground">
+                                      Marking a submission as Resolved will email
+                                      the user if they registered an account.
+                                    </p>
+                                  </div>
+                                </TabsContent>
+                              </Tabs>
                             ) : null}
                             </DialogContent>
                           </Dialog>
@@ -1936,8 +1721,8 @@ export function AdminFeedbackWorkspace({
                         ),
                       )
                     : null}
-                </TableBody>
-              </Table>
+                  </TableBody>
+                </Table>
               </div>
               <div className="flex items-center justify-end gap-2">
                 <Button
@@ -1970,9 +1755,10 @@ export function AdminFeedbackWorkspace({
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              </div>
+            </div>
             )}
           </div>
-    </div>
+        </div>
+      </div>
   );
 }
