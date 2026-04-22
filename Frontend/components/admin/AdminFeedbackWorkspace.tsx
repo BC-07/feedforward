@@ -675,9 +675,15 @@ export function AdminFeedbackWorkspace({
 
       const nameA = (a.isAnonymous ? "*****" : a.userName || "*****").toLowerCase();
       const nameB = (b.isAnonymous ? "*****" : b.userName || "*****").toLowerCase();
-      return filterName === "desc"
+      const nameComparison = filterName === "desc"
         ? nameB.localeCompare(nameA)
         : nameA.localeCompare(nameB);
+
+      if (nameComparison !== 0) {
+        return nameComparison;
+      }
+
+      return a.id.localeCompare(b.id);
     });
 
     return items;
