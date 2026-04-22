@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createFeedback, listCategories } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,9 @@ interface FormData {
   message: string;
 }
 
+const FEEDBACK_MESSAGE_MAX_LENGTH = 2000;
+const FEEDBACK_SUBJECT_MAX_LENGTH = 100;
+
 export default function Submit() {
   const router = useRouter();
   const draftKey = "ff:submitDraft";
@@ -52,6 +55,8 @@ export default function Submit() {
       : "";
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
+  const submitLockRef = useRef(false);
 
   useEffect(() => {
     void listCategories()
@@ -92,8 +97,15 @@ export default function Submit() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (submitLockRef.current) return;
+    if (formData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
+      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      return;
+    }
 
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
+    submitLockRef.current = true;
+    setIsSubmittingFeedback(true);
 
     try {
       const userId =
@@ -139,6 +151,9 @@ export default function Submit() {
       toast.error(
         message,
       );
+    } finally {
+      submitLockRef.current = false;
+      setIsSubmittingFeedback(false);
     }
   };
 
@@ -230,6 +245,7 @@ export default function Submit() {
                 <Label htmlFor="type">Feedback Type *</Label>
                 <Select
                   value={formData.type}
+                  disabled={isSubmittingFeedback}
                   onValueChange={(value) =>
                     setFormData({ ...formData, type: value })
                   }
@@ -252,6 +268,7 @@ export default function Submit() {
                 <Label htmlFor="category">Category *</Label>
                 <Select
                   value={formData.category}
+                  disabled={isSubmittingFeedback}
                   onValueChange={(value) =>
                     setFormData({ ...formData, category: value })
                   }
@@ -276,8 +293,13 @@ export default function Submit() {
                   id="subject"
                   placeholder="Brief summary of your feedback"
                   value={formData.subject}
+                  maxLength={FEEDBACK_SUBJECT_MAX_LENGTH}
+                  disabled={isSubmittingFeedback}
                   onChange={(e) =>
-                    setFormData({ ...formData, subject: e.target.value })
+                    setFormData({
+                      ...formData,
+                      subject: e.target.value.slice(0, FEEDBACK_SUBJECT_MAX_LENGTH),
+                    })
                   }
                   required
                 />
@@ -289,22 +311,36 @@ export default function Submit() {
                   id="message"
                   placeholder="Provide detailed information about your feedback..."
                   rows={5}
+                  maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
                   value={formData.message}
+                  disabled={isSubmittingFeedback}
                   onChange={(e) =>
-                    setFormData({ ...formData, message: e.target.value })
+                    setFormData({
+                      ...formData,
+                      message: e.target.value.slice(0, FEEDBACK_MESSAGE_MAX_LENGTH),
+                    })
                   }
                   required
                 />
+                <p className="text-right text-xs text-muted-foreground">
+                  {formData.message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
+                </p>
               </div>
 
               <Button
                 type="submit"
                 className="w-full bg-accent hover:bg-accent/90"
                 size="lg"
+                disabled={isSubmittingFeedback}
               >
                 <Send className="mr-2 h-4 w-4" />
-                Submit Feedback
+                {isSubmittingFeedback ? "Submitting feedback..." : "Submit Feedback"}
               </Button>
+              {isSubmittingFeedback ? (
+                <p className="text-center text-xs text-muted-foreground" aria-live="polite">
+                  Feedback is being sent. Please wait...
+                </p>
+              ) : null}
             </form>
           </CardContent>
         </Card>
