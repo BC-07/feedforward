@@ -1690,10 +1690,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
                     <div className="min-w-0">
                       <Tabs defaultValue="latest">
-                        <TabsList className="grid w-full grid-cols-3 gap-2 p-1.5">
-                          <TabsTrigger value="latest">Latest</TabsTrigger>
-                          <TabsTrigger value="attention">Needs Attention</TabsTrigger>
-                          <TabsTrigger value="updated">Recently Updated</TabsTrigger>
+                        <TabsList className="grid w-full grid-cols-3 gap-2 p-1">
+                          <TabsTrigger value="latest" className="h-full">Latest</TabsTrigger>
+                          <TabsTrigger value="attention" className="h-full">Needs Attention</TabsTrigger>
+                          <TabsTrigger value="updated" className="h-full">Recently Updated</TabsTrigger>
                         </TabsList>
                         <TabsContent value="latest" className="mt-3">
                           {renderHomeSubmissionGrid(
@@ -1783,7 +1783,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           style={{ color: "#8f877d" }}
                         />
                         <Input
-                          placeholder="Search by ID, subject, or message..."
+                          placeholder="Search by ID, subject, or message."
                           value={searchQuery}
                           onChange={(event) => setSearchQuery(event.target.value)}
                           className={`${SUBMISSION_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}
@@ -1831,7 +1831,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       <div className="relative flex-1">
                         <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
                         <Input
-                          placeholder="Search by ID, subject, message, or category"
+                          placeholder="Search by ID, subject, message."
                           value={searchQuery}
                           onChange={(event) => setSearchQuery(event.target.value)}
                           className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"

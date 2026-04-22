@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { CSSProperties } from "react";
 import {
   createFeedbackMessage,
   getFeedback,
@@ -106,6 +107,7 @@ interface ReplyComposerProps {
 const FEEDBACKS_PER_PAGE = 7;
 const CONVERSATION_MESSAGE_MAX_LENGTH = 2000;
 const EXPORT_LOGO_PATH = "/favicon.ico";
+const ADMIN_FEEDBACK_DETAIL_LAYOUT: "split" | "modal" = "split";
 type AdminHoverFilterKey = "name" | "date" | "type" | "priority" | "status";
 const ADMIN_FILTER_TEXT_COLOR = "#171717";
 const ADMIN_FILTER_MUTED_COLOR = "#8f877d";
@@ -170,7 +172,7 @@ const ReplyComposer = memo(function ReplyComposer({
     if (!input) return;
 
     input.style.height = "0px";
-    const nextHeight = Math.min(Math.max(input.scrollHeight, 36), 88);
+    const nextHeight = Math.min(Math.max(input.scrollHeight, 36), 72);
     input.style.height = `${nextHeight}px`;
   }, [draft]);
 
@@ -203,7 +205,7 @@ const ReplyComposer = memo(function ReplyComposer({
               void submitMessage();
             }
           }}
-          className="ff-hide-scrollbar w-full max-w-full min-w-0 min-h-9 max-h-[10.5rem] flex-1 resize-none overflow-y-auto rounded-full border-0 bg-[#eef4ff] px-4 py-2 text-sm shadow-none [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap] placeholder:text-[#6b7280] focus-visible:ring-0 focus-visible:ring-transparent"
+          className="ff-hide-scrollbar w-full max-w-full min-w-0 min-h-9 max-h-[72px] flex-1 resize-none overflow-y-auto rounded-full border-0 bg-[#eef4ff] px-4 py-2 text-sm shadow-none [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap] placeholder:text-[#6b7280] focus-visible:ring-0 focus-visible:ring-transparent"
           disabled={isSendingMessage}
         />
         <Button
@@ -252,8 +254,12 @@ export function AdminFeedbackWorkspace({
   const [currentPage, setCurrentPage] = useState(1);
   const openedFeedbackRequestRef = useRef("");
   const messageScrollRef = useRef<HTMLDivElement>(null);
+  const splitDetailContentRef = useRef<HTMLDivElement>(null);
+  const previousSelectedFeedbackIdRef = useRef<string | null>(null);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const trimmedSearchQuery = searchQuery.trim();
+  const isSplitPaneLayout = ADMIN_FEEDBACK_DETAIL_LAYOUT === "split";
+  const isSplitPaneOpen = isSplitPaneLayout && Boolean(selectedFeedback);
   const requestedFeedbackId = searchParams.get("feedbackId")?.trim() || "";
   const requestedFeedbackOpenToken = searchParams.get("open")?.trim() || "";
   const hasFeedbackChanges = selectedFeedback
@@ -332,6 +338,30 @@ export function AdminFeedbackWorkspace({
   useEffect(() => {
     void loadFeedbacks();
   }, [loadFeedbacks]);
+
+  useEffect(() => {
+    if (!isSplitPaneLayout) return;
+
+    const currentId = selectedFeedback?.id ?? null;
+    const previousId = previousSelectedFeedbackIdRef.current;
+    const content = splitDetailContentRef.current;
+
+    if (currentId && previousId && currentId !== previousId && content) {
+      content.getAnimations().forEach((animation) => animation.cancel());
+      content.animate(
+        [
+          { opacity: 0.86, transform: "translateX(12px)" },
+          { opacity: 1, transform: "translateX(0)" },
+        ],
+        {
+          duration: 1000,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        },
+      );
+    }
+
+    previousSelectedFeedbackIdRef.current = currentId;
+  }, [isSplitPaneLayout, selectedFeedback?.id]);
 
   const openFeedbackDialog = useCallback(
     async (feedback: Feedback) => {
@@ -690,6 +720,7 @@ export function AdminFeedbackWorkspace({
       trimmedSearchQuery,
     ],
   );
+  const splitPaneTopShift = activeFilterPills.length > 0 ? "-154px" : "-102px";
 
   const clearSingleFilter = useCallback((key: string) => {
     switch (key) {
@@ -1279,7 +1310,13 @@ export function AdminFeedbackWorkspace({
       </AlertDialog>
       <div className="px-4 pb-6 pt-4 sm:px-7 sm:pt-6">
         <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-4 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div
+            className={`flex flex-col gap-4 transition-[padding] duration-300 ease-out lg:flex-row lg:items-center lg:justify-between ${
+              isSplitPaneOpen
+                ? "xl:pr-[calc(40%+1rem)]"
+                : "xl:pr-0"
+            }`}
+          >
             <div className="flex h-9 items-center gap-3">
               <div className="flex h-9 w-11 items-center justify-center rounded-2xl bg-muted/50 text-[#171717]">
                 <BarChart3 className="h-5 w-5" />
@@ -1311,7 +1348,13 @@ export function AdminFeedbackWorkspace({
             </DropdownMenu>
           </div>
 
-          <div className="grid gap-x-3 gap-y-2 xl:grid-cols-[minmax(0,1.9fr)_repeat(5,minmax(0,1fr))]">
+          <div
+            className={`grid gap-x-3 gap-y-2 transition-[padding] duration-300 ease-out xl:grid-cols-[minmax(0,1.9fr)_repeat(5,minmax(0,1fr))] ${
+              isSplitPaneOpen
+                ? "xl:pr-[calc(40%+1rem)]"
+                : "xl:pr-0"
+            }`}
+          >
             <div>
               <div className="relative">
                 <Search
@@ -1319,7 +1362,7 @@ export function AdminFeedbackWorkspace({
                   style={{ color: ADMIN_FILTER_MUTED_COLOR }}
                 />
                 <Input
-                  placeholder="Search by ID, subject, or message..."
+                  placeholder="Search by ID, subject, or message."
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   className={`${ADMIN_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}
@@ -1353,7 +1396,13 @@ export function AdminFeedbackWorkspace({
           </div>
 
           {activeFilterPills.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-2">
+            <div
+              className={`flex flex-wrap items-center gap-2 transition-[padding] duration-300 ease-out ${
+                isSplitPaneOpen
+                  ? "xl:pr-[calc(40%+1rem)]"
+                  : "xl:pr-0"
+              }`}
+            >
               {activeFilterPills.map((pill) => (
                 <span
                   key={pill.key}
@@ -1385,11 +1434,7 @@ export function AdminFeedbackWorkspace({
             </div>
           ) : null}
 
-          {isFeedbacksLoading ? (
-            <div className="flex min-h-[420px] items-center justify-center rounded-[24px] border border-dashed border-[#e6ddd1] bg-[#fcfaf7] text-sm text-muted-foreground">
-              Loading feedback submissions...
-            </div>
-          ) : visibleFeedbacks.length === 0 ? (
+          {visibleFeedbacks.length === 0 && !isFeedbacksLoading ? (
             <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[24px] border border-dashed border-[#e6ddd1] bg-[#fcfaf7] px-6 text-center">
               <AlertCircle className="mb-4 h-12 w-12 text-muted-foreground" />
               <h3 className="mb-2 text-lg font-semibold text-[#171717]">
@@ -1400,8 +1445,15 @@ export function AdminFeedbackWorkspace({
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
-              <div className="w-full overflow-x-auto">
+            <div
+              className={
+                isSplitPaneLayout
+                  ? "flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start"
+                  : "space-y-2"
+              }
+            >
+              <div className="min-w-0 flex-1 space-y-2">
+              <div className="relative w-full overflow-x-auto">
                 <Table className="w-full min-w-[980px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
                   <TableHeader className="sticky top-0 z-10 bg-muted/50">
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
@@ -1421,7 +1473,14 @@ export function AdminFeedbackWorkspace({
                   </TableHeader>
                   <TableBody>
                   {paginatedFeedbacks.map((feedback) => (
-                    <TableRow key={feedback.id} className="h-14">
+                    <TableRow
+                      key={feedback.id}
+                      className={`h-14 ${
+                        selectedFeedback?.id === feedback.id
+                          ? "bg-[#fff8ee] shadow-[inset_3px_0_0_0_#f0a500]"
+                          : ""
+                      }`}
+                    >
                       <TableCell
                         className="truncate text-sm font-medium"
                         title={
@@ -1474,18 +1533,33 @@ export function AdminFeedbackWorkspace({
                       </TableCell>
                       <TableCell className="w-[88px] text-center">
                         <div className="flex justify-center">
-                          <Dialog
-                            open={
-                              isEditDialogOpen &&
-                              selectedFeedback?.id === feedback.id
-                            }
-                            onOpenChange={(open) => {
-                              if (!open) {
-                                handleAttemptCloseEditDialog();
+                          {isSplitPaneLayout ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 rounded-md"
+                              aria-label={`Open ${feedback.id}`}
+                              title="Open feedback"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void openFeedbackDialog(feedback);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : (
+                            <Dialog
+                              open={
+                                isEditDialogOpen &&
+                                selectedFeedback?.id === feedback.id
                               }
-                            }}
-                          >
-                            <DialogTrigger asChild>
+                              onOpenChange={(open) => {
+                                if (!open) {
+                                  handleAttemptCloseEditDialog();
+                                }
+                              }}
+                            >
+                              <DialogTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -1496,16 +1570,16 @@ export function AdminFeedbackWorkspace({
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
-                            </DialogTrigger>
-                            <DialogContent
-                              className={
-                                activeEditTab === "manage"
-                                  ? "flex h-[85vh] max-h-[85vh] max-w-2xl flex-col overflow-hidden"
-                                  : "flex max-h-[80vh] max-w-2xl flex-col overflow-hidden"
-                              }
-                              onInteractOutside={(event) => event.preventDefault()}
-                              onEscapeKeyDown={(event) => event.preventDefault()}
-                            >
+                              </DialogTrigger>
+                              <DialogContent
+                                className={
+                                  activeEditTab === "manage"
+                                    ? "flex h-[85vh] max-h-[85vh] max-w-2xl flex-col overflow-hidden"
+                                    : "flex max-h-[80vh] max-w-2xl flex-col overflow-hidden"
+                                }
+                                onInteractOutside={(event) => event.preventDefault()}
+                                onEscapeKeyDown={(event) => event.preventDefault()}
+                              >
                               <DialogHeader>
                                 <DialogTitle>Feedback Details</DialogTitle>
                                 <DialogDescription>
@@ -1533,35 +1607,24 @@ export function AdminFeedbackWorkspace({
                                   >
                                     <FeedbackDetailsCard
                                       feedback={selectedFeedback}
-                                      className="border border-border shadow-none"
+                                      title=""
+                                      className="rounded-none border-0 bg-transparent shadow-none"
                                       formatDate={formatDetailsUpdatedAt}
-                                    />
-
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                      <div className="rounded-lg border border-border/80 bg-white/70 p-3">
-                                        <Label className="text-muted-foreground">
-                                          Status
-                                        </Label>
-                                        <div className="mt-1.5">
-                                          <Badge
-                                            className={getStatusColor(selectedFeedback.status)}
-                                            variant="outline"
-                                          >
-                                            {selectedFeedback.status}
-                                          </Badge>
+                                      preSubjectContent={
+                                        <div className="grid grid-cols-1 gap-y-8">
+                                          <div className="space-y-1">
+                                            <Label className="text-muted-foreground">
+                                              Submitted By
+                                            </Label>
+                                            <p className="pt-0.5 text-[0.98rem] font-medium">
+                                              {selectedFeedback.isAnonymous
+                                                ? "*****"
+                                                : selectedFeedback.userName || "*****"}
+                                            </p>
+                                          </div>
                                         </div>
-                                      </div>
-                                      <div className="rounded-lg border border-border/80 bg-white/70 p-3">
-                                        <Label className="text-muted-foreground">
-                                          Submitted By
-                                        </Label>
-                                        <p className="mt-1.5 font-medium">
-                                          {selectedFeedback.isAnonymous
-                                            ? "*****"
-                                            : selectedFeedback.userName || "*****"}
-                                        </p>
-                                      </div>
-                                    </div>
+                                      }
+                                    />
 
                                     {selectedFeedback.response ? (
                                       <div>
@@ -1667,56 +1730,122 @@ export function AdminFeedbackWorkspace({
                                             </p>
                                           ) : null}
                                           <div className="space-y-4">
-                                            {messages.map((entry) => {
-                                              const isAdminMessage =
-                                                entry.senderRole !== "user";
-                                              const hasVeryLongToken =
-                                                /\S{24,}/.test(entry.message || "");
-                                              return (
-                                                <div
-                                                  key={entry.id}
-                                                  className={`flex ${isAdminMessage ? "justify-end" : "justify-start"}`}
-                                                >
-                                                  <div
-                                                    className={`max-w-[62%] sm:max-w-[12rem] ${isAdminMessage ? "text-right" : "text-left"}`}
-                                                  >
-                                                    <p className="mb-0.5 px-1 text-[11px] font-semibold text-muted-foreground">
-                                                      {isAdminMessage
-                                                        ? "You"
-                                                        : entry.senderName || "User"}
-                                                    </p>
-                                                    <div
-                                                      className={`rounded-2xl px-2.5 py-1.5 text-[13px] shadow-sm ${
-                                                        isAdminMessage
-                                                          ? "bg-accent text-white"
-                                                          : "border border-border bg-white text-foreground"
-                                                      }`}
-                                                    >
-                                                      <p
-                                                        className={`whitespace-pre-line leading-relaxed ${
-                                                          hasVeryLongToken
-                                                            ? "break-all"
-                                                            : "break-words"
-                                                        }`}
-                                                      >
-                                                        {isAdminMessage
-                                                          ? entry.message
-                                                          : formatFeedbackText(
-                                                              entry.message || "",
-                                                            )}
-                                                      </p>
-                                                    </div>
-                                                    {entry.createdAt ? (
-                                                      <p className="mt-0.5 px-1 text-[10px] text-muted-foreground">
-                                                        {formatLocalTime(
-                                                          entry.createdAt,
-                                                        )}
-                                                      </p>
+                                            {(() => {
+                                              let lastDayLabel = "";
+                                              return messages.map((entry, index, allMessages) => {
+                                                const createdAt = entry.createdAt
+                                                  ? new Date(entry.createdAt)
+                                                  : null;
+                                                const today = new Date();
+                                                const yesterday = new Date();
+                                                yesterday.setDate(today.getDate() - 1);
+
+                                                const dayLabel = createdAt
+                                                  ? createdAt.toDateString() === today.toDateString()
+                                                    ? "Today"
+                                                    : createdAt.toDateString() === yesterday.toDateString()
+                                                      ? "Yesterday"
+                                                      : createdAt.toLocaleDateString(undefined, {
+                                                          month: "short",
+                                                          day: "numeric",
+                                                          year: "numeric",
+                                                        })
+                                                  : "";
+                                                const showDayLabel =
+                                                  dayLabel && dayLabel !== lastDayLabel;
+                                                if (showDayLabel) {
+                                                  lastDayLabel = dayLabel;
+                                                }
+
+                                                const isUserMessage = entry.senderRole === "user";
+                                                const name = isUserMessage
+                                                  ? selectedFeedback?.isAnonymous
+                                                    ? "Anonymous"
+                                                    : entry.senderName || "User"
+                                                  : "You";
+                                                const prev = index > 0 ? allMessages[index - 1] : null;
+                                                const prevIsUser = prev ? prev.senderRole === "user" : false;
+                                                const prevName = prev
+                                                  ? prevIsUser
+                                                    ? selectedFeedback?.isAnonymous
+                                                      ? "Anonymous"
+                                                      : prev.senderName || "User"
+                                                    : "You"
+                                                  : "";
+                                                const showName =
+                                                  !prev ||
+                                                  showDayLabel ||
+                                                  prev.senderRole !== entry.senderRole ||
+                                                  prevName !== name;
+                                                const hasVeryLongToken = /\S{24,}/.test(
+                                                  entry.message || "",
+                                                );
+                                                const isLikelyMultiLine =
+                                                  (entry.message || "").includes("\n") ||
+                                                  (entry.message || "").length > 60;
+
+                                                return (
+                                                  <div key={entry.id} className="space-y-2">
+                                                    {showDayLabel ? (
+                                                      <div className="flex justify-center">
+                                                        <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                                          {dayLabel}
+                                                        </span>
+                                                      </div>
                                                     ) : null}
+                                                    <div
+                                                      className={`flex ${isUserMessage ? "justify-start" : "justify-end"}`}
+                                                    >
+                                                      <div
+                                                        className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUserMessage ? "text-left" : "text-right"}`}
+                                                      >
+                                                        {showName ? (
+                                                          <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
+                                                            {name}
+                                                          </p>
+                                                        ) : null}
+                                                        <div
+                                                          className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                                                            isUserMessage
+                                                              ? "border border-border bg-white text-foreground"
+                                                              : "bg-accent text-white"
+                                                          }`}
+                                                        >
+                                                          <p
+                                                            className={`whitespace-pre-line leading-relaxed ${
+                                                              hasVeryLongToken
+                                                                ? "break-all"
+                                                                : "break-words"
+                                                            }`}
+                                                          >
+                                                            {isUserMessage
+                                                              ? formatFeedbackText(
+                                                                  entry.message || "",
+                                                                )
+                                                              : entry.message}
+                                                          </p>
+                                                        </div>
+                                                        {entry.createdAt ? (
+                                                          <span
+                                                            className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-3 py-1.5 text-xs text-white shadow-sm group-hover:inline-flex ${
+                                                              isUserMessage
+                                                                ? "-right-1 translate-x-full"
+                                                                : "-left-1 -translate-x-full"
+                                                            } ${
+                                                              isLikelyMultiLine
+                                                                ? "top-1/2"
+                                                                : "top-[68%]"
+                                                            }`}
+                                                          >
+                                                            {formatLocalTime(entry.createdAt)}
+                                                          </span>
+                                                        ) : null}
+                                                      </div>
+                                                    </div>
                                                   </div>
-                                                </div>
-                                              );
-                                            })}
+                                                );
+                                              });
+                                            })()}
                                           </div>
                                         </div>
 
@@ -1747,8 +1876,9 @@ export function AdminFeedbackWorkspace({
                                 </TabsContent>
                               </Tabs>
                             ) : null}
-                            </DialogContent>
-                          </Dialog>
+                              </DialogContent>
+                            </Dialog>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1768,6 +1898,13 @@ export function AdminFeedbackWorkspace({
                     : null}
                   </TableBody>
                 </Table>
+                {isFeedbacksLoading ? (
+                  <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-white/55 backdrop-blur-[1px]">
+                    <div className="rounded-full border border-[#e6ddd1] bg-white/90 px-3 py-1 text-xs font-medium text-muted-foreground animate-pulse">
+                      Loading feedback submissions...
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <div className="flex items-center justify-end gap-2">
                 <Button
@@ -1800,6 +1937,337 @@ export function AdminFeedbackWorkspace({
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
+              </div>
+              {isSplitPaneLayout ? (
+                <div
+                  className={`xl:translate-y-[var(--split-pane-shift)] xl:mb-[var(--split-pane-space-comp)] transition-[width,opacity,transform,border-color,box-shadow,height,max-height,min-height,margin-bottom] duration-300 ease-out ${
+                    isSplitPaneOpen
+                      ? "w-full opacity-100 translate-x-0 xl:w-[40%] xl:min-w-[360px]"
+                      : "w-0 translate-x-4 opacity-0 pointer-events-none"
+                  } overflow-hidden rounded-[20px] border bg-white ${
+                    isSplitPaneOpen
+                      ? "border-[#e6ddd1] shadow-[0_12px_32px_rgba(34,25,12,0.08)]"
+                      : "border-transparent shadow-none"
+                  } relative ${
+                    isSplitPaneOpen
+                      ? "xl:self-start xl:h-[78vh] xl:min-h-[640px] xl:max-h-[900px]"
+                      : "xl:h-0 xl:min-h-0 xl:max-h-0"
+                  }`}
+                  style={
+                    {
+                      "--split-pane-shift": isSplitPaneOpen
+                        ? splitPaneTopShift
+                        : "0px",
+                      "--split-pane-space-comp": isSplitPaneOpen
+                        ? splitPaneTopShift
+                        : "0px",
+                    } as CSSProperties
+                  }
+                >
+                  {selectedFeedback ? (
+                    <div
+                      ref={splitDetailContentRef}
+                      className="relative z-[2] flex h-full min-h-[560px] flex-col"
+                    >
+                    <Tabs
+                      value={activeEditTab}
+                      onValueChange={(value) =>
+                        setActiveEditTab(value as "details" | "manage")
+                      }
+                      className="flex h-full min-h-[560px] flex-col"
+                    >
+                      <div className="shrink-0 border-b border-[#efe7dc] px-5 pb-4 pt-5">
+                        <div className="mb-3 flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-base font-semibold text-[#171717]">
+                              Feedback Details
+                            </h3>
+                            <p className="font-mono text-xs text-muted-foreground">
+                              Tracking ID: {selectedFeedback.id}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-md"
+                            onClick={handleAttemptCloseEditDialog}
+                            aria-label="Close details panel"
+                            title="Close details panel"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <TabsList className="grid w-full shrink-0 grid-cols-2 rounded-full">
+                          <TabsTrigger value="details">Details</TabsTrigger>
+                          <TabsTrigger value="manage">Manage</TabsTrigger>
+                        </TabsList>
+                      </div>
+
+                      <TabsContent
+                        value="details"
+                        className="ff-hide-scrollbar min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-5 pb-5 pt-4"
+                      >
+                        <div className="space-y-6">
+                          <FeedbackDetailsCard
+                            feedback={selectedFeedback}
+                            title=""
+                            className="rounded-none border-0 bg-transparent shadow-none"
+                            formatDate={formatDetailsUpdatedAt}
+                            preSubjectContent={
+                              <div className="grid grid-cols-1 gap-y-8">
+                                <div className="space-y-1">
+                                  <Label className="text-muted-foreground">
+                                    Submitted By
+                                  </Label>
+                                  <p className="pt-0.5 text-[0.98rem] font-medium">
+                                    {selectedFeedback.isAnonymous
+                                      ? "*****"
+                                      : selectedFeedback.userName || "*****"}
+                                  </p>
+                                </div>
+                              </div>
+                            }
+                          />
+
+                          {selectedFeedback.response ? (
+                            <div>
+                              <Label className="text-muted-foreground">
+                                Current Response
+                              </Label>
+                              <div className="mt-2 max-h-[260px] overflow-y-auto rounded-lg border border-accent/20 bg-accent/5 p-4">
+                                <div className="space-y-3">
+                                  {parseAdminResponses(
+                                    selectedFeedback.response,
+                                  ).map((entry, index) => (
+                                    <div
+                                      key={`${entry.time ?? "note"}-${index}`}
+                                    >
+                                      <p className="text-[10px] font-semibold text-muted-foreground">
+                                        {entry.author || "Admin"}{" "}
+                                        {entry.time
+                                          ? formatLocalTime(entry.time)
+                                          : ""}
+                                      </p>
+                                      <p className="text-sm leading-relaxed text-foreground/90">
+                                        {entry.message}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent
+                        value="manage"
+                        className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-5 pt-4"
+                      >
+                        <div className="shrink-0 border-b border-border/70 pb-4">
+                          <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                            <div className="space-y-2">
+                              <Label htmlFor="split-status">Status</Label>
+                              <Select value={newStatus} onValueChange={setNewStatus}>
+                                <SelectTrigger id="split-status">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Pending">Pending</SelectItem>
+                                  <SelectItem value="In Progress">In Progress</SelectItem>
+                                  <SelectItem value="Resolved">Resolved</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="split-priority">Priority</Label>
+                              <Select
+                                value={newPriority}
+                                onValueChange={setNewPriority}
+                              >
+                                <SelectTrigger id="split-priority">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Low">Low</SelectItem>
+                                  <SelectItem value="Medium">Medium</SelectItem>
+                                  <SelectItem value="High">High</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <Button
+                              type="button"
+                              onClick={handleUpdateFeedback}
+                              className="h-10 px-6 bg-accent hover:bg-accent/90"
+                              disabled={!hasFeedbackChanges}
+                            >
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
+                          <div className="mb-3 flex shrink-0 items-center gap-2">
+                            <MessageSquare className="h-5 w-5 text-foreground" />
+                            <p className="text-base font-semibold">Message thread</p>
+                          </div>
+
+                          <div
+                            ref={messageScrollRef}
+                            className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto pr-1"
+                          >
+                            {isMessagesLoading ? (
+                              <p className="text-sm text-muted-foreground">
+                                Loading conversation...
+                              </p>
+                            ) : null}
+                            {!isMessagesLoading && messages.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">
+                                No messages yet.
+                              </p>
+                            ) : null}
+                            <div className="space-y-4">
+                              {(() => {
+                                let lastDayLabel = "";
+                                return messages.map((entry, index, allMessages) => {
+                                  const createdAt = entry.createdAt
+                                    ? new Date(entry.createdAt)
+                                    : null;
+                                  const today = new Date();
+                                  const yesterday = new Date();
+                                  yesterday.setDate(today.getDate() - 1);
+
+                                  const dayLabel = createdAt
+                                    ? createdAt.toDateString() === today.toDateString()
+                                      ? "Today"
+                                      : createdAt.toDateString() === yesterday.toDateString()
+                                        ? "Yesterday"
+                                        : createdAt.toLocaleDateString(undefined, {
+                                            month: "short",
+                                            day: "numeric",
+                                            year: "numeric",
+                                          })
+                                    : "";
+                                  const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
+                                  if (showDayLabel) {
+                                    lastDayLabel = dayLabel;
+                                  }
+
+                                  const isUserMessage = entry.senderRole === "user";
+                                  const name = isUserMessage
+                                    ? selectedFeedback?.isAnonymous
+                                      ? "Anonymous"
+                                      : entry.senderName || "User"
+                                    : "You";
+                                  const prev = index > 0 ? allMessages[index - 1] : null;
+                                  const prevIsUser = prev ? prev.senderRole === "user" : false;
+                                  const prevName = prev
+                                    ? prevIsUser
+                                      ? selectedFeedback?.isAnonymous
+                                        ? "Anonymous"
+                                        : prev.senderName || "User"
+                                      : "You"
+                                    : "";
+                                  const showName =
+                                    !prev ||
+                                    showDayLabel ||
+                                    prev.senderRole !== entry.senderRole ||
+                                    prevName !== name;
+                                  const hasVeryLongToken = /\S{24,}/.test(
+                                    entry.message || "",
+                                  );
+                                  const isLikelyMultiLine =
+                                    (entry.message || "").includes("\n") ||
+                                    (entry.message || "").length > 60;
+
+                                  return (
+                                    <div key={entry.id} className="space-y-2">
+                                      {showDayLabel ? (
+                                        <div className="flex justify-center">
+                                          <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                            {dayLabel}
+                                          </span>
+                                        </div>
+                                      ) : null}
+                                      <div
+                                        className={`flex ${isUserMessage ? "justify-start" : "justify-end"}`}
+                                      >
+                                        <div
+                                          className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUserMessage ? "text-left" : "text-right"}`}
+                                        >
+                                          {showName ? (
+                                            <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
+                                              {name}
+                                            </p>
+                                          ) : null}
+                                          <div
+                                            className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                                              isUserMessage
+                                                ? "border border-border bg-white text-foreground"
+                                                : "bg-accent text-white"
+                                            }`}
+                                          >
+                                            <p
+                                              className={`whitespace-pre-line leading-relaxed ${
+                                                hasVeryLongToken
+                                                  ? "break-all"
+                                                  : "break-words"
+                                              }`}
+                                            >
+                                              {isUserMessage
+                                                ? formatFeedbackText(
+                                                    entry.message || "",
+                                                  )
+                                                : entry.message}
+                                            </p>
+                                          </div>
+                                          {entry.createdAt ? (
+                                            <span
+                                              className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-3 py-1.5 text-xs text-white shadow-sm group-hover:inline-flex ${
+                                                isUserMessage
+                                                  ? "-right-1 translate-x-full"
+                                                  : "-left-1 -translate-x-full"
+                                              } ${
+                                                isLikelyMultiLine
+                                                  ? "top-1/2"
+                                                  : "top-[68%]"
+                                              }`}
+                                            >
+                                              {formatLocalTime(entry.createdAt)}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                });
+                              })()}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 shrink-0 border-t border-border/70 px-1 pt-3">
+                          <ReplyComposer
+                            key={selectedFeedback.id}
+                            draft={messageDraft}
+                            onDraftChange={setMessageDraft}
+                            isSendingMessage={isSendingMessage}
+                            onSend={handleSendMessage}
+                          />
+                          <p className="pt-1 text-center text-xs text-muted-foreground">
+                            Marking a submission as Resolved will email
+                            the user if they registered an account.
+                          </p>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             )}
           </div>
