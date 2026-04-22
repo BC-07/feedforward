@@ -67,6 +67,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { formatLocalTime } from "@/lib/time";
+import { parseAdminResponses } from "@/lib/responseLog";
 import { toastApiError } from "@/lib/errorHandling";
 import { formatFilterChipLabel } from "@/lib/filterUtils";
 import { formatFeedbackText } from "@/lib/textFormat";
@@ -79,6 +80,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  MessageSquare,
   MessageSquare,
   Pencil,
   Search,
