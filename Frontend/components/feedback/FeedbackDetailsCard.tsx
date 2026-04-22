@@ -40,23 +40,23 @@ export function FeedbackDetailsCard({
 }: FeedbackDetailsCardProps) {
   return (
     <Card className={["shadow-lg", className].filter(Boolean).join(" ")}>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4 overflow-hidden">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <CardContent className="space-y-3 overflow-hidden">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           <div>
             <p className="text-sm font-semibold text-muted-foreground">Type</p>
-            <p className="mt-1 text-base font-medium capitalize">{feedback.type}</p>
+            <p className="mt-0.5 text-base font-medium capitalize">{feedback.type}</p>
           </div>
           <div>
             <p className="text-sm font-semibold text-muted-foreground">Category</p>
-            <p className="mt-1 text-base font-medium">{feedback.category}</p>
+            <p className="mt-0.5 text-base font-medium">{feedback.category}</p>
           </div>
           <div>
             <p className="text-sm font-semibold text-muted-foreground">Priority</p>
             <p
-              className={`mt-1 text-base font-medium capitalize ${getPriorityColor(
+              className={`mt-0.5 text-base font-medium capitalize ${getPriorityColor(
                 feedback.priority,
               )}`}
             >
@@ -65,7 +65,7 @@ export function FeedbackDetailsCard({
           </div>
           <div>
             <p className="text-sm font-semibold text-muted-foreground">Last Updated</p>
-            <p className="mt-1 text-base font-medium">{formatDate(feedback.updatedAt)}</p>
+            <p className="mt-0.5 text-base font-medium">{formatDate(feedback.updatedAt)}</p>
           </div>
         </div>
 

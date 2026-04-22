@@ -75,31 +75,31 @@ export function FeedbackStatusCard({
 
   return (
     <Card className={["shadow-lg", className].filter(Boolean).join(" ")}>
-      <CardContent className="pt-6">
-        <div className="mb-6 flex items-start justify-between">
+      <CardContent className="pt-5">
+        <div className="mb-5 flex items-start justify-between">
           <h3 className="mb-1 text-lg font-semibold">
             Status: <span className="uppercase">{feedback.status}</span>
           </h3>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {steps.map((step, index) => (
-            <div key={index} className="flex gap-4">
+            <div key={index} className="flex gap-3">
               <div className="flex flex-col items-center">
                 <div
-                  className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  className={`h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0 ${
                     step.completed ? "bg-green-500/20" : "bg-gray-200"
                   }`}
                 >
                   {step.completed ? (
-                    <CheckCircle className="h-5 w-5 text-green-700" />
+                    <CheckCircle className="h-4.5 w-4.5 text-green-700" />
                   ) : (
-                    <Circle className="h-5 w-5 text-gray-400" />
+                    <Circle className="h-4.5 w-4.5 text-gray-400" />
                   )}
                 </div>
-                {index < steps.length - 1 && <div className="h-16 w-px bg-border"></div>}
+                {index < steps.length - 1 && <div className="h-14 w-px bg-border"></div>}
               </div>
-              <div className="pb-4 flex-1">
+              <div className="pb-3 flex-1">
                 <p className="font-semibold">{step.name}</p>
                 {step.name === "Submitted" && (
                   <p className="text-sm text-muted-foreground">
@@ -114,7 +114,7 @@ export function FeedbackStatusCard({
           ))}
         </div>
 
-        <div className="mt-6 flex items-start gap-3 rounded-lg bg-muted/50 p-4">
+        <div className="mt-5 flex items-start gap-2.5 rounded-lg bg-muted/50 p-3.5">
           {renderStatusIcon(
             feedback.status,
             `mt-0.5 h-5 w-5 flex-shrink-0 ${getStatusIconTone(
