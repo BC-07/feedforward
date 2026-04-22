@@ -34,8 +34,8 @@ interface FormData {
   message: string;
 }
 
-const FEEDBACK_MESSAGE_MAX_LENGTH = 2000;
-const FEEDBACK_SUBJECT_MAX_LENGTH = 100;
+const FEEDBACK_MESSAGE_MAX_LENGTH = 250;
+const FEEDBACK_SUBJECT_MAX_LENGTH = 50;
 
 export default function Submit() {
   const router = useRouter();
@@ -316,8 +316,8 @@ export default function Submit() {
                 <Textarea
                   id="message"
                   placeholder="Provide detailed information about your feedback..."
-                  rows={5}
-                  className="ff-hide-scrollbar min-h-[120px] max-h-[120px] overflow-y-auto [field-sizing:fixed]"
+                  rows={1}
+                  className="ff-hide-scrollbar w-full max-w-full min-h-[2.5rem] overflow-hidden [field-sizing:content] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
                   maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
                   value={formData.message}
                   disabled={isSubmittingFeedback}

@@ -99,8 +99,9 @@ import {
 
 export type UserDashboardView = "home" | "my-submissions" | "submit-feedback";
 
-const FEEDBACK_MESSAGE_MAX_LENGTH = 2000;
-const FEEDBACK_SUBJECT_MAX_LENGTH = 100;
+const FEEDBACK_MESSAGE_MAX_LENGTH = 250;
+const FEEDBACK_SUBJECT_MAX_LENGTH = 50;
+const CONVERSATION_MESSAGE_MAX_LENGTH = 2000;
 const SUBMISSION_FILTER_TEXT_COLOR = "#171717";
 const SUBMISSION_FILTER_CONTROL_CLASS =
   "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
@@ -174,6 +175,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const leftColumnRef = useRef<HTMLDivElement | null>(null);
   const submissionsScrollRef = useRef<HTMLDivElement | null>(null);
+  const conversationScrollRef = useRef<HTMLDivElement | null>(null);
+  const miniConversationScrollRef = useRef<HTMLDivElement | null>(null);
   const submissionsScrollTop = useRef(0);
   const feedbackSubmitLockRef = useRef(false);
   const submissionsScrollKey = "userDashboardSubmissionsScrollTop";
@@ -350,6 +353,23 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       });
     });
   }, [selectedFeedback, trackingId]);
+
+  const scrollConversationsToBottom = useCallback(
+    (behavior: ScrollBehavior = "auto") => {
+      [conversationScrollRef.current, miniConversationScrollRef.current].forEach(
+        (container) => {
+          if (!container) return;
+          window.requestAnimationFrame(() => {
+            container.scrollTo({
+              top: container.scrollHeight,
+              behavior,
+            });
+          });
+        },
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -565,6 +585,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       toast.error("Please enter a message.");
       return;
     }
+    if (trimmed.length > CONVERSATION_MESSAGE_MAX_LENGTH) {
+      toast.error(`Message must be ${CONVERSATION_MESSAGE_MAX_LENGTH} characters or less.`);
+      return;
+    }
     const normalizedMessage = formatFeedbackText(trimmed);
     setIsSendingMessage(true);
     try {
@@ -573,12 +597,19 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       });
       setMessages((prev) => [...prev, created]);
       setMessageDraft("");
+      scrollConversationsToBottom("smooth");
     } catch (error) {
       toastApiError(error, "Failed to send message.");
     } finally {
       setIsSendingMessage(false);
     }
   };
+
+  useEffect(() => {
+    if (!selectedFeedback) return;
+    if (isMessagesLoading) return;
+    scrollConversationsToBottom();
+  }, [selectedFeedback, isMessagesLoading, messages.length, isMiniChatOpen, scrollConversationsToBottom]);
 
   const normalizeStatus = (status: string) =>
     status
@@ -762,8 +793,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         <Textarea
           id={`${idPrefix}-message`}
           placeholder="Provide detailed information about your feedback..."
-          rows={5}
-          className="ff-hide-scrollbar min-h-[120px] max-h-[120px] overflow-y-auto [field-sizing:fixed]"
+          rows={1}
+          className="ff-hide-scrollbar w-full max-w-full min-h-[2.5rem] overflow-hidden [field-sizing:content] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
           maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
           value={formData.message}
           disabled={isSubmittingFeedback}
@@ -1226,7 +1257,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         }
       }}
     >
-      <DialogContent className="ff-modal-panel w-[calc(100%-1.5rem)] max-w-2xl p-5 sm:w-full sm:p-6">
+      <DialogContent className="w-[calc(100%-1rem)] max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl sm:w-full sm:p-6 ff-hide-scrollbar">
         {createSubmissionStep === "form" ? (
           <>
             <DialogHeader>
@@ -2076,7 +2107,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   <Card className="shadow-lg bg-muted/40 border-border">
                     <CardContent className="pt-6">
                       <div className="grid max-h-[420px] min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-xl border border-border bg-white/70">
-                        <div className="ff-hide-scrollbar min-h-0 overflow-y-auto p-4">
+                        <div
+                          ref={conversationScrollRef}
+                          className="ff-hide-scrollbar min-h-0 overflow-y-auto p-4"
+                        >
                           {isMessagesLoading && (
                             <p className="text-sm text-muted-foreground">
                               Loading conversation...
@@ -2202,9 +2236,14 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               placeholder="Type your message..."
                               rows={1}
                               value={messageDraft}
-                              onChange={(e) => setMessageDraft(e.target.value)}
+                              onChange={(e) =>
+                                setMessageDraft(
+                                  e.target.value.slice(0, CONVERSATION_MESSAGE_MAX_LENGTH),
+                                )
+                              }
+                              maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
                               disabled={isSendingMessage}
-                              className="max-h-28 min-h-8 resize-none rounded-xl border border-border/70 bg-background px-4 py-2 leading-relaxed shadow-sm focus-visible:ring-2 focus-visible:ring-accent/30"
+                              className="ff-hide-scrollbar w-full max-w-full min-w-0 max-h-[10.5rem] min-h-8 resize-none overflow-y-auto rounded-xl border border-border/70 bg-background px-4 py-2 leading-relaxed shadow-sm [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap] focus-visible:ring-2 focus-visible:ring-accent/30"
                               onKeyDown={(event) => {
                                 if (event.key === "Enter" && !event.shiftKey) {
                                   event.preventDefault();
@@ -2248,7 +2287,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           </Button>
                         </div>
                         <div className="grid h-[calc(100%-40px)] grid-rows-[minmax(0,1fr)_auto]">
-                          <div className="ff-hide-scrollbar min-h-0 overflow-y-auto p-3">
+                          <div
+                            ref={miniConversationScrollRef}
+                            className="ff-hide-scrollbar min-h-0 overflow-y-auto p-3"
+                          >
                             {isMessagesLoading ? (
                               <p className="text-sm text-muted-foreground">
                                 Loading conversation...
@@ -2364,9 +2406,14 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                 placeholder="Type your message..."
                                 rows={1}
                                 value={messageDraft}
-                                onChange={(e) => setMessageDraft(e.target.value)}
+                                onChange={(e) =>
+                                  setMessageDraft(
+                                    e.target.value.slice(0, CONVERSATION_MESSAGE_MAX_LENGTH),
+                                  )
+                                }
+                                maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
                                 disabled={isSendingMessage}
-                                className="max-h-24 min-h-8 resize-none rounded-lg border border-border/70 bg-background px-3 py-2 text-xs leading-relaxed"
+                                className="ff-hide-scrollbar w-full max-w-full min-w-0 max-h-[8rem] min-h-8 resize-none overflow-y-auto rounded-lg border border-border/70 bg-background px-3 py-2 text-xs leading-relaxed [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
                                 onKeyDown={(event) => {
                                   if (event.key === "Enter" && !event.shiftKey) {
                                     event.preventDefault();

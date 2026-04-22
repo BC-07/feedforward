@@ -71,6 +71,7 @@ import { parseAdminResponses } from "@/lib/responseLog";
 import { toastApiError } from "@/lib/errorHandling";
 import { formatFilterChipLabel } from "@/lib/filterUtils";
 import { formatFeedbackText } from "@/lib/textFormat";
+import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
 import ExcelJS from "exceljs";
 import { jsPDF } from "jspdf";
 import autoTable, { type RowInput } from "jspdf-autotable";
@@ -103,6 +104,7 @@ interface ReplyComposerProps {
 }
 
 const FEEDBACKS_PER_PAGE = 7;
+const CONVERSATION_MESSAGE_MAX_LENGTH = 2000;
 const EXPORT_LOGO_PATH = "/favicon.ico";
 type AdminHoverFilterKey = "name" | "date" | "type" | "priority" | "status";
 const ADMIN_FILTER_TEXT_COLOR = "#171717";
@@ -191,14 +193,17 @@ const ReplyComposer = memo(function ReplyComposer({
           placeholder="Type your reply..."
           rows={1}
           value={draft}
-          onChange={(event) => onDraftChange(event.target.value)}
+          onChange={(event) =>
+            onDraftChange(event.target.value.slice(0, CONVERSATION_MESSAGE_MAX_LENGTH))
+          }
+          maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               void submitMessage();
             }
           }}
-          className="ff-hide-scrollbar min-h-9 max-h-[88px] flex-1 resize-none overflow-y-auto rounded-full border-0 bg-[#eef4ff] px-4 py-2 text-sm shadow-none placeholder:text-[#6b7280] focus-visible:ring-0 focus-visible:ring-transparent"
+          className="ff-hide-scrollbar w-full max-w-full min-w-0 min-h-9 max-h-[10.5rem] flex-1 resize-none overflow-y-auto rounded-full border-0 bg-[#eef4ff] px-4 py-2 text-sm shadow-none [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap] placeholder:text-[#6b7280] focus-visible:ring-0 focus-visible:ring-transparent"
           disabled={isSendingMessage}
         />
         <Button
@@ -255,17 +260,22 @@ export function AdminFeedbackWorkspace({
     ? newStatus !== selectedFeedback.status ||
       newPriority !== selectedFeedback.priority
     : false;
-  const detailMessageParagraphs = useMemo(
-    () =>
-      formatFeedbackText(selectedFeedback?.message ?? "")
-        .split(/\n+/)
-        .map((paragraph) => paragraph.trim())
-        .filter(Boolean),
-    [selectedFeedback?.message],
-  );
-  const detailMessageHasVeryLongToken = /\S{24,}/.test(
-    selectedFeedback?.message ?? "",
-  );
+  const formatDetailsUpdatedAt = useCallback((value: string) => {
+    const date = new Date(value);
+    const datePart = date.toLocaleDateString("en-US", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    const timePart = date.toLocaleTimeString("en-US", {
+      timeZone: "Asia/Manila",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    return `${datePart} at ${timePart}`;
+  }, []);
 
   const loadMessages = useCallback(async (feedbackId: string) => {
     setIsMessagesLoading(true);
@@ -414,6 +424,10 @@ export function AdminFeedbackWorkspace({
     const trimmed = draft.trim();
     if (!trimmed) {
       toast.error("Please enter a message.");
+      return false;
+    }
+    if (trimmed.length > CONVERSATION_MESSAGE_MAX_LENGTH) {
+      toast.error(`Message must be ${CONVERSATION_MESSAGE_MAX_LENGTH} characters or less.`);
       return false;
     }
 
@@ -1517,82 +1531,35 @@ export function AdminFeedbackWorkspace({
                                     value="details"
                                     className="ff-hide-scrollbar flex min-h-0 flex-1 flex-col space-y-4 overflow-x-hidden overflow-y-auto pr-1"
                                   >
-                                    <div className="grid grid-cols-2 gap-4 [&>div]:min-w-0">
-                                      <div className="min-w-0">
-                                        <Label className="text-muted-foreground">
-                                          Type
-                                        </Label>
-                                        <p className="font-medium capitalize">
-                                          {selectedFeedback.type}
-                                        </p>
-                                      </div>
-                                      <div className="min-w-0">
-                                        <Label className="text-muted-foreground">
-                                          Category
-                                        </Label>
-                                        <p className="font-medium">
-                                          {selectedFeedback.category}
-                                        </p>
-                                      </div>
-                                      <div className="min-w-0">
+                                    <FeedbackDetailsCard
+                                      feedback={selectedFeedback}
+                                      className="border border-border shadow-none"
+                                      formatDate={formatDetailsUpdatedAt}
+                                    />
+
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                      <div className="rounded-lg border border-border/80 bg-white/70 p-3">
                                         <Label className="text-muted-foreground">
                                           Status
                                         </Label>
-                                        <Badge
-                                          className={getStatusColor(
-                                            selectedFeedback.status,
-                                          )}
-                                          variant="outline"
-                                        >
-                                          {selectedFeedback.status}
-                                        </Badge>
+                                        <div className="mt-1.5">
+                                          <Badge
+                                            className={getStatusColor(selectedFeedback.status)}
+                                            variant="outline"
+                                          >
+                                            {selectedFeedback.status}
+                                          </Badge>
+                                        </div>
                                       </div>
-                                      <div className="min-w-0">
+                                      <div className="rounded-lg border border-border/80 bg-white/70 p-3">
                                         <Label className="text-muted-foreground">
                                           Submitted By
                                         </Label>
-                                        <p className="font-medium">
+                                        <p className="mt-1.5 font-medium">
                                           {selectedFeedback.isAnonymous
                                             ? "*****"
                                             : selectedFeedback.userName || "*****"}
                                         </p>
-                                      </div>
-                                    </div>
-
-                                    <div>
-                                      <Label className="text-muted-foreground">
-                                        Subject
-                                      </Label>
-                                      <p className="font-medium break-words [overflow-wrap:anywhere]">
-                                        {formatFeedbackText(selectedFeedback.subject)}
-                                      </p>
-                                    </div>
-
-                                    <div>
-                                      <Label className="text-muted-foreground">
-                                        Message
-                                      </Label>
-                                      <div className="ff-hide-scrollbar mt-2 max-h-48 overflow-y-auto rounded-lg border border-border bg-white/70">
-                                        <div className="space-y-4 p-4">
-                                          {detailMessageParagraphs.length > 0 ? (
-                                            detailMessageParagraphs.map((paragraph, index) => (
-                                              <p
-                                                key={`${selectedFeedback.id}-paragraph-${index}`}
-                                                className={`text-sm leading-7 text-foreground/90 whitespace-pre-wrap ${
-                                                  detailMessageHasVeryLongToken
-                                                    ? "break-all"
-                                                    : "break-words"
-                                                }`}
-                                              >
-                                                {paragraph}
-                                              </p>
-                                            ))
-                                          ) : (
-                                            <p className="text-sm leading-7 text-muted-foreground">
-                                              No message provided.
-                                            </p>
-                                          )}
-                                        </div>
                                       </div>
                                     </div>
 
