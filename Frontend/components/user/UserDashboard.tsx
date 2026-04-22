@@ -159,6 +159,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [categories, setCategories] = useState<string[]>([]);
   const [messages, setMessages] = useState<FeedbackMessage[]>([]);
   const [messageDraft, setMessageDraft] = useState("");
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [isMiniChatOpen, setIsMiniChatOpen] = useState(false);
