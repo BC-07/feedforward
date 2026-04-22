@@ -22,9 +22,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowRight, Send } from "lucide-react";
+import { ArrowRight, Copy, Send } from "lucide-react";
 import { useDraftStorage } from "@/lib/useDraftStorage";
 import { toastApiError } from "@/lib/errorHandling";
+import { formatFeedbackText } from "@/lib/textFormat";
 
 interface FormData {
   type: string;
@@ -103,6 +104,9 @@ export default function Submit() {
       return;
     }
 
+    const normalizedSubject = formatFeedbackText(formData.subject);
+    const normalizedMessage = formatFeedbackText(formData.message);
+
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
     submitLockRef.current = true;
     setIsSubmittingFeedback(true);
@@ -120,6 +124,8 @@ export default function Submit() {
       await createFeedback({
         id: newTrackingId,
         ...formData,
+        subject: normalizedSubject,
+        message: normalizedMessage,
         userId,
         userName,
         userEmail: userEmail || undefined,
@@ -171,11 +177,20 @@ export default function Submit() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-muted rounded-lg p-4 text-center">
+            <div className="bg-muted rounded-lg p-4 text-center relative">
               <p className="text-sm text-muted-foreground mb-2">
                 Your Tracking ID
               </p>
               <p className="text-2xl font-bold text-primary">{trackingId}</p>
+              <button
+                type="button"
+                className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-white/80 text-muted-foreground hover:bg-white hover:text-foreground"
+                onClick={() => copyToClipboard(trackingId)}
+                aria-label="Copy tracking ID"
+                title="Copy tracking ID"
+              >
+                <Copy className="h-4 w-4" />
+              </button>
             </div>
             <p className="text-sm text-muted-foreground text-center">
               Please save this tracking ID to check the status of your
@@ -191,13 +206,6 @@ export default function Submit() {
               </p>
             )}
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                variant="outline"
-                className="flex-1 w-full"
-                onClick={() => copyToClipboard(trackingId)}
-              >
-                Copy ID
-              </Button>
               <Button
                 variant="outline"
                 className="flex-1 w-full"
@@ -309,6 +317,7 @@ export default function Submit() {
                   id="message"
                   placeholder="Provide detailed information about your feedback..."
                   rows={5}
+                  className="ff-hide-scrollbar min-h-[120px] max-h-[120px] overflow-y-auto [field-sizing:fixed]"
                   maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
                   value={formData.message}
                   disabled={isSubmittingFeedback}

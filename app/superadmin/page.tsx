@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   createCategoryBySuperAdmin,
@@ -13,10 +13,9 @@ import {
   listCategories,
   pingSuperAdminSession,
   reverifySuperAdmin,
-  updateCategoryBySuperAdmin,
   updateAdminBySuperAdmin,
   type Admin,
-  type Category,
+  type Category as ApiCategory,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,13 +44,30 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Shield, UserCog, UserPlus, Trash2, Pencil, Tag, Save, Ban, UserCheck, Eye, EyeOff, Plus } from "lucide-react";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
+import { Shield, UserCog, UserPlus, Trash2, Pencil, Ban, UserCheck, Eye, EyeOff, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { getErrorMessage, toastApiError } from "@/lib/errorHandling";
 
@@ -70,6 +86,11 @@ type EditAdminForm = {
   unit: string;
 };
 
+type Category = ApiCategory & {
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 const emptyCreateForm: CreateAdminForm = {
   firstName: "",
   lastName: "",
@@ -84,6 +105,34 @@ const emptyEditForm: EditAdminForm = {
   password: "",
   unit: "",
 };
+
+const dashboardBarChartConfig = {
+  total: {
+    label: "Count",
+    color: "#f59e0b",
+  },
+} satisfies ChartConfig;
+
+const coveragePieChartConfig = {
+  covered: {
+    label: "Covered",
+    color: "#16a34a",
+  },
+  vacant: {
+    label: "Vacant",
+    color: "#f97316",
+  },
+} satisfies ChartConfig;
+
+const ADMIN_PAGE_SIZE = 8;
+const UNUSED_PAGE_SIZE = 6;
+const ASSIGNMENT_PAGE_SIZE = 8;
+const RECENT_PAGE_SIZE = 3;
+
+function getDateKey(value: string | number | Date) {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
 
 async function fetchAdmins(
   onSuccess: (admins: Admin[]) => void,
@@ -131,9 +180,6 @@ export default function SuperAdminDashboard() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
-  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
-  const [editingCategoryName, setEditingCategoryName] = useState("");
-  const [editingCategoryOriginalName, setEditingCategoryOriginalName] = useState("");
   const [adminFilter, setAdminFilter] = useState<"active" | "disabled">(
     "active",
   );
@@ -148,6 +194,17 @@ export default function SuperAdminDashboard() {
   );
   const [reauthTarget, setReauthTarget] = useState<Admin | null>(null);
   const [idleRemainingMs, setIdleRemainingMs] = useState(idleLimitMs);
+  const [adminPage, setAdminPage] = useState(1);
+  const [unusedPage, setUnusedPage] = useState(1);
+  const [assignmentPage, setAssignmentPage] = useState(1);
+  const [recentPage, setRecentPage] = useState(1);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [categoryStatusFilter, setCategoryStatusFilter] = useState<
+    "all" | "assigned" | "unassigned"
+  >("all");
+  const [deleteCategoryOpen, setDeleteCategoryOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
 
   /*
   const stats = {
@@ -199,12 +256,178 @@ export default function SuperAdminDashboard() {
         !admin.isDisabled && admin.unit.trim().toLowerCase() === name,
     );
   });
-  const activeAdminsCount = admins.filter((admin) => !admin.isDisabled).length;
+  const activeAdmins = useMemo(
+    () => admins.filter((admin) => !admin.isDisabled),
+    [admins],
+  );
+  const activeAdminsCount = activeAdmins.length;
   const disabledAdminsCount = admins.filter((admin) => Boolean(admin.isDisabled)).length;
-  const manageableCategoriesCount = categories.filter((category) => {
-    const name = category.name.trim().toLowerCase();
-    return name !== "disabled" && name !== "inactive";
-  }).length;
+  const manageableCategories = useMemo(
+    () =>
+      categories.filter((category) => {
+        const name = category.name.trim().toLowerCase();
+        return name !== "disabled" && name !== "inactive";
+      }),
+    [categories],
+  );
+  const manageableCategoriesCount = manageableCategories.length;
+  const manageableCategoryNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    manageableCategories.forEach((category) => {
+      const label = category.name.trim();
+      if (!label) return;
+      map.set(label.toLowerCase(), label);
+    });
+    return map;
+  }, [manageableCategories]);
+  const unitCoverageRows = useMemo(() => {
+    return [...manageableCategoryNameMap.entries()]
+      .map(([normalizedUnit, unitLabel]) => {
+        const assignedAdmin = activeAdmins.find(
+          (admin) => admin.unit.trim().toLowerCase() === normalizedUnit,
+        );
+        return {
+          unit: unitLabel,
+          adminName: assignedAdmin?.name ?? "Unassigned",
+          adminEmail: assignedAdmin?.email ?? "No active admin assigned",
+          covered: Boolean(assignedAdmin),
+        };
+      })
+      .sort((a, b) => {
+        if (a.covered !== b.covered) {
+          return a.covered ? -1 : 1;
+        }
+        return a.unit.localeCompare(b.unit);
+      });
+  }, [activeAdmins, manageableCategoryNameMap]);
+  const coveredCategoryCount = unitCoverageRows.filter((row) => row.covered).length;
+  const vacantCategoryCount = Math.max(manageableCategoriesCount - coveredCategoryCount, 0);
+  const unusedCategoryRows = unitCoverageRows.filter((row) => !row.covered);
+  const categoryCoverageRate = manageableCategoriesCount
+    ? Math.round((coveredCategoryCount / manageableCategoriesCount) * 100)
+    : 0;
+  const adminHealthData = [
+    { status: "Active Admins", total: activeAdminsCount },
+    { status: "Disabled Admins", total: disabledAdminsCount },
+    { status: "Vacant Categories", total: vacantCategoryCount },
+  ];
+  const coveragePieData = [
+    { name: "covered", value: coveredCategoryCount, fill: "var(--color-covered)" },
+    { name: "vacant", value: vacantCategoryCount, fill: "var(--color-vacant)" },
+  ];
+  const categoryControlRows = useMemo(() => {
+    return manageableCategories
+      .map((category) => {
+        const normalizedName = category.name.trim().toLowerCase();
+        const assignedAdmin = activeAdmins.find(
+          (admin) => admin.unit.trim().toLowerCase() === normalizedName,
+        );
+        return {
+          category,
+          isAssigned: Boolean(assignedAdmin),
+          assignedAdminName: assignedAdmin?.name ?? "Unassigned",
+          assignedAdminEmail: assignedAdmin?.email ?? "No active admin assigned",
+        };
+      })
+      .sort((a, b) => {
+        if (a.isAssigned !== b.isAssigned) return a.isAssigned ? -1 : 1;
+        return a.category.name.localeCompare(b.category.name);
+      });
+  }, [manageableCategories, activeAdmins]);
+  const filteredCategoryControlRows = useMemo(() => {
+    const normalizedSearch = categorySearch.trim().toLowerCase();
+    return categoryControlRows.filter((row) => {
+      if (categoryStatusFilter === "assigned" && !row.isAssigned) return false;
+      if (categoryStatusFilter === "unassigned" && row.isAssigned) return false;
+      if (!normalizedSearch) return true;
+      return (
+        row.category.name.toLowerCase().includes(normalizedSearch) ||
+        row.assignedAdminName.toLowerCase().includes(normalizedSearch) ||
+        row.assignedAdminEmail.toLowerCase().includes(normalizedSearch)
+      );
+    });
+  }, [categoryControlRows, categorySearch, categoryStatusFilter]);
+  const assignedCategoriesCount = categoryControlRows.filter((row) => row.isAssigned).length;
+  const unassignedCategoriesCount = Math.max(
+    categoryControlRows.length - assignedCategoriesCount,
+    0,
+  );
+  const latestCategoryUpdate = manageableCategories.reduce<number>(
+    (latest, category) =>
+      Math.max(
+        latest,
+        new Date(category.updatedAt ?? category.createdAt ?? 0).getTime() || 0,
+      ),
+    0,
+  );
+  const recentSignups7DaysData = useMemo(() => {
+    const totalsByDay = new Map<string, number>();
+    admins.forEach((admin) => {
+      const key = getDateKey(admin.createdAt);
+      totalsByDay.set(key, (totalsByDay.get(key) || 0) + 1);
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }, (_, index) => {
+      const day = new Date(today);
+      day.setDate(today.getDate() - (6 - index));
+      const key = getDateKey(day);
+      return {
+        day: day.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        admins: totalsByDay.get(key) || 0,
+      };
+    });
+  }, [admins]);
+  const recent7DayAdmins = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const sevenDayStart = new Date(today);
+    sevenDayStart.setDate(today.getDate() - 6);
+    const sevenDayStartTime = sevenDayStart.getTime();
+
+    return [...admins]
+      .filter((admin) => new Date(admin.createdAt).getTime() >= sevenDayStartTime)
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+  }, [admins]);
+  const adminTotalPages = Math.max(1, Math.ceil(visibleAdmins.length / ADMIN_PAGE_SIZE));
+  const currentAdminPage = Math.min(adminPage, adminTotalPages);
+  const paginatedAdmins = useMemo(() => {
+    const start = (currentAdminPage - 1) * ADMIN_PAGE_SIZE;
+    return visibleAdmins.slice(start, start + ADMIN_PAGE_SIZE);
+  }, [visibleAdmins, currentAdminPage]);
+  const unusedTotalPages = Math.max(1, Math.ceil(unusedCategoryRows.length / UNUSED_PAGE_SIZE));
+  const currentUnusedPage = Math.min(unusedPage, unusedTotalPages);
+  const paginatedUnusedRows = useMemo(() => {
+    const start = (currentUnusedPage - 1) * UNUSED_PAGE_SIZE;
+    return unusedCategoryRows.slice(start, start + UNUSED_PAGE_SIZE);
+  }, [unusedCategoryRows, currentUnusedPage]);
+  const unusedBlankRowsCount = Math.max(
+    0,
+    UNUSED_PAGE_SIZE - paginatedUnusedRows.length,
+  );
+  const assignmentTotalPages = Math.max(
+    1,
+    Math.ceil(unitCoverageRows.length / ASSIGNMENT_PAGE_SIZE),
+  );
+  const currentAssignmentPage = Math.min(assignmentPage, assignmentTotalPages);
+  const paginatedAssignmentRows = useMemo(() => {
+    const start = (currentAssignmentPage - 1) * ASSIGNMENT_PAGE_SIZE;
+    return unitCoverageRows.slice(start, start + ASSIGNMENT_PAGE_SIZE);
+  }, [unitCoverageRows, currentAssignmentPage]);
+  const recentTotalPages = Math.max(1, Math.ceil(recent7DayAdmins.length / RECENT_PAGE_SIZE));
+  const currentRecentPage = Math.min(recentPage, recentTotalPages);
+  const paginatedRecentAdmins = useMemo(() => {
+    const start = (currentRecentPage - 1) * RECENT_PAGE_SIZE;
+    return recent7DayAdmins.slice(start, start + RECENT_PAGE_SIZE);
+  }, [recent7DayAdmins, currentRecentPage]);
+  const recentBlankRowsCount = Math.max(
+    0,
+    RECENT_PAGE_SIZE - paginatedRecentAdmins.length,
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -460,71 +683,30 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleStartCategoryEdit = (category: Category) => {
-    setEditingCategoryId(category.id);
-    setEditingCategoryName(category.name);
-    setEditingCategoryOriginalName(category.name);
-  };
-
-  const handleSaveCategoryEdit = async () => {
-    if (editingCategoryId === null) return;
-
+  const handleDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    setIsDeletingCategory(true);
     try {
-      const updated = await updateCategoryBySuperAdmin(editingCategoryId, {
-        name: editingCategoryName,
-      });
+      const updated = await deleteCategoryBySuperAdmin(categoryToDelete.id);
       setCategories(updated);
       await fetchAdmins(setAdmins, () =>
         clearSuperAdminSession(() => router.push("/login")),
       );
       setCreateForm((current) => ({
         ...current,
-        unit:
-          current.unit === editingCategoryOriginalName
-            ? editingCategoryName.trim()
-            : current.unit,
+        unit: current.unit === categoryToDelete.name ? "" : current.unit,
       }));
       setEditForm((current) => ({
         ...current,
-        unit:
-          current.unit === editingCategoryOriginalName
-            ? editingCategoryName.trim()
-            : current.unit,
+        unit: current.unit === categoryToDelete.name ? "" : current.unit,
       }));
-      setEditingCategoryId(null);
-      setEditingCategoryName("");
-      setEditingCategoryOriginalName("");
-      toast.success("Category updated successfully");
-    } catch (error) {
-      toastApiError(error, "Failed to update category.");
-    }
-  };
-
-  const handleDeleteCategory = async (category: Category) => {
-    if (!window.confirm(`Delete category "${category.name}"?`)) return;
-
-    try {
-      const updated = await deleteCategoryBySuperAdmin(category.id);
-      setCategories(updated);
-      await fetchAdmins(setAdmins, () =>
-        clearSuperAdminSession(() => router.push("/login")),
-      );
-      setCreateForm((current) => ({
-        ...current,
-        unit: current.unit === category.name ? "" : current.unit,
-      }));
-      setEditForm((current) => ({
-        ...current,
-        unit: current.unit === category.name ? "" : current.unit,
-      }));
-      if (editingCategoryId === category.id) {
-        setEditingCategoryId(null);
-        setEditingCategoryName("");
-        setEditingCategoryOriginalName("");
-      }
       toast.success("Category deleted successfully");
+      setDeleteCategoryOpen(false);
+      setCategoryToDelete(null);
     } catch (error) {
       toastApiError(error, "Failed to delete category.");
+    } finally {
+      setIsDeletingCategory(false);
     }
   };
 
@@ -568,33 +750,376 @@ export default function SuperAdminDashboard() {
         */}
         <div className="space-y-6">
           {isAdminDashboardPage && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Admin Dashboard
-              </CardTitle>
-              <CardDescription>
-                Overview of admin accounts and category coverage.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-lg border bg-background p-4">
-                  <p className="text-sm text-muted-foreground">Active Admins</p>
-                  <p className="mt-2 text-3xl font-semibold">{activeAdminsCount}</p>
-                </div>
-                <div className="rounded-lg border bg-background p-4">
-                  <p className="text-sm text-muted-foreground">Disabled Admins</p>
-                  <p className="mt-2 text-3xl font-semibold">{disabledAdminsCount}</p>
-                </div>
-                <div className="rounded-lg border bg-background p-4">
-                  <p className="text-sm text-muted-foreground">Categories</p>
-                  <p className="mt-2 text-3xl font-semibold">{manageableCategoriesCount}</p>
-                </div>
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Admin Dashboard
+                  </CardTitle>
+                  <CardDescription>
+                    Operations snapshot for admin accounts, unit ownership, and category coverage.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Accounts</p>
+                      <p className="mt-2 text-3xl font-semibold">{admins.length}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Active Admins</p>
+                      <p className="mt-2 text-3xl font-semibold">{activeAdminsCount}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Disabled Admins</p>
+                      <p className="mt-2 text-3xl font-semibold">{disabledAdminsCount}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Manageable Categories</p>
+                      <p className="mt-2 text-3xl font-semibold">{manageableCategoriesCount}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Covered Categories</p>
+                      <p className="mt-2 text-3xl font-semibold">{coveredCategoryCount}</p>
+                    </div>
+                    <div className="rounded-lg border bg-background p-4">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Coverage Rate</p>
+                      <p className="mt-2 text-3xl font-semibold">{categoryCoverageRate}%</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-6 xl:grid-cols-3">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Unused Categories</CardTitle>
+                    <CardDescription>
+                      Categories without an active admin assignment.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="rounded-lg border overflow-hidden">
+                      <Table className="w-full table-fixed">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[70%]">Unused Category</TableHead>
+                            <TableHead className="w-[30%]">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {unusedCategoryRows.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={2} className="py-8 text-center text-muted-foreground">
+                                All categories are currently assigned.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            <>
+                              {paginatedUnusedRows.map((row) => (
+                                <TableRow key={row.unit}>
+                                  <TableCell className="font-medium break-words">{row.unit}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline">Unused</Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                              {Array.from({ length: unusedBlankRowsCount }, (_, index) => (
+                                <TableRow key={`unused-blank-${index}`} className="h-[53px]">
+                                  <TableCell>&nbsp;</TableCell>
+                                  <TableCell>&nbsp;</TableCell>
+                                </TableRow>
+                              ))}
+                            </>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {unusedCategoryRows.length > 0 && (
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>
+                          Page {currentUnusedPage} of {unusedTotalPages}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3"
+                            onClick={() => setUnusedPage(Math.max(1, currentUnusedPage - 1))}
+                            disabled={currentUnusedPage <= 1}
+                          >
+                            Previous
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3"
+                            onClick={() =>
+                              setUnusedPage(Math.min(unusedTotalPages, currentUnusedPage + 1))
+                            }
+                            disabled={currentUnusedPage >= unusedTotalPages}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Admin and Coverage Health</CardTitle>
+                    <CardDescription>
+                      Active, disabled, and vacant category counts.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer config={dashboardBarChartConfig} className="h-[290px] w-full">
+                      <BarChart data={adminHealthData} margin={{ top: 8, right: 14, left: 0, bottom: 0 }}>
+                        <CartesianGrid vertical={false} />
+                        <XAxis dataKey="status" tickLine={false} axisLine={false} tickMargin={8} />
+                        <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                        <Bar
+                          dataKey="total"
+                          fill="var(--color-total)"
+                          radius={[8, 8, 0, 0]}
+                          maxBarSize={58}
+                          isAnimationActive={false}
+                        />
+                      </BarChart>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Coverage Split</CardTitle>
+                    <CardDescription>
+                      Covered versus vacant category units.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ChartContainer config={coveragePieChartConfig} className="h-[290px] w-full">
+                      <PieChart>
+                        <ChartTooltip
+                          cursor={false}
+                          content={<ChartTooltipContent nameKey="name" />}
+                        />
+                        <Pie
+                          data={coveragePieData}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={54}
+                          outerRadius={94}
+                          paddingAngle={3}
+                          isAnimationActive={false}
+                        >
+                          {coveragePieData.map((entry) => (
+                            <Cell key={entry.name} fill={entry.fill} />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ChartContainer>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+
+              <div className="grid gap-6 xl:grid-cols-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Category Assignment Table</CardTitle>
+                    <CardDescription>
+                      Live view of which categories currently have an active admin assigned.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="rounded-lg border overflow-hidden">
+                      <Table className="w-full table-fixed">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[35%]">Category</TableHead>
+                            <TableHead className="w-[45%]">Assigned Admin</TableHead>
+                            <TableHead className="w-[20%]">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {unitCoverageRows.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
+                                No manageable categories available.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            paginatedAssignmentRows.map((row) => (
+                              <TableRow key={row.unit}>
+                                <TableCell className="font-medium break-words">{row.unit}</TableCell>
+                                <TableCell className="align-top">
+                                  <div>
+                                    <p className="break-words">{row.adminName}</p>
+                                    <p className="text-xs text-muted-foreground break-all">{row.adminEmail}</p>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="align-top">
+                                  <Badge variant={row.covered ? "default" : "outline"}>
+                                    {row.covered ? "Covered" : "Vacant"}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {unitCoverageRows.length > 0 && (
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>
+                          Page {currentAssignmentPage} of {assignmentTotalPages}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3"
+                            onClick={() =>
+                              setAssignmentPage(Math.max(1, currentAssignmentPage - 1))
+                            }
+                            disabled={currentAssignmentPage <= 1}
+                          >
+                            Previous
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3"
+                            onClick={() =>
+                              setAssignmentPage(
+                                Math.min(assignmentTotalPages, currentAssignmentPage + 1),
+                              )
+                            }
+                            disabled={currentAssignmentPage >= assignmentTotalPages}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Recent Account Activity</CardTitle>
+                    <CardDescription>
+                      New admin accounts created over the last 7 days and latest created accounts.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <ChartContainer config={dashboardBarChartConfig} className="h-[190px] w-full">
+                      <BarChart data={recentSignups7DaysData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                        <CartesianGrid vertical={false} />
+                        <XAxis dataKey="day" tickLine={false} axisLine={false} tickMargin={8} />
+                        <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                        <Bar
+                          dataKey="admins"
+                          fill="var(--color-total)"
+                          radius={[6, 6, 0, 0]}
+                          maxBarSize={42}
+                          isAnimationActive={false}
+                        />
+                      </BarChart>
+                    </ChartContainer>
+
+                    <div className="rounded-lg border overflow-hidden">
+                      <Table className="w-full table-fixed">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[50%]">Name</TableHead>
+                            <TableHead className="w-[30%]">Unit</TableHead>
+                            <TableHead className="w-[20%]">Created</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {recent7DayAdmins.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
+                                No admin accounts available yet.
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            <>
+                              {paginatedRecentAdmins.map((admin) => (
+                                <TableRow key={admin.id}>
+                                  <TableCell>
+                                    <div>
+                                      <p className="font-medium break-words">{admin.name}</p>
+                                      <p className="text-xs text-muted-foreground break-all">{admin.email}</p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="break-words">{admin.unit}</TableCell>
+                                  <TableCell className="whitespace-nowrap">
+                                    {new Date(admin.createdAt).toLocaleDateString("en-US", {
+                                      month: "short",
+                                      day: "numeric",
+                                      year: "numeric",
+                                    })}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                              {Array.from({ length: recentBlankRowsCount }, (_, index) => (
+                                <TableRow key={`recent-blank-${index}`} className="h-[67px]">
+                                  <TableCell>&nbsp;</TableCell>
+                                  <TableCell>&nbsp;</TableCell>
+                                  <TableCell>&nbsp;</TableCell>
+                                </TableRow>
+                              ))}
+                            </>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {recent7DayAdmins.length > 0 && (
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>
+                          Page {currentRecentPage} of {recentTotalPages}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3"
+                            onClick={() => setRecentPage(Math.max(1, currentRecentPage - 1))}
+                            disabled={currentRecentPage <= 1}
+                          >
+                            Previous
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3"
+                            onClick={() =>
+                              setRecentPage(Math.min(recentTotalPages, currentRecentPage + 1))
+                            }
+                            disabled={currentRecentPage >= recentTotalPages}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
           )}
 
           {isAdminControlPage && (
@@ -615,21 +1140,20 @@ export default function SuperAdminDashboard() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
-                    size="icon"
-                    className="h-9 w-9 rounded-full"
+                    size="sm"
                     onClick={() => setIsCreateOpen(true)}
-                    aria-label="Create admin"
-                    title="Create admin"
+                    className="h-9 rounded-md px-3"
                   >
-                    <Plus className="h-4 w-4" />
+                    <Plus className="mr-1 h-4 w-4" />
+                    Create Admin
                   </Button>
-                  <div className="flex flex-wrap items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-2 py-1">
+                  <div className="flex flex-wrap items-center gap-1 rounded-md border border-border/60 bg-muted/40 p-1">
                     <Button
                       type="button"
                       size="sm"
                       variant={adminFilter === "active" ? "default" : "ghost"}
                       onClick={() => setAdminFilter("active")}
-                      className="h-8 rounded-full px-3 flex-1 sm:flex-none"
+                      className="h-8 rounded-sm px-3"
                     >
                       Active
                     </Button>
@@ -638,7 +1162,7 @@ export default function SuperAdminDashboard() {
                       size="sm"
                       variant={adminFilter === "disabled" ? "default" : "ghost"}
                       onClick={() => setAdminFilter("disabled")}
-                      className="h-8 rounded-full px-3 flex-1 sm:flex-none"
+                      className="h-8 rounded-sm px-3"
                     >
                       Disabled
                     </Button>
@@ -662,7 +1186,7 @@ export default function SuperAdminDashboard() {
                     {visibleAdmins.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={5}
                           className="py-10 text-center text-muted-foreground"
                         >
                           {adminFilter === "disabled"
@@ -671,7 +1195,7 @@ export default function SuperAdminDashboard() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      visibleAdmins.map((admin) => (
+                      paginatedAdmins.map((admin) => (
                         <TableRow key={admin.id}>
                           <TableCell>
                             <div>
@@ -733,103 +1257,255 @@ export default function SuperAdminDashboard() {
                   </TableBody>
                 </Table>
               </div>
+              {visibleAdmins.length > 0 && (
+                <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    Page {currentAdminPage} of {adminTotalPages}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 px-3"
+                      onClick={() => setAdminPage(Math.max(1, currentAdminPage - 1))}
+                      disabled={currentAdminPage <= 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-8 px-3"
+                      onClick={() =>
+                        setAdminPage(Math.min(adminTotalPages, currentAdminPage + 1))
+                      }
+                      disabled={currentAdminPage >= adminTotalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
           )}
 
           {isCategoryControlPage && (
           <Card className="h-fit">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Tag className="h-5 w-5" />
-                Category Control
-              </CardTitle>
-              <CardDescription>
-                Create or rename categories and sync them across admin units
-                and feedback categories.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <form
-                onSubmit={handleCreateCategory}
-                className="flex flex-col gap-2 sm:flex-row"
-              >
-                <Input
-                  placeholder="New category name"
-                  value={newCategoryName}
-                  onChange={(event) => setNewCategoryName(event.target.value)}
-                  required
-                />
-                <Button type="submit" variant="secondary">
-                  Add
-                </Button>
-              </form>
-
-              <div className="space-y-2">
-                {categories.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No categories found.
+            <CardContent className="space-y-5">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Total Categories
                   </p>
-                ) : (
-                  <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
-                    {categories
-                      .filter((category) => {
-                        const name = category.name.trim().toLowerCase();
-                        return name !== "disabled" && name !== "inactive";
-                      })
-                      .map((category) => (
-                      <div
-                        key={category.id}
-                        className="flex items-center gap-2 rounded-md border p-2"
-                      >
-                        {editingCategoryId === category.id ? (
-                          <>
-                            <Input
-                              value={editingCategoryName}
-                              onChange={(event) =>
-                                setEditingCategoryName(event.target.value)
-                              }
-                            />
-                            <Button
-                              size="sm"
-                              onClick={handleSaveCategoryEdit}
-                              type="button"
+                  <p className="mt-1 text-2xl font-semibold">{categoryControlRows.length}</p>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Assigned
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold">{assignedCategoriesCount}</p>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Unassigned
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold">{unassignedCategoriesCount}</p>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Last Updated
+                  </p>
+                  <p className="mt-1 text-sm font-semibold">
+                    {latestCategoryUpdate > 0
+                      ? new Date(latestCategoryUpdate).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
+                      : "No updates yet"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-sm font-medium">Create Category</p>
+                  <form
+                    onSubmit={handleCreateCategory}
+                    className="mt-2 flex flex-col gap-2 sm:flex-row"
+                  >
+                    <Input
+                      placeholder="Enter category name"
+                      value={newCategoryName}
+                      onChange={(event) => setNewCategoryName(event.target.value)}
+                      required
+                      className="sm:flex-1"
+                    />
+                    <Button type="submit" className="sm:min-w-[150px]">
+                      Create Category
+                    </Button>
+                  </form>
+                </div>
+                <div className="rounded-lg border bg-background p-3">
+                  <p className="text-sm font-medium">Find Category</p>
+                  <Input
+                    placeholder="Search category or admin"
+                    value={categorySearch}
+                    onChange={(event) => setCategorySearch(event.target.value)}
+                    className="mt-2"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 bg-muted/40 p-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={categoryStatusFilter === "all" ? "default" : "ghost"}
+                  onClick={() => setCategoryStatusFilter("all")}
+                  className="h-8 rounded-sm px-3"
+                >
+                  All
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={categoryStatusFilter === "assigned" ? "default" : "ghost"}
+                  onClick={() => setCategoryStatusFilter("assigned")}
+                  className="h-8 rounded-sm px-3"
+                >
+                  Assigned
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={categoryStatusFilter === "unassigned" ? "default" : "ghost"}
+                  onClick={() => setCategoryStatusFilter("unassigned")}
+                  className="h-8 rounded-sm px-3"
+                >
+                  Unassigned
+                </Button>
+              </div>
+
+              <div className="rounded-lg border overflow-hidden">
+                <Table className="w-full table-fixed">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[26%] py-2.5">Category</TableHead>
+                      <TableHead className="w-[12%] py-2.5">Status</TableHead>
+                      <TableHead className="w-[30%] py-2.5">Assigned Admin</TableHead>
+                      <TableHead className="w-[17%] py-2.5">Updated</TableHead>
+                      <TableHead className="w-[15%] py-2.5 text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCategoryControlRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5}
+                          className="py-10 text-center text-muted-foreground"
+                        >
+                          No categories match your current filters.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredCategoryControlRows.map((row) => (
+                        <TableRow key={row.category.id}>
+                          <TableCell className="py-2.5 align-top">
+                            <p className="font-medium break-words">{row.category.name}</p>
+                          </TableCell>
+                          <TableCell className="py-2.5 align-top">
+                            <Badge
+                              variant={row.isAssigned ? "default" : "outline"}
+                              className="h-6 px-2 text-sm"
                             >
-                              <Save className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <p className="flex-1 truncate text-sm">{category.name}</p>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              type="button"
-                              onClick={() => handleStartCategoryEdit(category)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              type="button"
-                              onClick={() => handleDeleteCategory(category)}
-                              className="border-border text-foreground hover:border-red-600 hover:bg-red-600 hover:text-black"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                              {row.isAssigned ? "Assigned" : "Unassigned"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-2.5 align-top">
+                            <div>
+                              <p className="break-words leading-snug">{row.assignedAdminName}</p>
+                              <p className="text-xs text-muted-foreground break-all leading-snug">
+                                {row.assignedAdminEmail}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-2.5 align-top">
+                            {(() => {
+                              const categoryTimestamp =
+                                row.category.updatedAt ?? row.category.createdAt;
+                              if (!categoryTimestamp) return "-";
+                              return new Date(categoryTimestamp).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell className="py-2.5 text-right align-top">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                type="button"
+                                onClick={() => {
+                                  setCategoryToDelete(row.category);
+                                  setDeleteCategoryOpen(true);
+                                }}
+                                className="h-8 w-8 border-border p-0 text-foreground hover:border-red-600 hover:bg-red-600 hover:text-black"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
           )}
         </div>
       </div>
+
+      <AlertDialog
+        open={deleteCategoryOpen}
+        onOpenChange={(open) => {
+          setDeleteCategoryOpen(open);
+          if (!open && !isDeletingCategory) {
+            setCategoryToDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete category?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {categoryToDelete
+                ? `This will permanently remove "${categoryToDelete.name}" from categories and cannot be undone.`
+                : "This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingCategory}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCategory}
+              disabled={isDeletingCategory || !categoryToDelete}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              {isDeletingCategory ? "Deleting..." : "Delete Category"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-lg data-[state=open]:duration-200 data-[state=closed]:duration-150">
