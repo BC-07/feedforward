@@ -46,18 +46,18 @@ export function FeedbackDetailsCard({
           </div>
           <div className="rounded-lg border border-border bg-muted/30 p-3">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Category</p>
-            <p className="mt-1 text-sm font-medium text-foreground">{feedback.category}</p>
+            <p className="mt-1 text-sm font-medium text-foreground break-words [overflow-wrap:anywhere]">{feedback.category}</p>
           </div>
         </div>
 
         <div className="rounded-lg border border-border bg-muted/30 p-3">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Subject</p>
-          <p className="mt-1 text-sm font-medium text-foreground">{feedback.subject}</p>
+          <p className="mt-1 text-sm font-medium text-foreground break-words [overflow-wrap:anywhere]">{feedback.subject}</p>
         </div>
 
-        <div className="rounded-lg border border-border bg-muted/30 p-3">
+        <div className="rounded-lg border border-border bg-muted/30 p-3 overflow-hidden">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Message</p>
-          <p className="mt-1 whitespace-pre-wrap break-all text-sm leading-relaxed text-foreground">
+          <p className="mt-1 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-foreground">
             {displayedMessage}
           </p>
           {canExpandMessage ? (

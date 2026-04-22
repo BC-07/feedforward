@@ -63,8 +63,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  OPEN_FEEDBACK_EVENT,
-  PENDING_ADMIN_FEEDBACK_KEY,
 } from "@/components/admin/constants";
 
 const SESSION_EVENT = "feedforward:session-change";
@@ -353,11 +351,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     adminUnit,
     adminAvatar,
   } = effectiveSession;
+  const isAdminSetPasswordRoute = pathname.startsWith("/admin/set-password");
   const shouldShowSidebar =
-    pathname.startsWith("/user") ||
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/superadmin") ||
-    pathname.startsWith("/admin");
+    !isAdminSetPasswordRoute &&
+    (pathname.startsWith("/user") ||
+      pathname.startsWith("/dashboard") ||
+      pathname.startsWith("/superadmin"));
   const topBarHeightClass = "h-16";
   const collapsedSidebarOffsetClass = shouldShowSidebar ? "md:pl-14" : "";
 
@@ -459,15 +458,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       saveReadNotificationIds(next);
     }
     setIsNotificationsOpen(false);
-    sessionStorage.setItem(PENDING_ADMIN_FEEDBACK_KEY, feedback.id);
-    router.push("/dashboard/feedback-submission");
-    window.setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent(OPEN_FEEDBACK_EVENT, {
-          detail: { feedbackId: feedback.id },
-        }),
-      );
-    }, 120);
+    router.push(
+      `/dashboard/feedback-submission?feedbackId=${encodeURIComponent(
+        feedback.id,
+      )}&open=${Date.now()}`,
+    );
   };
 
   const sortedAdminNotifications = [...adminNotifications].sort(
@@ -766,17 +761,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ? "Feedback Submission"
       : "Admin Dashboard";
   const userPageTitle =
-    pathname === "/user/track-feedback"
-      ? "Track Feedback"
+    pathname === "/user/home"
+      ? "Home"
       : pathname === "/user/my-submissions"
-        ? "My Submissions"
-        : pathname === "/user/submit-feedback"
-          ? "Submit Feedback"
-          : "User";
+      ? "My Submissions"
+      : pathname === "/user/submit-feedback"
+        ? "Submit Feedback"
+        : "User";
   const superAdminPageTitle =
-    pathname === "/superadmin" ||
-    pathname === "/superadmin/admin-dashboard" ||
-    pathname === "/superadmin/admin-control/admin-dashboard"
+    pathname === "/superadmin" || pathname === "/superadmin/admin-dashboard"
       ? "Admin Dashboard"
       : pathname === "/superadmin/admin-control"
         ? "Admin Control"
@@ -793,7 +786,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         },
         {
           href: "/dashboard/feedback-submission",
-          label: "Submission List",
+          label: "Feedback Submission ",
           icon: ClipboardList,
           isActive: (path) => path.startsWith("/dashboard/feedback-submission"),
         },
@@ -801,10 +794,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     : isUserLoggedIn
       ? [
           {
-            href: "/user/submit-feedback",
-            label: "Submit Feedback",
-            icon: Send,
-            isActive: (path) => path === "/user/submit-feedback",
+            href: "/user/home",
+            label: "Home",
+            icon: House,
+            isActive: (path) => path === "/user/home",
           },
           {
             href: "/user/my-submissions",
@@ -812,23 +805,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             icon: ListChecks,
             isActive: (path) => path === "/user/my-submissions",
           },
-          {
-            href: "/user/track-feedback",
-            label: "Track Feedback",
-            icon: Search,
-            isActive: (path) => path === "/user/track-feedback",
-          },
         ]
       : isSuperAdminLoggedIn
         ? [
             {
-              href: "/superadmin/admin-control/admin-dashboard",
+              href: "/superadmin/admin-dashboard",
               label: "Admin Dashboard",
               icon: ShieldCheck,
               isActive: (path) =>
-                path === "/superadmin" ||
-                path.startsWith("/superadmin/admin-dashboard") ||
-                path.startsWith("/superadmin/admin-control/admin-dashboard"),
+                path === "/superadmin" || path.startsWith("/superadmin/admin-dashboard"),
             },
             {
               href: "/superadmin/admin-control",
@@ -859,6 +844,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ];
   const expandedSidebarTitle = "FEED FORWARD";
   const expandedSidebarSubtitle = "SMART. FAST. SAFE.";
+  const handleSidebarExpandClick = (
+    event?: React.MouseEvent<HTMLButtonElement> | React.PointerEvent<HTMLButtonElement>,
+  ) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    setIsDesktopSidebarExpanded(true);
+  };
+
+  const handleSidebarCollapseClick = (
+    event?: React.MouseEvent<HTMLButtonElement> | React.PointerEvent<HTMLButtonElement>,
+  ) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    setIsDesktopSidebarExpanded(false);
+  };
 
   const AppFooter = () => (
     <footer className="border-t border-muted bg-white mt-auto">
@@ -908,7 +908,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     size="icon"
                     className="h-7 w-7 shrink-0 text-foreground hover:bg-muted/80"
                     aria-label="Collapse sidebar menu"
-                    onClick={() => setIsDesktopSidebarExpanded(false)}
+                    onPointerDown={handleSidebarCollapseClick}
+                    onClick={handleSidebarCollapseClick}
                   >
                     <Menu className="h-4 w-4 text-foreground" />
                   </Button>
@@ -922,7 +923,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   size="icon"
                   className="h-9 w-9 text-foreground hover:bg-muted/80"
                   aria-label="Expand sidebar menu"
-                  onClick={() => setIsDesktopSidebarExpanded(true)}
+                  onPointerDown={handleSidebarExpandClick}
+                  onClick={handleSidebarExpandClick}
                 >
                   <Menu className="h-5 w-5 text-foreground" />
                 </Button>
@@ -937,6 +939,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     title={item.label}
                     aria-label={item.label}
+                    onClick={() => {
+                      if (!isDesktopSidebarExpanded) {
+                        setIsDesktopSidebarExpanded(true);
+                      }
+                    }}
                     className={`${isDesktopSidebarExpanded && index === 0 ? "mt-2" : ""} mb-0.5 flex h-10 items-center justify-center rounded-lg border transition-all duration-300 ${
                       isDesktopSidebarExpanded
                         ? "mx-auto w-[calc(100%-1.5rem)] justify-start px-4"
@@ -1025,7 +1032,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             onClick={() => setIsMobileMenuOpen(false)}
                           >
                             <ClipboardList className="h-4 w-4" />
-                            <span>Submission List</span>
+                            <span>Feedback Submission</span>
                           </Link>
                         </>
                       )}
@@ -1033,12 +1040,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       {isUserLoggedIn && !isAdminLoggedIn && (
                         <>
                           <Link
-                            href="/user/submit-feedback"
+                            href="/user/home"
                             className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
                             onClick={() => setIsMobileMenuOpen(false)}
                           >
-                            <Send className="h-4 w-4" />
-                            <span>Submit Feedback</span>
+                            <House className="h-4 w-4" />
+                            <span>Home</span>
                           </Link>
                           <div className="h-px bg-border" />
                           <Link
@@ -1049,22 +1056,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             <ListChecks className="h-4 w-4" />
                             <span>My Submissions</span>
                           </Link>
-                          <div className="h-px bg-border" />
-                          <Link
-                            href="/user/track-feedback"
-                            className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
-                            onClick={() => setIsMobileMenuOpen(false)}
-                          >
-                            <Search className="h-4 w-4" />
-                            <span>Track Feedback</span>
-                          </Link>
                         </>
                       )}
 
                       {isSuperAdminLoggedIn && !isAdminLoggedIn && !isUserLoggedIn && (
                         <>
                           <Link
-                            href="/superadmin/admin-control/admin-dashboard"
+                            href="/superadmin/admin-dashboard"
                             className="flex items-center gap-3 py-3 text-sm font-medium transition-colors hover:text-accent"
                             onClick={() => setIsMobileMenuOpen(false)}
                           >
@@ -1226,7 +1224,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       )}
                     </Button>
                   </SheetTrigger>
-                <SheetContent className="w-[360px] sm:w-[400px] overflow-hidden rounded-l-3xl ff-sheet-anim">
+                <SheetContent
+                  className="w-[360px] sm:w-[400px] overflow-hidden rounded-l-3xl ff-sheet-anim"
+                  onInteractOutside={(event) => {
+                    event.preventDefault();
+                  }}
+                >
                   <SheetHeader className="px-3 pb-0 pt-4">
                     <SheetTitle className="text-center text-lg font-semibold">
                       Notifications
@@ -1513,7 +1516,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Admin Profile Sheet */}
       <Sheet open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-        <SheetContent className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl ff-sheet-anim">
+        <SheetContent
+          className="w-[360px] sm:w-[400px] overflow-y-auto rounded-l-3xl ff-sheet-anim"
+          onInteractOutside={(event) => {
+            event.preventDefault();
+          }}
+        >
           <SheetHeader className="px-2 flex items-center justify-center text-center">
             <SheetTitle className="text-center w-full">Admin Profile</SheetTitle>
             <SheetDescription className="text-center w-full">Your account information</SheetDescription>
@@ -1538,7 +1546,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   onChange={handleAdminAvatarChange}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">Hover photo to change</p>
 
               <div className="text-center">
                 <p className="text-xl font-bold">{adminName}</p>
@@ -1584,10 +1591,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   value={adminProfileEdit.lastName}
                   onChange={(e) => {
                     const next = e.target.value;
-                    if (containsEmailLike(next)) {
-                      toast.error("Last name must not contain an email");
-                      return;
-                    }
                     setAdminProfileEdit({ ...adminProfileEdit, lastName: next });
                   }}
                 />

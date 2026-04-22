@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { listFeedbacks, type Feedback } from "@/lib/api";
 import { toastApiError } from "@/lib/errorHandling";
 import { AdminDashboardShell } from "@/components/admin/AdminDashboardShell";
-import { AdminFeedbackStatusChart } from "../../components/admin/AdminFeedbackStatusChart";
+import { AdminFeedbackStatusChart } from "@/components/admin/AdminFeedbackStatusChart";
 import { AdminFeedbackTypeChart } from "@/components/admin/AdminFeedbackTypeChart";
 import { AdminStatsGrid } from "@/components/admin/AdminStatsGrid";
 import { useAdminSession } from "@/components/admin/useAdminSession";
