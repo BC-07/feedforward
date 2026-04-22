@@ -81,7 +81,6 @@ import {
   ChevronRight,
   Download,
   MessageSquare,
-  MessageSquare,
   Pencil,
   Search,
   SendHorizontal,
@@ -107,7 +106,7 @@ const FEEDBACKS_PER_PAGE = 7;
 const EXPORT_LOGO_PATH = "/favicon.ico";
 type AdminHoverFilterKey = "name" | "date" | "type" | "priority" | "status";
 const ADMIN_FILTER_TEXT_COLOR = "#171717";
-const ADMIN_FILTER_MUTED_COLOR = "#fffdfb";
+const ADMIN_FILTER_MUTED_COLOR = "#8f877d";
 const ADMIN_FILTER_CONTROL_CLASS =
   "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
 const ADMIN_FILTER_CHIP_CLASS =
@@ -638,6 +637,70 @@ export function AdminFeedbackWorkspace({
       }>,
     [filterDate, filterName, filterPriority, filterStatus, filterType],
   );
+  const activeFilterPills = useMemo(
+    () =>
+      [
+        trimmedSearchQuery
+          ? { key: "search", label: searchQuery.trim() }
+          : null,
+        filterName !== "asc" ? { key: "name", label: "Z - A" } : null,
+        filterDate !== "recent"
+          ? { key: "date", label: "Oldest" }
+          : null,
+        filterType !== "all"
+          ? { key: "type", label: formatFilterChipLabel(filterType) }
+          : null,
+        filterPriority !== "all"
+          ? {
+              key: "priority",
+              label: formatFilterChipLabel(filterPriority),
+            }
+          : null,
+        filterStatus !== "all"
+          ? {
+              key: "status",
+              label:
+                filterStatus === "inprogress"
+                  ? "In Progress"
+                  : formatFilterChipLabel(filterStatus),
+            }
+          : null,
+      ].filter((pill): pill is { key: string; label: string } => Boolean(pill)),
+    [
+      filterDate,
+      filterName,
+      filterPriority,
+      filterStatus,
+      filterType,
+      searchQuery,
+      trimmedSearchQuery,
+    ],
+  );
+
+  const clearSingleFilter = useCallback((key: string) => {
+    switch (key) {
+      case "search":
+        setSearchQuery("");
+        break;
+      case "name":
+        setFilterName("asc");
+        break;
+      case "date":
+        setFilterDate("recent");
+        break;
+      case "type":
+        setFilterType("all");
+        break;
+      case "priority":
+        setFilterPriority("all");
+        break;
+      case "status":
+        setFilterStatus("all");
+        break;
+      default:
+        break;
+    }
+  }, []);
 
   const visibleFeedbacks = useMemo(() => {
     const items = [...feedbacks];
@@ -1235,7 +1298,7 @@ export function AdminFeedbackWorkspace({
           </div>
 
           <div className="grid gap-x-3 gap-y-2 xl:grid-cols-[minmax(0,1.9fr)_repeat(5,minmax(0,1fr))]">
-            <div className="space-y-1.5">
+            <div>
               <div className="relative">
                 <Search
                   className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2"
@@ -1252,19 +1315,6 @@ export function AdminFeedbackWorkspace({
                   }}
                 />
               </div>
-              {hasActiveFilters ? (
-                <div className="min-h-5">
-                  <button
-                    type="button"
-                    onClick={clearAllFilters}
-                    className="inline-flex items-center gap-1.5 text-[12px] font-medium transition-colors hover:text-[#4d463e]"
-                    style={{ color: ADMIN_FILTER_TEXT_COLOR }}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Clear all
-                  </button>
-                </div>
-              ) : null}
             </div>
 
             {inlineFilterChips.map((filter) => (
@@ -1284,16 +1334,42 @@ export function AdminFeedbackWorkspace({
                     ))}
                   </SelectContent>
                 </Select>
-                {filter.showChip ? (
-                  <div className="min-h-5">
-                    <span className={ADMIN_FILTER_CHIP_CLASS}>
-                      {filter.chipLabel}
-                    </span>
-                  </div>
-                ) : null}
               </div>
             ))}
           </div>
+
+          {activeFilterPills.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {activeFilterPills.map((pill) => (
+                <span
+                  key={pill.key}
+                  className={`${ADMIN_FILTER_CHIP_CLASS} gap-1.5`}
+                >
+                  {pill.label}
+                  <button
+                    type="button"
+                    onClick={() => clearSingleFilter(pill.key)}
+                    className="inline-flex items-center justify-center rounded-full p-0.5 text-[#6f6255] transition-colors hover:bg-[#efe5da] hover:text-[#4d463e]"
+                    aria-label={`Remove ${pill.label} filter`}
+                    title={`Remove ${pill.label} filter`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              ))}
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
+                  style={{ color: ADMIN_FILTER_TEXT_COLOR }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Clear all
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           {isFeedbacksLoading ? (
             <div className="flex min-h-[420px] items-center justify-center rounded-[24px] border border-dashed border-[#e6ddd1] bg-[#fcfaf7] text-sm text-muted-foreground">

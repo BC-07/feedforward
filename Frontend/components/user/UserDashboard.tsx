@@ -81,6 +81,7 @@ import {
 } from "@/components/filters/HoverFilterPopover";
 import {
   ArrowRight,
+  BarChart3,
   Send,
   Search,
   Clock,
@@ -100,6 +101,9 @@ export type UserDashboardView = "home" | "my-submissions" | "submit-feedback";
 
 const FEEDBACK_MESSAGE_MAX_LENGTH = 2000;
 const FEEDBACK_SUBJECT_MAX_LENGTH = 100;
+const SUBMISSION_FILTER_TEXT_COLOR = "#171717";
+const SUBMISSION_FILTER_CONTROL_CLASS =
+  "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
 
 export function UserDashboard({ view }: { view: UserDashboardView }) {
   const MY_SUBMISSIONS_PER_PAGE = 7;
@@ -920,27 +924,27 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   ].filter(Boolean).length;
   const activeFilterChips = [
     trimmedSearchQuery
-      ? { key: "search", label: `Search: ${searchQuery.trim()}` }
+      ? { key: "search", label: searchQuery.trim() }
       : null,
     filterTracking !== "asc"
-      ? { key: "tracking", label: "Tracking: Z - A" }
+      ? { key: "tracking", label: "Z - A" }
       : null,
     filterDate !== "recent"
-      ? { key: "date", label: "Date: Oldest" }
+      ? { key: "date", label: "Oldest" }
       : null,
     filterType !== "all"
-      ? { key: "type", label: `Type: ${formatFilterChipLabel(filterType)}` }
+      ? { key: "type", label: formatFilterChipLabel(filterType) }
       : null,
     filterCategory !== "all"
       ? {
           key: "category",
-          label: `Category: ${formatFilterChipLabel(filterCategory)}`,
+          label: formatFilterChipLabel(filterCategory),
         }
       : null,
     filterPriority !== "all"
       ? {
           key: "priority",
-          label: `Priority: ${formatFilterChipLabel(filterPriority)}`,
+          label: formatFilterChipLabel(filterPriority),
         }
       : null,
     filterStatus !== "all"
@@ -948,8 +952,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           key: "status",
           label:
             filterStatus === "inprogress"
-              ? "Status: In Progress"
-              : `Status: ${formatFilterChipLabel(filterStatus)}`,
+              ? "In Progress"
+              : formatFilterChipLabel(filterStatus),
         }
       : null,
   ].filter((chip): chip is { key: string; label: string } => Boolean(chip));
@@ -1067,6 +1071,13 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         },
       ] satisfies HoverFilterItem<HoverFilterKey>[],
     [categories, filterCategory, filterDate, filterPriority, filterStatus, filterTracking, filterType],
+  );
+  const desktopInlineFilterItems = useMemo(
+    () =>
+      hoverFilterItems.filter((item) =>
+        ["tracking", "date", "type", "priority", "status"].includes(item.key),
+      ),
+    [hoverFilterItems],
   );
   const dashboardStats = useMemo(() => {
     const pending = feedbacks.filter(
@@ -1706,59 +1717,130 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                 </div>
               </div>
             ) : isMySubmissionsView && feedbacks.length > 0 ? (
-              <div className="h-full min-h-0 flex flex-col bg-background">
-                <div className="px-1 pb-1">
-                  <div className="-mt-2 pb-1 sm:pb-2">
-                    <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex w-full gap-2 sm:max-w-md">
-                        <div className="relative flex-1">
-                          <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                          <Input
-                            placeholder="Search by ID, subject, message, or category"
-                            value={searchQuery}
-                            onChange={(event) => setSearchQuery(event.target.value)}
-                            className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
-                          />
-                        </div>
-                        <HoverFilterPopover
-                          items={hoverFilterItems}
-                          activeCount={activeFilterCount}
-                          onReset={clearAllFilters}
+              <div className="mx-auto flex h-full min-h-0 w-full flex-col gap-2 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex h-9 items-center gap-3">
+                    <div className="flex h-9 w-11 items-center justify-center rounded-2xl bg-muted/50 text-[#171717]">
+                      <BarChart3 className="h-5 w-5" />
+                    </div>
+                    <div className="flex h-9 items-center">
+                      <h2 className="text-[21px] font-semibold leading-none tracking-[-0.02em] text-[#171717]">
+                        Submission list
+                      </h2>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setCreateSubmissionStep("form");
+                      setCreateSubmissionTrackingId(null);
+                      setIsAnonymous(false);
+                      setIsCreateSubmissionOpen(true);
+                    }}
+                    className="h-9 sm:w-auto bg-accent hover:bg-accent/90 transition-colors duration-150 hover:-translate-y-px"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Submission
+                  </Button>
+                </div>
+                <div>
+                  <div className="mb-3">
+                    <div className="hidden gap-x-3 gap-y-2 md:grid xl:grid-cols-[minmax(0,1.9fr)_repeat(5,minmax(0,1fr))]">
+                      <div className="relative">
+                        <Search
+                          className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2"
+                          style={{ color: "#8f877d" }}
+                        />
+                        <Input
+                          placeholder="Search by ID, subject, or message..."
+                          value={searchQuery}
+                          onChange={(event) => setSearchQuery(event.target.value)}
+                          className={`${SUBMISSION_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}
+                          style={{
+                            color: SUBMISSION_FILTER_TEXT_COLOR,
+                            paddingLeft: "2.75rem",
+                          }}
                         />
                       </div>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setCreateSubmissionStep("form");
-                          setCreateSubmissionTrackingId(null);
-                          setIsAnonymous(false);
-                          setIsCreateSubmissionOpen(true);
-                        }}
-                        className="h-9 sm:w-auto bg-accent hover:bg-accent/90 transition-colors duration-150 hover:-translate-y-px"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        New Submission
-                      </Button>
+                      {desktopInlineFilterItems.map((filter) => {
+                        const value =
+                          filter.key === "tracking"
+                            ? filterTracking
+                            : filter.key === "date"
+                              ? filterDate
+                              : filter.key === "type"
+                                ? filterType
+                                : filter.key === "priority"
+                                  ? filterPriority
+                                  : filterStatus;
+                        return (
+                          <Select
+                            key={filter.key}
+                            value={value}
+                            onValueChange={filter.onSelect}
+                          >
+                            <SelectTrigger
+                              className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`}
+                              style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
+                            >
+                              <SelectValue placeholder={filter.label} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {filter.options.map((option) => (
+                                <SelectItem key={`${filter.key}-${option.value}`} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      })}
+                    </div>
+                    <div className="flex w-full gap-2 md:hidden">
+                      <div className="relative flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by ID, subject, message, or category"
+                          value={searchQuery}
+                          onChange={(event) => setSearchQuery(event.target.value)}
+                          className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
+                        />
+                      </div>
+                      <HoverFilterPopover
+                        items={hoverFilterItems}
+                        activeCount={activeFilterCount}
+                        onReset={clearAllFilters}
+                      />
                     </div>
                     {activeFilterChips.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <div className="mt-5 mb-3 flex flex-wrap items-center gap-2">
                         {activeFilterChips.map((chip) => (
                           <span
                             key={chip.key}
-                            className="inline-flex items-center gap-1 rounded-full border border-foreground/20 bg-background px-3 py-1 text-xs text-foreground shadow-sm"
+                            className="inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-medium leading-none text-[#6f6255]"
+                            style={{ columnGap: "12px" }}
                           >
-                            {chip.label}
+                            <span>{chip.label}</span>
                               <button
                                 type="button"
                                 onClick={() => clearSingleFilter(chip.key)}
-                                className="rounded-full p-0.5 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                className="inline-flex items-center justify-center rounded-full p-0.5 text-[#6f6255] transition-colors hover:bg-[#efe5da] hover:text-[#4d463e]"
                                 aria-label={`Remove ${chip.label} filter`}
                                 title={`Remove ${chip.label} filter`}
                               >
-                              <X className="h-3 w-3" />
+                              <X className="h-3.5 w-3.5" />
                             </button>
                           </span>
                         ))}
+                        <button
+                          type="button"
+                          onClick={clearAllFilters}
+                          className="inline-flex min-h-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium leading-none transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
+                          style={{ color: "#171717" }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Clear all
+                        </button>
                       </div>
                     ) : null}
                   </div>
@@ -1766,7 +1848,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                 {renderCreateSubmissionDialog()}
                 <div
                   ref={submissionsScrollRef}
-                  className="flex-1 min-h-0 w-full max-w-full overflow-y-scroll overflow-x-hidden [scrollbar-gutter:stable_both-edges] h-[calc(100vh-260px)]"
+                  className="ff-hide-scrollbar flex-1 min-h-0 w-full max-w-full overflow-y-scroll overflow-x-hidden md:[scrollbar-gutter:stable] h-[calc(100vh-260px)]"
                   onScroll={(event) => {
                     const top = event.currentTarget.scrollTop;
                     submissionsScrollTop.current = top;
@@ -1778,8 +1860,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     }
                   }}
                 >
-                  <div className="w-full max-w-full overflow-x-auto">
-                    <Table className="w-full min-w-[980px] table-fixed text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
+                  <div className="w-full overflow-x-auto">
+                    <Table className="w-full min-w-full md:min-w-[980px] md:table-fixed text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
                       <TableHeader className="bg-muted/50 sticky top-0 z-10">
                         <TableRow className="bg-muted/50 hover:bg-muted/50">
                           <TableHead className="w-[150px]">Tracking ID</TableHead>

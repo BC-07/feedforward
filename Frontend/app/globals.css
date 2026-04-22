@@ -136,8 +136,6 @@
 
   html {
     font-size: var(--font-size);
-    overflow-y: scroll;
-    scrollbar-gutter: stable;
   }
 
   h1 {
