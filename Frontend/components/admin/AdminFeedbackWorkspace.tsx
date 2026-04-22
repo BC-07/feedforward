@@ -456,18 +456,26 @@ export function AdminFeedbackWorkspace({
   const visibleFeedbacks = useMemo(() => {
     const items = [...feedbacks];
     items.sort((a, b) => {
-      if (filterDate === "oldest") {
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      }
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+      const timeA = new Date(a.createdAt).getTime();
+      const timeB = new Date(b.createdAt).getTime();
+      const dateComparison =
+        filterDate === "oldest" ? timeA - timeB : timeB - timeA;
 
-    items.sort((a, b) => {
+      if (dateComparison !== 0) {
+        return dateComparison;
+      }
+
       const nameA = (a.isAnonymous ? "*****" : a.userName || "*****").toLowerCase();
       const nameB = (b.isAnonymous ? "*****" : b.userName || "*****").toLowerCase();
-      return filterName === "desc"
+      const nameComparison = filterName === "desc"
         ? nameB.localeCompare(nameA)
         : nameA.localeCompare(nameB);
+
+      if (nameComparison !== 0) {
+        return nameComparison;
+      }
+
+      return a.id.localeCompare(b.id);
     });
 
     return items;
@@ -973,7 +981,7 @@ export function AdminFeedbackWorkspace({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              Feedback Submissions
+              Submission History
             </CardTitle>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
