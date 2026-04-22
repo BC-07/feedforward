@@ -86,6 +86,9 @@ import {
 
 export type UserDashboardView = "home" | "my-submissions" | "submit-feedback";
 
+const FEEDBACK_MESSAGE_MAX_LENGTH = 2000;
+const FEEDBACK_SUBJECT_MAX_LENGTH = 100;
+
 export function UserDashboard({ view }: { view: UserDashboardView }) {
   const MY_SUBMISSIONS_PER_PAGE = 7;
   type HoverFilterKey =
@@ -147,11 +150,13 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [messageDraft, setMessageDraft] = useState("");
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const leftColumnRef = useRef<HTMLDivElement | null>(null);
   const submissionsScrollRef = useRef<HTMLDivElement | null>(null);
   const submissionsScrollTop = useRef(0);
+  const feedbackSubmitLockRef = useRef(false);
   const submissionsScrollKey = "userDashboardSubmissionsScrollTop";
   const isHomeView = view === "home";
   const isMySubmissionsView = view === "my-submissions";
@@ -378,6 +383,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
+    if (formData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
+      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      return;
+    }
 
     setConfirmData({
       ...formData,
@@ -389,6 +398,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const handleCreateSubmissionFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
+    if (formData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
+      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      return;
+    }
 
     setConfirmData({
       ...formData,
@@ -399,6 +412,13 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
   const handleCreateSubmissionConfirmSubmit = async () => {
     if (!currentUser) return;
+    if (feedbackSubmitLockRef.current) return;
+    if (confirmData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
+      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      return;
+    }
+    feedbackSubmitLockRef.current = true;
+    setIsSubmittingFeedback(true);
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
     try {
       await createFeedback({
@@ -432,11 +452,21 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         return;
       }
       toast.error(message);
+    } finally {
+      feedbackSubmitLockRef.current = false;
+      setIsSubmittingFeedback(false);
     }
   };
 
   const handleConfirmSubmit = async () => {
     if (!currentUser) return;
+    if (feedbackSubmitLockRef.current) return;
+    if (confirmData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
+      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      return;
+    }
+    feedbackSubmitLockRef.current = true;
+    setIsSubmittingFeedback(true);
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
     try {
       await createFeedback({
@@ -471,6 +501,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         return;
       }
       toast.error(message);
+    } finally {
+      feedbackSubmitLockRef.current = false;
+      setIsSubmittingFeedback(false);
     }
   };
 
@@ -585,6 +618,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           {isHydrated ? (
             <Select
               value={formData.type}
+              disabled={isSubmittingFeedback}
               onValueChange={(value) =>
                 setFormData({ ...formData, type: value })
               }
@@ -611,6 +645,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           {isHydrated ? (
             <Select
               value={formData.category}
+              disabled={isSubmittingFeedback}
               onValueChange={(value) =>
                 setFormData({ ...formData, category: value })
               }
@@ -640,7 +675,14 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           id={`${idPrefix}-subject`}
           placeholder="Brief summary of your feedback"
           value={formData.subject}
-          onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+          maxLength={FEEDBACK_SUBJECT_MAX_LENGTH}
+          disabled={isSubmittingFeedback}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              subject: e.target.value.slice(0, FEEDBACK_SUBJECT_MAX_LENGTH),
+            })
+          }
           required
         />
       </div>
@@ -651,15 +693,26 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           id={`${idPrefix}-message`}
           placeholder="Provide detailed information about your feedback..."
           rows={5}
+          maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
           value={formData.message}
-          onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+          disabled={isSubmittingFeedback}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              message: e.target.value.slice(0, FEEDBACK_MESSAGE_MAX_LENGTH),
+            })
+          }
           required
         />
+        <p className="text-right text-xs text-muted-foreground">
+          {formData.message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
+        </p>
         </div>
       </div>
       <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-4">
         <Checkbox
           id={`${idPrefix}-anonymous`}
+          disabled={isSubmittingFeedback}
           checked={isAnonymous}
           onCheckedChange={(checked) => setIsAnonymous(checked === true)}
           className="mt-0.5"
@@ -674,10 +727,19 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         </div>
       </div>
 
-      <Button type="submit" className="w-full bg-accent hover:bg-accent/90">
+      <Button
+        type="submit"
+        className="w-full bg-accent hover:bg-accent/90"
+        disabled={isSubmittingFeedback}
+      >
         <Send className="mr-2 h-4 w-4" />
-        Submit Feedback
+        {isSubmittingFeedback ? "Submitting feedback..." : "Submit Feedback"}
       </Button>
+      {isSubmittingFeedback ? (
+        <p className="text-center text-xs text-muted-foreground" aria-live="polite">
+          Feedback is being sent. Please wait...
+        </p>
+      ) : null}
     </form>
   );
 
@@ -1165,8 +1227,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               <Button
                 className="bg-accent hover:bg-accent/90"
                 onClick={handleCreateSubmissionConfirmSubmit}
+                disabled={isSubmittingFeedback}
               >
-                Confirm & Submit
+                {isSubmittingFeedback ? "Submitting feedback..." : "Confirm & Submit"}
               </Button>
             </div>
           </>
@@ -1361,8 +1424,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             <Button
               className="bg-accent hover:bg-accent/90"
               onClick={handleConfirmSubmit}
+              disabled={isSubmittingFeedback}
             >
-              Confirm & Submit
+              {isSubmittingFeedback ? "Submitting feedback..." : "Confirm & Submit"}
             </Button>
           </div>
         </DialogContent>
