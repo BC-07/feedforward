@@ -66,8 +66,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { formatLocalTime } from "@/lib/time";
+import { parseAdminResponses } from "@/lib/responseLog";
 import { toastApiError } from "@/lib/errorHandling";
 import { formatFilterChipLabel } from "@/lib/filterUtils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   HoverFilterPopover,
   type HoverFilterItem,
@@ -81,6 +83,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  MessageSquare,
   Pencil,
   Search,
   SendHorizontal,
@@ -1403,7 +1406,6 @@ export function AdminFeedbackWorkspace({
                               </Button>
                             </DialogTrigger>
                             <DialogContent
-                              className="flex h-[88vh] max-h-[88vh] w-[67vw] max-w-[67vw] flex-col overflow-hidden sm:max-w-[67vw] lg:w-[64vw] lg:max-w-[64vw] xl:w-[62vw] xl:max-w-[62vw] 2xl:w-[59vw] 2xl:max-w-[59vw]"
                               className={
                                 activeEditTab === "manage"
                                   ? "flex h-[85vh] max-h-[85vh] max-w-2xl flex-col overflow-hidden"
@@ -1473,55 +1475,6 @@ export function AdminFeedbackWorkspace({
                             </DialogHeader>
                             {selectedFeedback ? (
                               <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                                <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-hidden lg:grid-cols-[minmax(0,9fr)_minmax(0,11fr)]">
-                                  <div className="min-h-0 space-y-4 overflow-y-auto rounded-lg border border-border bg-muted/20 p-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div>
-                                        <Label className="text-muted-foreground">
-                                          Type
-                                        </Label>
-                                        <p className="font-medium capitalize">
-                                          {selectedFeedback.type}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <Label className="text-muted-foreground">
-                                          Category
-                                        </Label>
-                                        <p className="font-medium">
-                                          {selectedFeedback.category}
-                                        </p>
-                                      </div>
-                                      <div>
-                                        <Label className="text-muted-foreground">
-                                          Status
-                                        </Label>
-                                        <Badge
-                                          className={getStatusColor(
-                                            selectedFeedback.status,
-                                          )}
-                                          variant="outline"
-                                        >
-                                          {selectedFeedback.status}
-                                        </Badge>
-                                      </div>
-                                      <div>
-                                        <Label className="text-muted-foreground">
-                                          Submitted By
-                                        </Label>
-                                        <p className="font-medium">
-                                          {selectedFeedback.isAnonymous
-                                            ? "*****"
-                                            : selectedFeedback.userName || "*****"}
-                                        </p>
-                                      </div>
-                                    </div>
-                              <DialogTitle>Feedback Details</DialogTitle>
-                              <DialogDescription>
-                                Tracking ID: {selectedFeedback?.id}
-                              </DialogDescription>
-                            </DialogHeader>
-                            {selectedFeedback ? (
                               <Tabs
                                 value={activeEditTab}
                                 onValueChange={(value) =>
@@ -1762,6 +1715,8 @@ export function AdminFeedbackWorkspace({
                                       </div>
                                     </div>
                                   ) : null}
+                                    </div>
+                                  </div>
                                 </TabsContent>
 
                                 <TabsContent
@@ -1902,11 +1857,11 @@ export function AdminFeedbackWorkspace({
                                   </div>
                                 </div>
 
-                                <div className="-mt-px shrink-0 rounded-b-lg border-x border-b border-border bg-muted/30 px-3 pb-3 pt-6">
-                                  <Button
-                                    onClick={handleUpdateFeedback}
-                                    className="mx-auto block w-3/5 bg-accent hover:bg-accent/90"
-                                    disabled={!hasFeedbackChanges}
+                                  <div className="-mt-px shrink-0 rounded-b-lg border-x border-b border-border bg-muted/30 px-3 pb-3 pt-6">
+                                    <Button
+                                      onClick={handleUpdateFeedback}
+                                      className="mx-auto block w-3/5 bg-accent hover:bg-accent/90"
+                                      disabled={!hasFeedbackChanges}
                                   >
                                     Update Feedback
                                   </Button>
@@ -1915,6 +1870,8 @@ export function AdminFeedbackWorkspace({
                                     the user if they registered an account.
                                   </p>
                                 </div>
+                                </TabsContent>
+                              </Tabs>
                               </div>
                             ) : null}
                             </DialogContent>
