@@ -61,6 +61,7 @@ import { formatLocalTime } from "@/lib/time";
 import { useDraftStorage } from "@/lib/useDraftStorage";
 import { toastApiError } from "@/lib/errorHandling";
 import { formatFilterChipLabel } from "@/lib/filterUtils";
+import { formatFeedbackText } from "@/lib/textFormat";
 import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
 import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
 import {
@@ -420,13 +421,15 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     feedbackSubmitLockRef.current = true;
     setIsSubmittingFeedback(true);
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
+    const normalizedSubject = formatFeedbackText(confirmData.subject);
+    const normalizedMessage = formatFeedbackText(confirmData.message);
     try {
       await createFeedback({
         id: newTrackingId,
         type: confirmData.type,
         category: confirmData.category.trim(),
-        subject: confirmData.subject,
-        message: confirmData.message,
+        subject: normalizedSubject,
+        message: normalizedMessage,
         status: "Pending",
         priority: "Medium",
         isAnonymous,
@@ -468,13 +471,15 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     feedbackSubmitLockRef.current = true;
     setIsSubmittingFeedback(true);
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
+    const normalizedSubject = formatFeedbackText(confirmData.subject);
+    const normalizedMessage = formatFeedbackText(confirmData.message);
     try {
       await createFeedback({
         id: newTrackingId,
         type: confirmData.type,
         category: confirmData.category.trim(),
-        subject: confirmData.subject,
-        message: confirmData.message,
+        subject: normalizedSubject,
+        message: normalizedMessage,
         status: "Pending",
         priority: "Medium",
         isAnonymous,
@@ -541,10 +546,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       toast.error("Please enter a message.");
       return;
     }
+    const normalizedMessage = formatFeedbackText(trimmed);
     setIsSendingMessage(true);
     try {
       const created = await createFeedbackMessage(selectedFeedback.id, {
-        message: trimmed,
+        message: normalizedMessage,
       });
       setMessages((prev) => [...prev, created]);
       setMessageDraft("");
@@ -693,6 +699,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           id={`${idPrefix}-message`}
           placeholder="Provide detailed information about your feedback..."
           rows={5}
+          className="ff-hide-scrollbar min-h-[120px] max-h-[120px] overflow-y-auto [field-sizing:fixed]"
           maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
           value={formData.message}
           disabled={isSubmittingFeedback}
@@ -1211,9 +1218,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   <p className="text-xs font-semibold text-muted-foreground">
                     MESSAGE
                   </p>
-                  <p className="mt-1 text-sm leading-relaxed break-all">
-                    {formatMessagePreview(confirmData.message) || "—"}
-                  </p>
+                  <div className="ff-hide-scrollbar mt-1 max-h-[160px] min-h-[160px] overflow-y-auto pr-1">
+                    <p className="text-sm leading-relaxed break-all">
+                      {formatMessagePreview(confirmData.message) || "—"}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1408,9 +1417,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                 <p className="text-xs font-semibold text-muted-foreground">
                   MESSAGE
                 </p>
-                <p className="mt-1 text-sm leading-relaxed break-all">
-                  {formatMessagePreview(confirmData.message) || "—"}
-                </p>
+                <div className="ff-hide-scrollbar mt-1 max-h-[160px] min-h-[160px] overflow-y-auto pr-1">
+                  <p className="text-sm leading-relaxed break-all">
+                    {formatMessagePreview(confirmData.message) || "—"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>

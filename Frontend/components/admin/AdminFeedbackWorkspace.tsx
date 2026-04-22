@@ -65,6 +65,7 @@ import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
 import { toastApiError } from "@/lib/errorHandling";
 import { formatFilterChipLabel } from "@/lib/filterUtils";
+import { formatFeedbackText } from "@/lib/textFormat";
 import ExcelJS from "exceljs";
 import { jsPDF } from "jspdf";
 import autoTable, { type RowInput } from "jspdf-autotable";
@@ -171,6 +172,7 @@ export function AdminFeedbackWorkspace({
   const [activeEditTab, setActiveEditTab] = useState<"details" | "manage">(
     "details",
   );
+  const [isDetailMessageExpanded, setIsDetailMessageExpanded] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const openedFeedbackRequestRef = useRef("");
   const messageScrollRef = useRef<HTMLDivElement>(null);
@@ -183,6 +185,27 @@ export function AdminFeedbackWorkspace({
     ? newStatus !== selectedFeedback.status ||
       newPriority !== selectedFeedback.priority
     : false;
+  const detailMessageParagraphs = useMemo(
+    () =>
+      formatFeedbackText(selectedFeedback?.message ?? "")
+        .split(/\n+/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean),
+    [selectedFeedback?.message],
+  );
+  const detailMessageHasVeryLongToken = /\S{24,}/.test(
+    selectedFeedback?.message ?? "",
+  );
+  const detailMessageNeedsExpansion = useMemo(
+    () =>
+      detailMessageParagraphs.length > 3 ||
+      detailMessageParagraphs.some((paragraph) => paragraph.length > 180),
+    [detailMessageParagraphs],
+  );
+
+  useEffect(() => {
+    setIsDetailMessageExpanded(false);
+  }, [selectedFeedback?.id]);
 
   const loadMessages = useCallback(async (feedbackId: string) => {
     setIsMessagesLoading(true);
@@ -611,8 +634,8 @@ export function AdminFeedbackWorkspace({
       status: feedback.status,
       priority: feedback.priority,
       submitted: formatSubmittedAt(feedback.createdAt),
-      subject: feedback.subject,
-      message: feedback.message,
+      subject: formatFeedbackText(feedback.subject),
+      message: formatFeedbackText(feedback.message),
     }));
     const filterSummary = getFilterSummary();
     const nowText = new Date().toLocaleString("en-US");
@@ -1201,7 +1224,7 @@ export function AdminFeedbackWorkspace({
                               className={
                                 activeEditTab === "manage"
                                   ? "flex h-[85vh] max-h-[85vh] max-w-2xl flex-col overflow-hidden"
-                                  : "max-h-[80vh] max-w-2xl overflow-y-auto"
+                                  : "max-h-[80vh] max-w-2xl overflow-x-hidden overflow-y-auto"
                               }
                               onInteractOutside={(event) => event.preventDefault()}
                               onEscapeKeyDown={(event) => event.preventDefault()}
@@ -1218,22 +1241,21 @@ export function AdminFeedbackWorkspace({
                                 onValueChange={(value) =>
                                   setActiveEditTab(value as "details" | "manage")
                                 }
-                                className={
-                                  activeEditTab === "manage"
-                                    ? "flex min-h-0 w-full flex-1 flex-col"
-                                    : "w-full"
-                                }
+                                className="flex min-h-0 w-full flex-1 flex-col"
                               >
-                                <TabsList className="grid w-full shrink-0 grid-cols-2">
+                                <TabsList className="grid w-full shrink-0 grid-cols-2 rounded-full">
                                   <TabsTrigger value="details">
                                     Details
                                   </TabsTrigger>
                                   <TabsTrigger value="manage">Manage</TabsTrigger>
                                 </TabsList>
 
-                                <TabsContent value="details" className="space-y-4">
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div>
+                                <TabsContent
+                                  value="details"
+                                  className="flex min-h-0 flex-1 flex-col space-y-4 overflow-x-hidden"
+                                >
+                                  <div className="grid grid-cols-2 gap-4 [&>div]:min-w-0">
+                                    <div className="min-w-0">
                                       <Label className="text-muted-foreground">
                                         Type
                                       </Label>
@@ -1241,7 +1263,7 @@ export function AdminFeedbackWorkspace({
                                         {selectedFeedback.type}
                                       </p>
                                     </div>
-                                    <div>
+                                    <div className="min-w-0">
                                       <Label className="text-muted-foreground">
                                         Category
                                       </Label>
@@ -1249,7 +1271,7 @@ export function AdminFeedbackWorkspace({
                                         {selectedFeedback.category}
                                       </p>
                                     </div>
-                                    <div>
+                                    <div className="min-w-0">
                                       <Label className="text-muted-foreground">
                                         Status
                                       </Label>
@@ -1262,7 +1284,7 @@ export function AdminFeedbackWorkspace({
                                         {selectedFeedback.status}
                                       </Badge>
                                     </div>
-                                    <div>
+                                    <div className="min-w-0">
                                       <Label className="text-muted-foreground">
                                         Submitted By
                                       </Label>
@@ -1278,8 +1300,8 @@ export function AdminFeedbackWorkspace({
                                     <Label className="text-muted-foreground">
                                       Subject
                                     </Label>
-                                    <p className="font-medium">
-                                      {selectedFeedback.subject}
+                                    <p className="font-medium break-words [overflow-wrap:anywhere]">
+                                      {formatFeedbackText(selectedFeedback.subject)}
                                     </p>
                                   </div>
 
@@ -1287,11 +1309,46 @@ export function AdminFeedbackWorkspace({
                                     <Label className="text-muted-foreground">
                                       Message
                                     </Label>
-                                    <div className="mt-2 rounded-lg bg-muted p-4">
-                                      <p className="whitespace-pre-wrap text-sm">
-                                        {selectedFeedback.message}
-                                      </p>
+                                    <div
+                                      className={`mt-2 overflow-hidden rounded-lg border border-border bg-white/70 ${
+                                        detailMessageNeedsExpansion &&
+                                        !isDetailMessageExpanded
+                                          ? "max-h-56"
+                                          : ""
+                                      }`}
+                                    >
+                                      <div className="space-y-4 p-4">
+                                        {detailMessageParagraphs.length > 0 ? (
+                                          detailMessageParagraphs.map((paragraph, index) => (
+                                            <p
+                                              key={`${selectedFeedback.id}-paragraph-${index}`}
+                                              className={`text-sm leading-7 text-foreground/90 whitespace-pre-wrap ${
+                                                detailMessageHasVeryLongToken
+                                                  ? "break-all"
+                                                  : "break-words"
+                                              }`}
+                                            >
+                                              {paragraph}
+                                            </p>
+                                          ))
+                                        ) : (
+                                          <p className="text-sm leading-7 text-muted-foreground">
+                                            No message provided.
+                                          </p>
+                                        )}
+                                      </div>
                                     </div>
+                                    {detailMessageNeedsExpansion ? (
+                                      <button
+                                        type="button"
+                                        className="mt-2 text-sm font-semibold text-accent transition-colors hover:text-accent/80"
+                                        onClick={() =>
+                                          setIsDetailMessageExpanded((current) => !current)
+                                        }
+                                      >
+                                        {isDetailMessageExpanded ? "See Less" : "See All"}
+                                      </button>
+                                    ) : null}
                                   </div>
 
                                   {selectedFeedback.response ? (
@@ -1430,7 +1487,11 @@ export function AdminFeedbackWorkspace({
                                                             : "break-words"
                                                         }`}
                                                       >
-                                                        {entry.message}
+                                                        {isAdminMessage
+                                                          ? entry.message
+                                                          : formatFeedbackText(
+                                                              entry.message || "",
+                                                            )}
                                                       </p>
                                                     </div>
                                                     {entry.createdAt ? (

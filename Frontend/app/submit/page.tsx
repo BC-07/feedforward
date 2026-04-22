@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { ArrowRight, Copy, Send } from "lucide-react";
 import { useDraftStorage } from "@/lib/useDraftStorage";
 import { toastApiError } from "@/lib/errorHandling";
+import { formatFeedbackText } from "@/lib/textFormat";
 
 interface FormData {
   type: string;
@@ -103,6 +104,9 @@ export default function Submit() {
       return;
     }
 
+    const normalizedSubject = formatFeedbackText(formData.subject);
+    const normalizedMessage = formatFeedbackText(formData.message);
+
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
     submitLockRef.current = true;
     setIsSubmittingFeedback(true);
@@ -120,6 +124,8 @@ export default function Submit() {
       await createFeedback({
         id: newTrackingId,
         ...formData,
+        subject: normalizedSubject,
+        message: normalizedMessage,
         userId,
         userName,
         userEmail: userEmail || undefined,
@@ -311,6 +317,7 @@ export default function Submit() {
                   id="message"
                   placeholder="Provide detailed information about your feedback..."
                   rows={5}
+                  className="ff-hide-scrollbar min-h-[120px] max-h-[120px] overflow-y-auto [field-sizing:fixed]"
                   maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
                   value={formData.message}
                   disabled={isSubmittingFeedback}
