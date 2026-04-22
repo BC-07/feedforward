@@ -141,10 +141,10 @@ func ForgotPassword(c *fiber.Ctx) error {
 
 	var user model.User
 	if err := db.Table("public.users").Select("email, first_name, last_name, name").Where("LOWER(TRIM(email)) = ?", email).First(&user).Error; err != nil {
-		return c.Status(200).JSON(response.ResponseModel{
-			RetCode: "200",
-			Message: "If this email is registered, an OTP has been sent",
-			Data:    map[string]any{"sent": true},
+		return c.Status(404).JSON(response.ResponseModel{
+			RetCode: "404",
+			Message: "Account not found",
+			Data:    errors.ErrorModel{Message: "No registered account found for this email", IsSuccess: false},
 		})
 	}
 

@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Mail, ShieldCheck } from "lucide-react";
+import { CircleAlert, Mail, ShieldCheck } from "lucide-react";
 import { forgotPassword, verifyResetOTP } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -20,7 +21,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { toastApiError } from "@/lib/errorHandling";
+import { getErrorMessage, toastApiError } from "@/lib/errorHandling";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -29,22 +30,34 @@ export default function ForgotPasswordPage() {
   const [step, setStep] = useState<"request" | "verify">("request");
   const [isRequesting, setIsRequesting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [requestErrorMessage, setRequestErrorMessage] = useState("");
 
   const handleRequestOTP = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalizedEmail = email.trim();
     if (!normalizedEmail) {
       toast.error("Please enter your email.");
+      setRequestErrorMessage("Please enter your email.");
       return;
     }
+
+    setRequestErrorMessage("");
     setIsRequesting(true);
     try {
-      await forgotPassword({ email: normalizedEmail });
-      toast.success("If your email exists, an OTP was sent.");
-      setStep("verify");
-      setOtp("");
+      const response = await forgotPassword({ email: normalizedEmail });
+      if (response.sent) {
+        toast.success("OTP sent successfully.");
+        setStep("verify");
+        setOtp("");
+      } else {
+        const message = "No registered account found for this email.";
+        toast.error(message);
+        setRequestErrorMessage(message);
+      }
     } catch (error) {
-      toastApiError(error, "Failed to send OTP");
+      const message = getErrorMessage(error, "Failed to send OTP");
+      toast.error(message);
+      setRequestErrorMessage(message);
     } finally {
       setIsRequesting(false);
     }
@@ -97,6 +110,18 @@ export default function ForgotPasswordPage() {
           </CardHeader>
 
           <CardContent className="space-y-6">
+            {requestErrorMessage ? (
+              <Alert className="border-red-300 bg-red-50 text-red-900">
+                <CircleAlert className="h-4 w-4" />
+                <AlertTitle className="text-sm font-semibold text-red-900">
+                  Unable to send OTP
+                </AlertTitle>
+                <AlertDescription className="text-sm text-red-800">
+                  {requestErrorMessage}
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
             <form onSubmit={handleRequestOTP} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
@@ -108,7 +133,12 @@ export default function ForgotPasswordPage() {
                     placeholder="Enter your email"
                     className="pl-10"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (requestErrorMessage) {
+                        setRequestErrorMessage("");
+                      }
+                    }}
                     required
                   />
                 </div>
@@ -176,9 +206,13 @@ export default function ForgotPasswordPage() {
                     }
                     setIsRequesting(true);
                     try {
-                      await forgotPassword({ email: normalizedEmail });
-                      toast.success("If your email exists, an OTP was sent.");
-                      setOtp("");
+                      const response = await forgotPassword({ email: normalizedEmail });
+                      if (response.sent) {
+                        toast.success("OTP sent successfully.");
+                        setOtp("");
+                      } else {
+                        toast.error("No registered account found for this email.");
+                      }
                     } catch (error) {
                       toastApiError(error, "Failed to send OTP");
                     } finally {
