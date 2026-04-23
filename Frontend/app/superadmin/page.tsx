@@ -8,6 +8,8 @@ import {
   disableAdminBySuperAdmin,
   enableAdminBySuperAdmin,
   deleteCategoryBySuperAdmin,
+  getCategorySubmissionsLast7Days,
+  getResolvedAdminsLast7Days,
   getSessionMe,
   listAdmins,
   listCategories,
@@ -16,6 +18,7 @@ import {
   updateAdminBySuperAdmin,
   type Admin,
   type Category,
+  type SuperAdminBarStatRow,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,8 +69,21 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis } from "recharts";
-import { Shield, UserCog, UserPlus, Trash2, Pencil, Ban, UserCheck, Eye, EyeOff, Plus } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import {
+  Shield,
+  UserCog,
+  UserPlus,
+  Trash2,
+  Pencil,
+  Ban,
+  UserCheck,
+  Eye,
+  EyeOff,
+  Plus,
+  Mail,
+  CircleAlert,
+} from "lucide-react";
 import { toast } from "sonner";
 import { getErrorMessage, toastApiError } from "@/lib/errorHandling";
 
@@ -85,6 +101,8 @@ type EditAdminForm = {
   password: string;
   unit: string;
 };
+
+type StatsRange = "1d" | "7d" | "30d";
 
 const emptyCreateForm: CreateAdminForm = {
   firstName: "",
@@ -108,21 +126,22 @@ const dashboardBarChartConfig = {
   },
 } satisfies ChartConfig;
 
-const coveragePieChartConfig = {
-  covered: {
-    label: "Covered",
+const resolvedAdmins7DaysChartConfig = {
+  resolved: {
+    label: "Resolved",
     color: "#16a34a",
-  },
-  vacant: {
-    label: "Vacant",
-    color: "#f97316",
   },
 } satisfies ChartConfig;
 
 const ADMIN_PAGE_SIZE = 8;
-const UNUSED_PAGE_SIZE = 6;
 const ASSIGNMENT_PAGE_SIZE = 8;
 const RECENT_PAGE_SIZE = 3;
+const TOP_CATEGORIES_PAGE_SIZE = 6;
+const statsRangeOptions: Array<{ value: StatsRange; label: string }> = [
+  { value: "1d", label: "1 Day" },
+  { value: "7d", label: "7 Days" },
+  { value: "30d", label: "1 Month" },
+];
 
 function getDateKey(value: string | number | Date) {
   const date = new Date(value);
@@ -169,6 +188,9 @@ export default function SuperAdminDashboard() {
   const idleExpiryCheckRef = useRef<number>(0);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [resolvedAdmins7Days, setResolvedAdmins7Days] = useState<SuperAdminBarStatRow[]>([]);
+  const [categorySubmissions7Days, setCategorySubmissions7Days] = useState<SuperAdminBarStatRow[]>([]);
+  const [isDashboardStatsLoading, setIsDashboardStatsLoading] = useState(false);
   const [createForm, setCreateForm] = useState<CreateAdminForm>(emptyCreateForm);
   const [editForm, setEditForm] = useState<EditAdminForm>(emptyEditForm);
   const [selectedAdmin, setSelectedAdmin] = useState<Admin | null>(null);
@@ -190,9 +212,10 @@ export default function SuperAdminDashboard() {
   const [reauthTarget, setReauthTarget] = useState<Admin | null>(null);
   const [idleRemainingMs, setIdleRemainingMs] = useState(idleLimitMs);
   const [adminPage, setAdminPage] = useState(1);
-  const [unusedPage, setUnusedPage] = useState(1);
   const [assignmentPage, setAssignmentPage] = useState(1);
   const [recentPage, setRecentPage] = useState(1);
+  const [topCategoriesPage, setTopCategoriesPage] = useState(1);
+  const [statsRange, setStatsRange] = useState<StatsRange>("7d");
   const [categorySearch, setCategorySearch] = useState("");
   const [categoryStatusFilter, setCategoryStatusFilter] = useState<
     "all" | "assigned" | "unassigned"
@@ -296,20 +319,9 @@ export default function SuperAdminDashboard() {
       });
   }, [activeAdmins, manageableCategoryNameMap]);
   const coveredCategoryCount = unitCoverageRows.filter((row) => row.covered).length;
-  const vacantCategoryCount = Math.max(manageableCategoriesCount - coveredCategoryCount, 0);
-  const unusedCategoryRows = unitCoverageRows.filter((row) => !row.covered);
   const categoryCoverageRate = manageableCategoriesCount
     ? Math.round((coveredCategoryCount / manageableCategoriesCount) * 100)
     : 0;
-  const adminHealthData = [
-    { status: "Active Admins", total: activeAdminsCount },
-    { status: "Disabled Admins", total: disabledAdminsCount },
-    { status: "Vacant Categories", total: vacantCategoryCount },
-  ];
-  const coveragePieData = [
-    { name: "covered", value: coveredCategoryCount, fill: "var(--color-covered)" },
-    { name: "vacant", value: vacantCategoryCount, fill: "var(--color-vacant)" },
-  ];
   const categoryControlRows = useMemo(() => {
     return manageableCategories
       .map((category) => {
@@ -391,16 +403,6 @@ export default function SuperAdminDashboard() {
     const start = (currentAdminPage - 1) * ADMIN_PAGE_SIZE;
     return visibleAdmins.slice(start, start + ADMIN_PAGE_SIZE);
   }, [visibleAdmins, currentAdminPage]);
-  const unusedTotalPages = Math.max(1, Math.ceil(unusedCategoryRows.length / UNUSED_PAGE_SIZE));
-  const currentUnusedPage = Math.min(unusedPage, unusedTotalPages);
-  const paginatedUnusedRows = useMemo(() => {
-    const start = (currentUnusedPage - 1) * UNUSED_PAGE_SIZE;
-    return unusedCategoryRows.slice(start, start + UNUSED_PAGE_SIZE);
-  }, [unusedCategoryRows, currentUnusedPage]);
-  const unusedBlankRowsCount = Math.max(
-    0,
-    UNUSED_PAGE_SIZE - paginatedUnusedRows.length,
-  );
   const assignmentTotalPages = Math.max(
     1,
     Math.ceil(unitCoverageRows.length / ASSIGNMENT_PAGE_SIZE),
@@ -420,6 +422,47 @@ export default function SuperAdminDashboard() {
     0,
     RECENT_PAGE_SIZE - paginatedRecentAdmins.length,
   );
+
+  const resolvedAdmins7DaysChartData = useMemo(() => {
+    return resolvedAdmins7Days.map((row) => ({
+      label: row.label,
+      resolved: row.count,
+    }));
+  }, [resolvedAdmins7Days]);
+
+  const categorySubmissions7DaysChartData = useMemo(() => {
+    return categorySubmissions7Days.map((row) => ({
+      label: row.label,
+      submissions: row.count,
+    }));
+  }, [categorySubmissions7Days]);
+  const topCategoriesTotalPages = Math.max(
+    1,
+    Math.ceil(categorySubmissions7DaysChartData.length / TOP_CATEGORIES_PAGE_SIZE),
+  );
+  const currentTopCategoriesPage = Math.min(topCategoriesPage, topCategoriesTotalPages);
+  const paginatedTopCategories = useMemo(() => {
+    const start = (currentTopCategoriesPage - 1) * TOP_CATEGORIES_PAGE_SIZE;
+    return categorySubmissions7DaysChartData.slice(
+      start,
+      start + TOP_CATEGORIES_PAGE_SIZE,
+    );
+  }, [categorySubmissions7DaysChartData, currentTopCategoriesPage]);
+  const maxCategorySubmissionCount = useMemo(
+    () =>
+      paginatedTopCategories.reduce(
+        (highest, row) => Math.max(highest, row.submissions),
+        0,
+      ),
+    [paginatedTopCategories],
+  );
+  const categorySubmissionColumns = useMemo(() => {
+    const midpoint = Math.ceil(paginatedTopCategories.length / 2);
+    return [
+      paginatedTopCategories.slice(0, midpoint),
+      paginatedTopCategories.slice(midpoint),
+    ].filter((column) => column.length > 0);
+  }, [paginatedTopCategories]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -528,6 +571,25 @@ export default function SuperAdminDashboard() {
         toastApiError(error, "Failed to load categories.");
       });
   }, [router]);
+
+  useEffect(() => {
+    setIsDashboardStatsLoading(true);
+    setTopCategoriesPage(1);
+    void Promise.all([
+      getResolvedAdminsLast7Days(statsRange),
+      getCategorySubmissionsLast7Days(statsRange),
+    ])
+      .then(([resolvedAdmins, categorySubmissions]) => {
+        setResolvedAdmins7Days(resolvedAdmins);
+        setCategorySubmissions7Days(categorySubmissions);
+      })
+      .catch((error) => {
+        toastApiError(error, "Failed to load dashboard statistics.");
+      })
+      .finally(() => {
+        setIsDashboardStatsLoading(false);
+      });
+  }, [statsRange]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -783,140 +845,165 @@ export default function SuperAdminDashboard() {
                 </CardContent>
               </Card>
 
-              <div className="grid gap-6 xl:grid-cols-3">
+              <div className="flex justify-end">
+                <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-border/70 bg-background/80 p-1">
+                  {statsRangeOptions.map((option) => (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      size="sm"
+                      variant={statsRange === option.value ? "default" : "ghost"}
+                      className="rounded-full px-4"
+                      onClick={() => setStatsRange(option.value)}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-6 xl:grid-cols-2">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Unused Categories</CardTitle>
+                    <CardTitle className="text-base">Most Resolved</CardTitle>
                     <CardDescription>
-                      Categories without an active admin assignment.
+                      Resolved feedbacks counted per assigned admin category.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="rounded-lg border overflow-hidden">
-                      <Table className="w-full table-fixed">
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[70%]">Unused Category</TableHead>
-                            <TableHead className="w-[30%]">Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {unusedCategoryRows.length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={2} className="py-8 text-center text-muted-foreground">
-                                All categories are currently assigned.
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            <>
-                              {paginatedUnusedRows.map((row) => (
-                                <TableRow key={row.unit}>
-                                  <TableCell className="font-medium break-words">{row.unit}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">Unused</Badge>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                              {Array.from({ length: unusedBlankRowsCount }, (_, index) => (
-                                <TableRow key={`unused-blank-${index}`} className="h-[53px]">
-                                  <TableCell>&nbsp;</TableCell>
-                                  <TableCell>&nbsp;</TableCell>
-                                </TableRow>
-                              ))}
-                            </>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                    {unusedCategoryRows.length > 0 && (
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>
-                          Page {currentUnusedPage} of {unusedTotalPages}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3"
-                            onClick={() => setUnusedPage(Math.max(1, currentUnusedPage - 1))}
-                            disabled={currentUnusedPage <= 1}
-                          >
-                            Previous
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3"
-                            onClick={() =>
-                              setUnusedPage(Math.min(unusedTotalPages, currentUnusedPage + 1))
-                            }
-                            disabled={currentUnusedPage >= unusedTotalPages}
-                          >
-                            Next
-                          </Button>
-                        </div>
-                      </div>
+                  <CardContent>
+                    {isDashboardStatsLoading ? (
+                      <p className="py-10 text-center text-sm text-muted-foreground">
+                        Loading statistics...
+                      </p>
+                    ) : resolvedAdmins7DaysChartData.length === 0 ? (
+                      <p className="py-10 text-center text-sm text-muted-foreground">
+                        No resolved feedbacks in the last 7 days.
+                      </p>
+                    ) : (
+                      <ChartContainer
+                        config={resolvedAdmins7DaysChartConfig}
+                        className="h-[290px] w-full"
+                      >
+                        <BarChart
+                          data={resolvedAdmins7DaysChartData}
+                          layout="vertical"
+                          margin={{ top: 8, right: 18, left: 8, bottom: 0 }}
+                        >
+                          <CartesianGrid horizontal={false} />
+                          <XAxis
+                            type="number"
+                            allowDecimals={false}
+                            tickLine={false}
+                            axisLine={false}
+                            tickMargin={8}
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="label"
+                            tickLine={false}
+                            axisLine={false}
+                            width={120}
+                          />
+                          <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                          <Bar
+                            dataKey="resolved"
+                            fill="var(--color-resolved)"
+                            radius={[0, 8, 8, 0]}
+                            maxBarSize={34}
+                            isAnimationActive={false}
+                          />
+                        </BarChart>
+                      </ChartContainer>
                     )}
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-base">Admin and Coverage Health</CardTitle>
+                    <CardTitle className="text-base">Top Categories</CardTitle>
                     <CardDescription>
-                      Active, disabled, and vacant category counts.
+                      Most used categories across all submissions for the selected range.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <ChartContainer config={dashboardBarChartConfig} className="h-[290px] w-full">
-                      <BarChart data={adminHealthData} margin={{ top: 8, right: 14, left: 0, bottom: 0 }}>
-                        <CartesianGrid vertical={false} />
-                        <XAxis dataKey="status" tickLine={false} axisLine={false} tickMargin={8} />
-                        <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                        <Bar
-                          dataKey="total"
-                          fill="var(--color-total)"
-                          radius={[8, 8, 0, 0]}
-                          maxBarSize={58}
-                          isAnimationActive={false}
-                        />
-                      </BarChart>
-                    </ChartContainer>
-                  </CardContent>
-                </Card>
+                  <CardContent className="flex h-full flex-col">
+                    {isDashboardStatsLoading ? (
+                      <p className="py-10 text-center text-sm text-muted-foreground">
+                        Loading statistics...
+                      </p>
+                    ) : categorySubmissions7DaysChartData.length === 0 ? (
+                      <p className="py-10 text-center text-sm text-muted-foreground">
+                        No submissions in the last 7 days.
+                      </p>
+                    ) : (
+                      <div className="flex h-full flex-col justify-between gap-6">
+                        <div className="grid gap-6 md:grid-cols-2">
+                          {categorySubmissionColumns.map((column, columnIndex) => (
+                            <div key={`category-column-${columnIndex}`} className="space-y-4">
+                              {column.map((row) => {
+                                const width = maxCategorySubmissionCount
+                                  ? `${Math.max(
+                                      (row.submissions / maxCategorySubmissionCount) * 100,
+                                      12,
+                                    )}%`
+                                  : "0%";
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Coverage Split</CardTitle>
-                    <CardDescription>
-                      Covered versus vacant category units.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ChartContainer config={coveragePieChartConfig} className="h-[290px] w-full">
-                      <PieChart>
-                        <ChartTooltip
-                          cursor={false}
-                          content={<ChartTooltipContent nameKey="name" />}
-                        />
-                        <Pie
-                          data={coveragePieData}
-                          dataKey="value"
-                          nameKey="name"
-                          innerRadius={54}
-                          outerRadius={94}
-                          paddingAngle={3}
-                          isAnimationActive={false}
-                        >
-                          {coveragePieData.map((entry) => (
-                            <Cell key={entry.name} fill={entry.fill} />
+                                return (
+                                  <div key={row.label} className="space-y-2">
+                                    <div className="flex items-center justify-between gap-3">
+                                      <p className="text-sm font-semibold leading-6 break-words">
+                                        {row.label}
+                                      </p>
+                                      <span className="shrink-0 text-sm font-medium text-muted-foreground">
+                                        {row.submissions}
+                                      </span>
+                                    </div>
+                                    <div className="h-3 rounded-full bg-muted/70">
+                                      <div
+                                        className="h-full rounded-full bg-primary"
+                                        style={{ width }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           ))}
-                        </Pie>
-                      </PieChart>
-                    </ChartContainer>
+                        </div>
+                        {topCategoriesTotalPages > 1 && (
+                          <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3"
+                              onClick={() =>
+                                setTopCategoriesPage(Math.max(1, currentTopCategoriesPage - 1))
+                              }
+                              disabled={currentTopCategoriesPage <= 1}
+                            >
+                              Previous
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3"
+                              onClick={() =>
+                                setTopCategoriesPage(
+                                  Math.min(
+                                    topCategoriesTotalPages,
+                                    currentTopCategoriesPage + 1,
+                                  ),
+                                )
+                              }
+                              disabled={currentTopCategoriesPage >= topCategoriesTotalPages}
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -1492,69 +1579,92 @@ export default function SuperAdminDashboard() {
       </AlertDialog>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-lg data-[state=open]:duration-200 data-[state=closed]:duration-150">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
-              Create Admin
-            </DialogTitle>
-            <DialogDescription>
-              Provision a new unit admin directly from the control console.
-            </DialogDescription>
+        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto border-border/70 bg-card p-0 shadow-2xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:max-w-xl data-[state=open]:duration-200 data-[state=closed]:duration-150">
+          <DialogHeader className="border-b border-border/60 px-6 py-6 pr-14">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+                <UserPlus className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <DialogTitle className="text-2xl font-semibold tracking-tight">
+                  Create Admin
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground">
+                  Provision a new unit admin account.
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <form onSubmit={handleCreateAdmin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="create-first-name">First Name</Label>
-              <Input
-                id="create-first-name"
-                value={createForm.firstName}
-                onChange={(event) =>
-                  setCreateForm((current) => ({
-                    ...current,
-                    firstName: event.target.value,
-                  }))
-                }
-                required
-              />
+          <form onSubmit={handleCreateAdmin} className="space-y-6 px-5 py-5 sm:px-6 sm:py-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="create-first-name" className="text-sm font-medium">
+                  First Name
+                </Label>
+                <Input
+                  id="create-first-name"
+                  value={createForm.firstName}
+                  onChange={(event) =>
+                    setCreateForm((current) => ({
+                      ...current,
+                      firstName: event.target.value,
+                    }))
+                  }
+                  placeholder="e.g. Juan"
+                  className="h-11 rounded-xl border-slate-300 bg-slate-50 px-4 shadow-sm focus-visible:border-primary/70 focus-visible:ring-primary/20"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="create-last-name" className="text-sm font-medium">
+                  Last Name
+                </Label>
+                <Input
+                  id="create-last-name"
+                  value={createForm.lastName}
+                  onChange={(event) =>
+                    setCreateForm((current) => ({
+                      ...current,
+                      lastName: event.target.value,
+                    }))
+                  }
+                  placeholder="e.g. Dela Cruz"
+                  className="h-11 rounded-xl border-slate-300 bg-slate-50 px-4 shadow-sm focus-visible:border-primary/70 focus-visible:ring-primary/20"
+                  required
+                />
+              </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="create-last-name">Last Name</Label>
-              <Input
-                id="create-last-name"
-                value={createForm.lastName}
-                onChange={(event) =>
-                  setCreateForm((current) => ({
-                    ...current,
-                    lastName: event.target.value,
-                  }))
-                }
-                required
-              />
+              <Label htmlFor="create-email" className="text-sm font-medium">
+                Email Address
+              </Label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="create-email"
+                  type="email"
+                  value={createForm.email}
+                  onChange={(event) =>
+                    setCreateForm((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
+                  }
+                  placeholder="admin@school.edu.ph"
+                  className="h-11 rounded-xl border-slate-300 bg-slate-50 pr-4 pl-11 shadow-sm focus-visible:border-primary/70 focus-visible:ring-primary/20"
+                  required
+                />
+              </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="create-email">Email</Label>
-              <Input
-                id="create-email"
-                type="email"
-                value={createForm.email}
-                onChange={(event) =>
-                  setCreateForm((current) => ({
-                    ...current,
-                    email: event.target.value,
-                  }))
-                }
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Unit</Label>
+              <Label className="text-sm font-medium">Unit</Label>
               <Select
                 value={createForm.unit}
                 onValueChange={(value) =>
                   setCreateForm((current) => ({ ...current, unit: value }))
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 rounded-xl border-slate-300 bg-slate-50 px-4 shadow-sm focus-visible:border-primary/70 focus-visible:ring-primary/20">
                   <SelectValue placeholder="Select a unit" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1566,9 +1676,26 @@ export default function SuperAdminDashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" className="w-full">
+            <div className="flex gap-3 rounded-2xl border border-primary/15 bg-primary/8 px-4 py-3 text-sm text-foreground">
+              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              <p className="leading-6 text-muted-foreground">
+                A verification email will be sent to the provided address. Make sure the
+                email is correct so the new admin can set their password.
+              </p>
+            </div>
+            <div className="space-y-3 pt-1">
+              <Button type="submit" className="h-12 w-full rounded-full text-base font-semibold">
               Create Admin Account
-            </Button>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-10 w-full text-sm text-muted-foreground"
+                onClick={() => setIsCreateOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

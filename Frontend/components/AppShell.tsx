@@ -37,7 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   Sheet,
   SheetContent,
@@ -271,6 +271,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(
     new Set(),
   );
+  const [clearedNotificationIds, setClearedNotificationIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isClearingNotifications, setIsClearingNotifications] = useState(false);
+  const [exitingNotificationIds, setExitingNotificationIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const notificationItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [isHydrated, setIsHydrated] = useState(false);
   const [logoutConfirmRole, setLogoutConfirmRole] = useState<LogoutRole | null>(null);
   const [isLogoutPending, setIsLogoutPending] = useState(false);
@@ -371,6 +379,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     [adminId, adminUnit, isAdminLoggedIn],
   );
 
+  const saveClearedNotificationIds = useCallback(
+    (nextSet: Set<string>) => {
+      if (typeof window === "undefined") return;
+      if (!isAdminLoggedIn || !adminId || !adminUnit) return;
+      const key = `adminNotificationsCleared:${adminId}:${adminUnit}`;
+      localStorage.setItem(key, JSON.stringify(Array.from(nextSet)));
+      setClearedNotificationIds(new Set(nextSet));
+    },
+    [adminId, adminUnit, isAdminLoggedIn],
+  );
+
   const refreshAdminNotifications = useCallback(async () => {
     if (!isAdminLoggedIn || !adminUnit) return;
     setIsNotificationsLoading(true);
@@ -387,14 +406,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         )
         .slice(0, 10);
-      setAdminNotifications(recent);
+      const visibleRecent = recent.filter(
+        (feedback) => !clearedNotificationIds.has(feedback.id),
+      );
+      setAdminNotifications(visibleRecent);
       if (readNotificationIds.size > 0) {
-        const allowedIds = new Set(recent.map((item) => item.id));
+        const allowedIds = new Set(visibleRecent.map((item) => item.id));
         const nextRead = new Set(
           Array.from(readNotificationIds).filter((id) => allowedIds.has(id)),
         );
         if (nextRead.size !== readNotificationIds.size) {
           saveReadNotificationIds(nextRead);
+        }
+      }
+      if (clearedNotificationIds.size > 0) {
+        const recentIds = new Set(recent.map((item) => item.id));
+        const nextCleared = new Set(
+          Array.from(clearedNotificationIds).filter((id) => recentIds.has(id)),
+        );
+        if (nextCleared.size !== clearedNotificationIds.size) {
+          saveClearedNotificationIds(nextCleared);
         }
       }
     } catch (error) {
@@ -406,13 +437,110 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     } finally {
       setIsNotificationsLoading(false);
     }
-  }, [adminUnit, isAdminLoggedIn, readNotificationIds, saveReadNotificationIds]);
+  }, [
+    adminUnit,
+    clearedNotificationIds,
+    isAdminLoggedIn,
+    readNotificationIds,
+    saveClearedNotificationIds,
+    saveReadNotificationIds,
+  ]);
 
-  const handleNotificationsClearAll = () => {
-    if (!window.confirm("Mark all notifications as read?")) return;
-    const next = new Set(sortedAdminNotifications.map((item) => item.id));
-    saveReadNotificationIds(next);
-  };
+  const sortedAdminNotifications = useMemo(
+    () =>
+      [...adminNotifications].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
+    [adminNotifications],
+  );
+  const unreadAdminNotifications = useMemo(
+    () =>
+      sortedAdminNotifications.filter(
+        (feedback) => !readNotificationIds.has(feedback.id),
+      ),
+    [readNotificationIds, sortedAdminNotifications],
+  );
+  const adminNotificationCount = unreadAdminNotifications.length;
+
+  const handleNotificationsClearAll = useCallback(async () => {
+    if (isClearingNotifications || sortedAdminNotifications.length === 0) return;
+
+    setIsClearingNotifications(true);
+    const idsToClear = sortedAdminNotifications.map((item) => item.id);
+    const nextCleared = new Set(clearedNotificationIds);
+    const nextRead = new Set(readNotificationIds);
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        window.setTimeout(resolve, ms);
+      });
+    const animateNotificationReflow = (positionsBeforeRemoval: Map<string, number>) => {
+      window.requestAnimationFrame(() => {
+        positionsBeforeRemoval.forEach((previousTop, id) => {
+          const element = notificationItemRefs.current[id];
+          if (!element) return;
+
+          const nextTop = element.getBoundingClientRect().top;
+          const deltaY = previousTop - nextTop;
+
+          if (Math.abs(deltaY) < 1) return;
+
+          element.animate(
+            [
+              { transform: `translateY(${deltaY}px)` },
+              { transform: "translateY(0px)" },
+            ],
+            {
+              duration: 220,
+              easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+            },
+          );
+        });
+      });
+    };
+
+    try {
+      for (const id of idsToClear) {
+        const positionsBeforeRemoval = new Map<string, number>();
+        idsToClear.forEach((currentId) => {
+          if (currentId === id) return;
+          const element = notificationItemRefs.current[currentId];
+          if (!element) return;
+          positionsBeforeRemoval.set(currentId, element.getBoundingClientRect().top);
+        });
+
+        setExitingNotificationIds((prev) => {
+          const next = new Set(prev);
+          next.add(id);
+          return next;
+        });
+
+        await wait(300);
+        setAdminNotifications((prev) => {
+          const next = prev.filter((notification) => notification.id !== id);
+          return next;
+        });
+        nextCleared.add(id);
+        nextRead.delete(id);
+        delete notificationItemRefs.current[id];
+        animateNotificationReflow(positionsBeforeRemoval);
+        await wait(220);
+      }
+
+      saveClearedNotificationIds(nextCleared);
+      saveReadNotificationIds(nextRead);
+    } finally {
+      setExitingNotificationIds(new Set());
+      setIsClearingNotifications(false);
+    }
+  }, [
+    clearedNotificationIds,
+    isClearingNotifications,
+    readNotificationIds,
+    saveClearedNotificationIds,
+    saveReadNotificationIds,
+    sortedAdminNotifications,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -433,6 +561,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }
     } catch {
       setReadNotificationIds(new Set());
+    }
+  }, [isAdminLoggedIn, adminId, adminUnit]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isAdminLoggedIn || !adminId || !adminUnit) return;
+    const key = `adminNotificationsCleared:${adminId}:${adminUnit}`;
+    const stored = localStorage.getItem(key);
+    if (!stored) {
+      setClearedNotificationIds(new Set());
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        const ids = parsed.filter((id) => typeof id === "string");
+        setClearedNotificationIds(new Set(ids));
+      } else {
+        setClearedNotificationIds(new Set());
+      }
+    } catch {
+      setClearedNotificationIds(new Set());
     }
   }, [isAdminLoggedIn, adminId, adminUnit]);
 
@@ -464,14 +614,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}&open=${Date.now()}`,
     );
   };
-
-  const sortedAdminNotifications = [...adminNotifications].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
-  const unreadAdminNotifications = sortedAdminNotifications.filter(
-    (feedback) => !readNotificationIds.has(feedback.id),
-  );
-  const adminNotificationCount = unreadAdminNotifications.length;
 
   const clearSessionForRole = (role: LogoutRole) => {
     if (role === "user") {
@@ -1247,9 +1389,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       size="sm"
                       variant="outline"
                       onClick={handleNotificationsClearAll}
-                      disabled={sortedAdminNotifications.length === 0}
+                      disabled={
+                        sortedAdminNotifications.length === 0 || isClearingNotifications
+                      }
                     >
-                      Clear All
+                      {isClearingNotifications ? "Clearing..." : "Clear All"}
                     </Button>
                   </div>
                   <div className="mt-2 flex-1 min-h-0 space-y-3 overflow-y-auto px-3 pr-4 pb-3">
@@ -1264,12 +1408,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       ) : (
                         sortedAdminNotifications.slice(0, 12).map((feedback) => {
                           const isRead = readNotificationIds.has(feedback.id);
+                          const isExiting = exitingNotificationIds.has(feedback.id);
                           return (
                           <div
                             role="button"
                             tabIndex={0}
                             key={feedback.id}
+                            ref={(element) => {
+                              notificationItemRefs.current[feedback.id] = element;
+                            }}
                             onClick={(event) => {
+                              if (isClearingNotifications || isExiting) return;
                               const target = event.target as HTMLElement | null;
                               if (target?.closest("[data-notification-action='true']")) {
                                 return;
@@ -1277,6 +1426,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                               handleOpenAdminNotification(feedback);
                             }}
                             onKeyDown={(event) => {
+                              if (isClearingNotifications || isExiting) return;
                               const target = event.target as HTMLElement | null;
                               if (target?.closest("[data-notification-action='true']")) {
                                 return;
@@ -1286,7 +1436,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                 handleOpenAdminNotification(feedback);
                               }
                             }}
-                            className={`w-full text-left rounded-lg border border-border/40 border-l-4 bg-white/80 p-3 shadow-sm cursor-pointer transition-all duration-200 ease-out hover:bg-white hover:border-border/70 hover:shadow-[0_0_0_1px_rgba(255,149,0,0.18),0_8px_20px_-12px_rgba(0,0,0,0.35)] hover:scale-[1.01] active:scale-[0.995] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+                            className={`w-full origin-top overflow-hidden text-left rounded-lg border border-border/40 border-l-4 bg-white/80 p-3 shadow-sm cursor-pointer transition-[transform,opacity,max-height,margin,padding,border-color,box-shadow] duration-300 ease-out will-change-[transform,opacity,max-height] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+                              isExiting
+                                ? "pointer-events-none !mt-0 translate-x-10 opacity-0 max-h-0 py-0 border-transparent shadow-none"
+                                : "translate-x-0 opacity-100 max-h-[220px] hover:bg-white hover:border-border/70 hover:shadow-[0_0_0_1px_rgba(255,149,0,0.18),0_8px_20px_-12px_rgba(0,0,0,0.35)] hover:scale-[1.01] active:scale-[0.995]"
+                            } ${
                               feedback.priority?.toLowerCase() === "high"
                                 ? "border-l-orange-400"
                                 : feedback.priority?.toLowerCase() === "medium"
@@ -1307,7 +1461,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                 >
                                   {isRead ? "Read" : "Unread"}
                                 </Badge>
-                                <DropdownMenu>
+                                <DropdownMenu modal={false}>
                                   <DropdownMenuTrigger asChild>
                                     <Button
                                       type="button"
@@ -1316,13 +1470,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                       className="h-7 w-7"
                                       aria-label="Notification actions"
                                       data-notification-action="true"
+                                      onPointerDown={(event) => event.stopPropagation()}
                                       onClick={(event) => event.stopPropagation()}
+                                      onKeyDown={(event) => event.stopPropagation()}
+                                      disabled={isClearingNotifications}
                                     >
                                       <MoreVertical className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent
                                     align="end"
+                                    className="z-[120]"
                                     data-notification-action="true"
                                   >
                                     <DropdownMenuItem

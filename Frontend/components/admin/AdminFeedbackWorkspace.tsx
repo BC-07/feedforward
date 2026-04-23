@@ -255,7 +255,10 @@ export function AdminFeedbackWorkspace({
   const openedFeedbackRequestRef = useRef("");
   const messageScrollRef = useRef<HTMLDivElement>(null);
   const splitDetailContentRef = useRef<HTMLDivElement>(null);
+  const splitPaneContainerRef = useRef<HTMLDivElement>(null);
+  const splitPaneListColumnRef = useRef<HTMLDivElement>(null);
   const previousSelectedFeedbackIdRef = useRef<string | null>(null);
+  const [splitPaneTargetHeight, setSplitPaneTargetHeight] = useState<number | null>(null);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const trimmedSearchQuery = searchQuery.trim();
   const isSplitPaneLayout = ADMIN_FEEDBACK_DETAIL_LAYOUT === "split";
@@ -362,6 +365,26 @@ export function AdminFeedbackWorkspace({
 
     previousSelectedFeedbackIdRef.current = currentId;
   }, [isSplitPaneLayout, selectedFeedback?.id]);
+
+  const syncSplitPaneHeight = useCallback(() => {
+    if (!isSplitPaneLayout || !isSplitPaneOpen) {
+      setSplitPaneTargetHeight(null);
+      return;
+    }
+
+    const splitPaneContainer = splitPaneContainerRef.current;
+    const listColumn = splitPaneListColumnRef.current;
+    if (!splitPaneContainer || !listColumn) return;
+
+    const listBounds = listColumn.getBoundingClientRect();
+    const splitPaneBounds = splitPaneContainer.getBoundingClientRect();
+    const nextHeight = Math.floor(listBounds.bottom - splitPaneBounds.top);
+    if (nextHeight <= 0) return;
+
+    setSplitPaneTargetHeight((currentHeight) =>
+      currentHeight === nextHeight ? currentHeight : nextHeight,
+    );
+  }, [isSplitPaneLayout, isSplitPaneOpen]);
 
   const openFeedbackDialog = useCallback(
     async (feedback: Feedback) => {
@@ -721,6 +744,39 @@ export function AdminFeedbackWorkspace({
     ],
   );
   const splitPaneTopShift = activeFilterPills.length > 0 ? "-154px" : "-102px";
+
+  useEffect(() => {
+    if (!isSplitPaneLayout || !isSplitPaneOpen) return;
+
+    const queueSync = () => {
+      window.requestAnimationFrame(() => {
+        syncSplitPaneHeight();
+      });
+    };
+
+    queueSync();
+    window.addEventListener("resize", queueSync);
+
+    const listColumn = splitPaneListColumnRef.current;
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined" && listColumn
+        ? new ResizeObserver(queueSync)
+        : null;
+
+    if (resizeObserver && listColumn) {
+      resizeObserver.observe(listColumn);
+    }
+
+    return () => {
+      window.removeEventListener("resize", queueSync);
+      resizeObserver?.disconnect();
+    };
+  }, [
+    isSplitPaneLayout,
+    isSplitPaneOpen,
+    splitPaneTopShift,
+    syncSplitPaneHeight,
+  ]);
 
   const clearSingleFilter = useCallback((key: string) => {
     switch (key) {
@@ -1452,7 +1508,7 @@ export function AdminFeedbackWorkspace({
                   : "space-y-2"
               }
             >
-              <div className="min-w-0 flex-1 space-y-2">
+              <div ref={splitPaneListColumnRef} className="min-w-0 flex-1 space-y-2">
               <div className="relative w-full overflow-x-auto">
                 <Table className="w-full min-w-[980px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
                   <TableHeader className="sticky top-0 z-10 bg-muted/50">
@@ -1940,6 +1996,7 @@ export function AdminFeedbackWorkspace({
               </div>
               {isSplitPaneLayout ? (
                 <div
+                  ref={splitPaneContainerRef}
                   className={`xl:translate-y-[var(--split-pane-shift)] xl:mb-[var(--split-pane-space-comp)] transition-[width,opacity,transform,border-color,box-shadow,height,max-height,min-height,margin-bottom] duration-300 ease-out ${
                     isSplitPaneOpen
                       ? "w-full opacity-100 translate-x-0 xl:w-[40%] xl:min-w-[360px]"
@@ -1950,7 +2007,7 @@ export function AdminFeedbackWorkspace({
                       : "border-transparent shadow-none"
                   } relative ${
                     isSplitPaneOpen
-                      ? "xl:self-start xl:h-[78vh] xl:min-h-[640px] xl:max-h-[900px]"
+                      ? "xl:self-start xl:h-[var(--split-pane-target-height,clamp(520px,68vh,760px))] xl:min-h-[520px] xl:max-h-[var(--split-pane-target-height,760px)]"
                       : "xl:h-0 xl:min-h-0 xl:max-h-0"
                   }`}
                   style={
@@ -1961,20 +2018,24 @@ export function AdminFeedbackWorkspace({
                       "--split-pane-space-comp": isSplitPaneOpen
                         ? splitPaneTopShift
                         : "0px",
+                      "--split-pane-target-height":
+                        splitPaneTargetHeight && splitPaneTargetHeight > 0
+                          ? `${splitPaneTargetHeight}px`
+                          : undefined,
                     } as CSSProperties
                   }
                 >
                   {selectedFeedback ? (
                     <div
                       ref={splitDetailContentRef}
-                      className="relative z-[2] flex h-full min-h-[560px] flex-col"
+                      className="relative z-[2] flex h-full min-h-[480px] flex-col"
                     >
                     <Tabs
                       value={activeEditTab}
                       onValueChange={(value) =>
                         setActiveEditTab(value as "details" | "manage")
                       }
-                      className="flex h-full min-h-[560px] flex-col"
+                      className="flex h-full min-h-[480px] flex-col"
                     >
                       <div className="shrink-0 border-b border-[#efe7dc] px-5 pb-4 pt-5">
                         <div className="mb-3 flex items-start justify-between gap-3">

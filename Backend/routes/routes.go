@@ -56,6 +56,10 @@ func AppRoutes(app *fiber.App) {
 	app.Put("/superadmin/categories/:id", controller.UpdateCategoryBySuperAdmin)
 	app.Delete("/superadmin/categories/:id", controller.DeleteCategoryBySuperAdmin)
 
+	// Superadmin - Stats
+	app.Get("/superadmin/stats/resolved-admins", controller.GetResolvedAdminsStats)
+	app.Get("/superadmin/stats/submissions-categories", controller.GetCategorySubmissionsStats)
+
 	// Feedbacks
 	app.Get("/feedbacks", controller.GetFeedbacks)
 	app.Get("/feedbacks/:id", controller.GetFeedbackByID)

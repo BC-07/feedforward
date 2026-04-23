@@ -60,6 +60,11 @@ export interface Category {
   updatedAt: string;
 }
 
+export interface SuperAdminBarStatRow {
+  label: string;
+  count: number;
+}
+
 interface ApiResponse<T> {
   retCode: string;
   message: string;
@@ -363,6 +368,24 @@ export async function loginSuperAdmin(payload: {
 
 export async function listAdmins(): Promise<Admin[]> {
   const data = await apiFetch<Admin[] | null>("/superadmin/admins");
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getResolvedAdminsLast7Days(
+  range: "1d" | "7d" | "30d" = "7d",
+): Promise<SuperAdminBarStatRow[]> {
+  const data = await apiFetch<SuperAdminBarStatRow[] | null>(
+    `/superadmin/stats/resolved-admins?range=${encodeURIComponent(range)}`,
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getCategorySubmissionsLast7Days(
+  range: "1d" | "7d" | "30d" = "7d",
+): Promise<SuperAdminBarStatRow[]> {
+  const data = await apiFetch<SuperAdminBarStatRow[] | null>(
+    `/superadmin/stats/submissions-categories?range=${encodeURIComponent(range)}`,
+  );
   return Array.isArray(data) ? data : [];
 }
 
