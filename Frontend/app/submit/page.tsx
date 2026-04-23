@@ -17,15 +17,15 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowRight, Copy, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { useDraftStorage } from "@/lib/useDraftStorage";
 import { toastApiError } from "@/lib/errorHandling";
 import { formatFeedbackText } from "@/lib/textFormat";
+import { FeedbackSuccessCard } from "@/components/feedback/FeedbackSuccessCard";
 
 interface FormData {
   type: string;
@@ -166,66 +166,15 @@ export default function Submit() {
   if (trackingId) {
     return (
       <div className="min-h-[calc(100vh-200px)] flex items-center justify-center bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
-        <Card className="max-w-lg w-full shadow-lg">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
-              <ArrowRight className="h-8 w-8 text-accent" />
-            </div>
-            <CardTitle>Feedback Submitted!</CardTitle>
-            <CardDescription>
-              Your feedback has been received successfully
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-muted rounded-lg p-4 text-center relative">
-              <p className="text-sm text-muted-foreground mb-2">
-                Your Tracking ID
-              </p>
-              <p className="text-2xl font-bold text-primary">{trackingId}</p>
-              <button
-                type="button"
-                className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-white/80 text-muted-foreground hover:bg-white hover:text-foreground"
-                onClick={() => copyToClipboard(trackingId)}
-                aria-label="Copy tracking ID"
-                title="Copy tracking ID"
-              >
-                <Copy className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="text-sm text-muted-foreground text-center">
-              Please save this tracking ID to check the status of your
-              submission.
-            </p>
-            {userEmail ? (
-              <p className="text-xs text-muted-foreground text-center">
-                A copy of this tracking ID was sent to {userEmail}.
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground text-center">
-                Sign in to receive email updates when your feedback is resolved.
-              </p>
-            )}
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                variant="outline"
-                className="flex-1 w-full"
-                onClick={() =>
-                  router.push(
-                    `/track?trackingId=${encodeURIComponent(trackingId)}`,
-                  )
-                }
-              >
-                Track Submission
-              </Button>
-              <Button
-                className="flex-1 w-full bg-accent hover:bg-accent/90"
-                onClick={() => setTrackingId(null)}
-              >
-                Submit Another
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <FeedbackSuccessCard
+          trackingId={trackingId}
+          email={userEmail}
+          onCopyTrackingId={copyToClipboard}
+          onTrackSubmission={(id) =>
+            router.push(`/track?trackingId=${encodeURIComponent(id)}`)
+          }
+          onSubmitAnother={() => setTrackingId(null)}
+        />
       </div>
     );
   }

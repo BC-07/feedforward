@@ -326,6 +326,14 @@
   will-change: transform, opacity;
 }
 
+.ff-step-slide-in-left {
+  animation: ffStepSlideInLeft 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.ff-step-slide-in-right {
+  animation: ffStepSlideInRight 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @keyframes ffModalBackdropIn {
   from {
     opacity: 0;
@@ -343,6 +351,35 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ffStepSlideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ffStepSlideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ff-step-slide-in-left,
+  .ff-step-slide-in-right {
+    animation: none;
   }
 }
 

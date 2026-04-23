@@ -65,6 +65,7 @@ import { formatFilterChipLabel } from "@/lib/filterUtils";
 import { formatFeedbackText } from "@/lib/textFormat";
 import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
 import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
+import { FeedbackSuccessCard } from "@/components/feedback/FeedbackSuccessCard";
 import {
   HoverFilterPopover,
   type HoverFilterItem,
@@ -90,6 +91,12 @@ import {
 } from "lucide-react";
 
 export type UserDashboardView = "home" | "my-submissions" | "submit-feedback";
+type CreateSubmissionStep = "form" | "confirm" | "success";
+const CREATE_SUBMISSION_STEP_ORDER: Record<CreateSubmissionStep, number> = {
+  form: 0,
+  confirm: 1,
+  success: 2,
+};
 
 const FEEDBACK_MESSAGE_MAX_LENGTH = 250;
 const FEEDBACK_SUBJECT_MAX_LENGTH = 50;
@@ -128,9 +135,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [isCreateSubmissionOpen, setIsCreateSubmissionOpen] = useState(false);
-  const [createSubmissionStep, setCreateSubmissionStep] = useState<
-    "form" | "confirm" | "success"
-  >("form");
+  const [createSubmissionStep, setCreateSubmissionStep] =
+    useState<CreateSubmissionStep>("form");
+  const [createSubmissionStepDirection, setCreateSubmissionStepDirection] =
+    useState<"forward" | "backward">("forward");
   const [createSubmissionTrackingId, setCreateSubmissionTrackingId] =
     useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -170,9 +178,12 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const submissionsScrollRef = useRef<HTMLDivElement | null>(null);
   const conversationScrollRef = useRef<HTMLDivElement | null>(null);
   const miniConversationScrollRef = useRef<HTMLDivElement | null>(null);
+  const createSubmissionDialogContentRef = useRef<HTMLDivElement | null>(null);
   const submissionsScrollTop = useRef(0);
   const feedbackSubmitLockRef = useRef(false);
   const submissionsScrollKey = "userDashboardSubmissionsScrollTop";
+  const [createSubmissionFormModalHeight, setCreateSubmissionFormModalHeight] =
+    useState<number | null>(null);
   const isHomeView = view === "home";
   const isMySubmissionsView = view === "my-submissions";
   const isSubmitView = view === "submit-feedback";
@@ -189,6 +200,16 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   useEffect(() => {
     setIsHydrated(true);
   }, []);
+
+  const goToCreateSubmissionStep = useCallback(
+    (nextStep: CreateSubmissionStep) => {
+      const currentOrder = CREATE_SUBMISSION_STEP_ORDER[createSubmissionStep];
+      const nextOrder = CREATE_SUBMISSION_STEP_ORDER[nextStep];
+      setCreateSubmissionStepDirection(nextOrder >= currentOrder ? "forward" : "backward");
+      setCreateSubmissionStep(nextStep);
+    },
+    [createSubmissionStep],
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -210,6 +231,33 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       department: localStorage.getItem("currentUserDepartment") || "",
     });
   }, [router]);
+
+  useLayoutEffect(() => {
+    if (!isCreateSubmissionOpen || createSubmissionStep !== "form") return;
+    if (typeof window === "undefined" || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const node = createSubmissionDialogContentRef.current;
+    if (!node) return;
+
+    const syncHeight = () => {
+      const height = Math.ceil(node.getBoundingClientRect().height);
+      if (height > 0) {
+        setCreateSubmissionFormModalHeight(height);
+      }
+    };
+
+    syncHeight();
+    const observer = new ResizeObserver(() => {
+      syncHeight();
+    });
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isCreateSubmissionOpen, createSubmissionStep]);
 
   // Draft storage handled by useDraftStorage.
 
@@ -440,7 +488,13 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       ...formData,
       category: formData.category.trim(),
     });
-    setCreateSubmissionStep("confirm");
+    const currentModalHeight = Math.ceil(
+      createSubmissionDialogContentRef.current?.getBoundingClientRect().height ?? 0,
+    );
+    if (currentModalHeight > 0) {
+      setCreateSubmissionFormModalHeight(currentModalHeight);
+    }
+    goToCreateSubmissionStep("confirm");
   };
 
   const handleCreateSubmissionConfirmSubmit = async () => {
@@ -474,7 +528,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       await loadUserFeedbacks(currentUser.id);
       toast.success("Feedback submitted successfully!");
       setCreateSubmissionTrackingId(newTrackingId);
-      setCreateSubmissionStep("success");
+      goToCreateSubmissionStep("success");
       setFormData(emptyForm);
       clearDraft();
       setConfirmData(emptyForm);
@@ -700,20 +754,81 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     return `${datePart} ${timePart}`;
   };
 
-  const formatMessagePreview = (value: string) => {
-    if (!value) return value;
-    let result = value.replace(/(^\s*[a-z])/, (match) => match.toUpperCase());
-    result = result.replace(/([.!?]\s+)([a-z])/g, (_, spacer, letter) => {
-      return spacer + String(letter).toUpperCase();
+  const submissionFieldClass =
+    "h-10 rounded-lg border-border/70 bg-background focus-visible:border-amber-400 focus-visible:ring-2 focus-visible:ring-amber-200/60";
+  const submissionActionButtonHeightClass = "h-9";
+  const formatConfirmSubmittedOn = (value: string) => {
+    const date = new Date(value);
+    const datePart = date.toLocaleDateString("en-US", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
-    return result;
+    const timePart = date.toLocaleTimeString("en-US", {
+      timeZone: "Asia/Manila",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    return `${datePart} · ${timePart}`;
+  };
+
+  const renderConfirmSummary = () => {
+    const nowIso = new Date().toISOString();
+    const previewSubject = confirmData.subject.trim() || "-";
+    const previewMessage = confirmData.message.trim() || "-";
+    const previewFeedback: Feedback = {
+      id: "preview",
+      type: confirmData.type || "-",
+      category: confirmData.category || "-",
+      priority: "Medium",
+      status: "Pending",
+      subject: previewSubject,
+      message: previewMessage,
+      userId: currentUser?.id ?? null,
+      userName: currentUser?.fullName || currentUser?.name || "",
+      userEmail: currentUser?.email || "",
+      isAnonymous,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      response: "",
+    };
+
+    return (
+      <div>
+        <FeedbackDetailsCard
+          feedback={previewFeedback}
+          title=""
+          className="rounded-none border-0 bg-transparent shadow-none"
+          compactNoTitleLayout
+          indentMessageFirstLineIfMultiline
+          fitMessageToContent
+          hidePriority
+          dateLabel="Date"
+          dateValue={previewFeedback.createdAt}
+          formatDate={formatConfirmSubmittedOn}
+          preSubjectContent={
+            <div className="grid grid-cols-1 gap-y-4">
+              <div className="space-y-1">
+                <Label className="text-muted-foreground">
+                  Submitted By
+                </Label>
+                <p className="pt-0.5 text-[0.98rem] font-medium break-words">
+                  {isAnonymous ? "*****" : currentUser?.fullName || currentUser?.name || "*****"}
+                </p>
+              </div>
+            </div>
+          }
+        />
+      </div>
+    );
   };
 
   const renderSubmissionForm = (
     idPrefix: string,
     onSubmit: (e: React.FormEvent) => void = handleSubmit,
   ) => (
-    <form onSubmit={onSubmit} className="space-y-5">
+    <form onSubmit={onSubmit} className="space-y-2">
       <div className="grid gap-2">
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-type`}>Feedback Type *</Label>
@@ -726,7 +841,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               }
               required
             >
-              <SelectTrigger id={`${idPrefix}-type`}>
+              <SelectTrigger
+                id={`${idPrefix}-type`}
+                className={submissionFieldClass}
+              >
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent className="z-[110]">
@@ -738,7 +856,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               </SelectContent>
             </Select>
           ) : (
-            <div className="h-10 rounded-md border bg-muted/30" aria-hidden="true" />
+            <div className="h-10 rounded-lg border bg-muted/30" aria-hidden="true" />
           )}
         </div>
 
@@ -753,7 +871,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               }
               required
             >
-              <SelectTrigger id={`${idPrefix}-category`}>
+              <SelectTrigger
+                id={`${idPrefix}-category`}
+                className={submissionFieldClass}
+              >
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent className="z-[110]">
@@ -765,7 +886,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               </SelectContent>
             </Select>
           ) : (
-            <div className="h-10 rounded-md border bg-muted/30" aria-hidden="true" />
+            <div className="h-10 rounded-lg border bg-muted/30" aria-hidden="true" />
           )}
         </div>
 
@@ -776,6 +897,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         <Input
           id={`${idPrefix}-subject`}
           placeholder="Brief summary of your feedback"
+          className={submissionFieldClass}
           value={formData.subject}
           maxLength={FEEDBACK_SUBJECT_MAX_LENGTH}
           disabled={isSubmittingFeedback}
@@ -795,7 +917,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           id={`${idPrefix}-message`}
           placeholder="Provide detailed information about your feedback..."
           rows={1}
-          className="ff-hide-scrollbar w-full max-w-full min-h-[2.5rem] overflow-hidden [field-sizing:content] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
+          className="ff-hide-scrollbar w-full max-w-full min-h-[2.5rem] max-h-[4rem] rounded-lg border-border/70 bg-background overflow-y-auto focus-visible:border-amber-400 focus-visible:ring-2 focus-visible:ring-amber-200/60 [field-sizing:content] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
           maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
           value={formData.message}
           disabled={isSubmittingFeedback}
@@ -832,7 +954,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
       <Button
         type="submit"
-        className="w-full bg-accent hover:bg-accent/90"
+        className={`${submissionActionButtonHeightClass} w-full rounded-lg bg-accent hover:bg-accent/90`}
         disabled={isSubmittingFeedback}
       >
         <Send className="mr-2 h-4 w-4" />
@@ -1278,6 +1400,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     );
   };
 
+  const createSubmissionStepAnimationClass =
+    createSubmissionStepDirection === "backward"
+      ? "ff-step-slide-in-right"
+      : "ff-step-slide-in-left";
+
   const renderCreateSubmissionDialog = () => (
     <Dialog
       open={isCreateSubmissionOpen}
@@ -1285,13 +1412,23 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         setIsCreateSubmissionOpen(open);
         if (!open) {
           setCreateSubmissionStep("form");
+          setCreateSubmissionStepDirection("forward");
           setCreateSubmissionTrackingId(null);
+          setCreateSubmissionFormModalHeight(null);
         }
       }}
     >
-      <DialogContent className="w-[calc(100%-1rem)] max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl sm:w-full sm:p-6 ff-hide-scrollbar">
+      <DialogContent
+        ref={createSubmissionDialogContentRef}
+        className="w-[calc(100%-1rem)] max-w-2xl max-h-[93vh] overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl transition-[height] duration-200 sm:w-full sm:p-6 ff-hide-scrollbar"
+        style={
+          createSubmissionStep === "confirm" && createSubmissionFormModalHeight
+            ? { height: `${createSubmissionFormModalHeight}px` }
+            : undefined
+        }
+      >
         {createSubmissionStep === "form" ? (
-          <>
+          <div key={`create-step-form-${createSubmissionStepDirection}`} className={createSubmissionStepAnimationClass}>
             <DialogHeader>
               <DialogTitle>Feedback Form</DialogTitle>
               <DialogDescription>
@@ -1302,129 +1439,60 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               "modal",
               handleCreateSubmissionFormSubmit,
             )}
-          </>
+          </div>
         ) : null}
         {createSubmissionStep === "confirm" ? (
-          <>
+          <div key={`create-step-confirm-${createSubmissionStepDirection}`} className={createSubmissionStepAnimationClass}>
             <DialogHeader>
               <DialogTitle>Confirm Your Feedback</DialogTitle>
               <DialogDescription>
-                Please review the details before submitting.
+                Review your details before we send this feedback.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                  <p className="text-[11px] font-semibold text-muted-foreground">
-                    TYPE
-                  </p>
-                  <p className="mt-1 text-sm font-semibold capitalize">
-                    {confirmData.type || "—"}
-                  </p>
-                </div>
-                <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                  <p className="text-[11px] font-semibold text-muted-foreground">
-                    CATEGORY
-                  </p>
-                  <p className="mt-1 text-sm font-semibold break-words break-all">
-                    {confirmData.category || "—"}
-                  </p>
-                </div>
-                <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                  <p className="text-[11px] font-semibold text-muted-foreground">
-                    ANONYMOUS
-                  </p>
-                  <p className="mt-1 text-sm font-semibold">
-                    {isAnonymous ? "Yes" : "No"}
-                  </p>
-                </div>
-              </div>
-              <div className="grid gap-4">
-                <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    SUBJECT
-                  </p>
-                  <p className="mt-1 font-semibold break-words break-all">
-                    {formatMessagePreview(confirmData.subject) || "—"}
-                  </p>
-                </div>
-                <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    MESSAGE
-                  </p>
-                  <div className="ff-hide-scrollbar mt-1 max-h-[160px] min-h-[160px] overflow-y-auto pr-1">
-                    <p className="text-sm leading-relaxed break-all">
-                      {formatMessagePreview(confirmData.message) || "—"}
-                    </p>
-                  </div>
-                </div>
-              </div>
+            <div className="ff-hide-scrollbar max-h-[284vh] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {renderConfirmSummary()}
             </div>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mx-auto mt-2 h-px w-[92%] bg-border/70" />
+            <div className="mt-[6px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 variant="outline"
-                onClick={() => setCreateSubmissionStep("form")}
+                className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 sm:min-w-[160px]`}
+                onClick={() => goToCreateSubmissionStep("form")}
               >
                 Back
               </Button>
               <Button
-                className="bg-accent hover:bg-accent/90"
+                className={`${submissionActionButtonHeightClass} rounded-lg bg-accent text-white hover:bg-accent/90 sm:min-w-[190px]`}
                 onClick={handleCreateSubmissionConfirmSubmit}
                 disabled={isSubmittingFeedback}
               >
                 {isSubmittingFeedback ? "Submitting feedback..." : "Confirm & Submit"}
               </Button>
             </div>
-          </>
+          </div>
         ) : null}
         {createSubmissionStep === "success" ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Feedback Submitted!</DialogTitle>
-              <DialogDescription>
-                Your feedback has been received successfully.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="w-full bg-muted rounded-lg p-4 text-center relative">
-                <p className="text-sm text-muted-foreground mb-2">
-                  Your Tracking ID
-                </p>
-                <p className="text-2xl font-bold text-primary">
-                  {createSubmissionTrackingId}
-                </p>
-                {createSubmissionTrackingId ? (
-                  <button
-                    type="button"
-                    className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-white/80 text-muted-foreground hover:bg-white hover:text-foreground"
-                    onClick={() => copyToClipboard(createSubmissionTrackingId)}
-                    aria-label="Copy tracking ID"
-                    title="Copy tracking ID"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                ) : null}
-              </div>
-              {currentUser?.email ? (
-                <p className="text-xs text-muted-foreground text-center">
-                  A copy of this tracking ID was sent to{" "}
-                  {currentUser.email}.
-                </p>
-              ) : null}
-              <div className="mt-2 flex justify-end">
-                <Button
-                  className="bg-accent hover:bg-accent/90"
-                  onClick={() => {
-                    setIsCreateSubmissionOpen(false);
-                    setCreateSubmissionStep("form");
-                    setCreateSubmissionTrackingId(null);
-                  }}
-                >
-                  Done
-                </Button>
-              </div>
+          createSubmissionTrackingId ? (
+            <div key={`create-step-success-${createSubmissionStepDirection}`} className={createSubmissionStepAnimationClass}>
+              <FeedbackSuccessCard
+                trackingId={createSubmissionTrackingId}
+                email={currentUser?.email}
+                className="w-full max-w-none gap-4 border-0 bg-transparent shadow-none"
+                onCopyTrackingId={copyToClipboard}
+                onTrackSubmission={(id) => {
+                  setIsCreateSubmissionOpen(false);
+                  setCreateSubmissionStep("form");
+                  setCreateSubmissionStepDirection("forward");
+                  setCreateSubmissionTrackingId(null);
+                  router.push(`/track?trackingId=${encodeURIComponent(id)}`);
+                }}
+                onSubmitAnother={() => {
+                  goToCreateSubmissionStep("form");
+                  setCreateSubmissionTrackingId(null);
+                }}
+              />
             </div>
-          </>
+          ) : null
         ) : null}
       </DialogContent>
     </Dialog>
@@ -1509,65 +1577,23 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           <DialogHeader>
             <DialogTitle>Confirm Your Feedback</DialogTitle>
             <DialogDescription>
-              Please review the details before submitting.
+              Review your details before we send this feedback.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                <p className="text-[11px] font-semibold text-muted-foreground">
-                  TYPE
-                </p>
-                <p className="mt-1 text-sm font-semibold capitalize">
-                  {confirmData.type || "—"}
-                </p>
-              </div>
-              <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                <p className="text-[11px] font-semibold text-muted-foreground">
-                  CATEGORY
-                </p>
-                <p className="mt-1 text-sm font-semibold break-words break-all">
-                  {confirmData.category || "—"}
-                </p>
-              </div>              <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                <p className="text-[11px] font-semibold text-muted-foreground">
-                  ANONYMOUS
-                </p>
-                <p className="mt-1 text-sm font-semibold">
-                  {isAnonymous ? "Yes" : "No"}
-                </p>
-              </div>
-            </div>
-            <div className="grid gap-4">
-              <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                <p className="text-xs font-semibold text-muted-foreground">
-                  SUBJECT
-                </p>
-                <p className="mt-1 font-semibold break-words break-all">
-                  {formatMessagePreview(confirmData.subject) || "—"}
-                </p>
-              </div>
-              <div className="min-w-0 rounded-lg border bg-white p-4 border-l-4 border-l-orange-400 pl-3">
-                <p className="text-xs font-semibold text-muted-foreground">
-                  MESSAGE
-                </p>
-                <div className="ff-hide-scrollbar mt-1 max-h-[160px] min-h-[160px] overflow-y-auto pr-1">
-                  <p className="text-sm leading-relaxed break-all">
-                    {formatMessagePreview(confirmData.message) || "—"}
-                  </p>
-                </div>
-              </div>
-            </div>
+          <div className="ff-hide-scrollbar max-h-[34vh] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {renderConfirmSummary()}
           </div>
-          <div className="mt-4 flex justify-end gap-2">
+          <div className="mx-auto mt-3 h-px w-[92%] bg-border/70" />
+          <div className="mt-[6px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               variant="outline"
+              className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 sm:min-w-[160px]`}
               onClick={() => setIsConfirmOpen(false)}
             >
-              Cancel
+              Back
             </Button>
             <Button
-              className="bg-accent hover:bg-accent/90"
+              className={`${submissionActionButtonHeightClass} rounded-lg bg-accent text-white hover:bg-accent/90 sm:min-w-[190px]`}
               onClick={handleConfirmSubmit}
               disabled={isSubmittingFeedback}
             >
