@@ -1362,7 +1362,7 @@ export function AdminFeedbackWorkspace({
                   style={{ color: ADMIN_FILTER_MUTED_COLOR }}
                 />
                 <Input
-                  placeholder="Search by ID, subject, or message."
+                  placeholder="Search by ID, subject, or name."
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   className={`${ADMIN_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}

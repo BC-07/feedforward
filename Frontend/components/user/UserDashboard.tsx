@@ -618,14 +618,14 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       .replace(/[_-]+/g, " ")
       .replace(/\s+/g, " ");
 
-  const getStatusIndicatorClass = (status: string) => {
+  const getStatusBadgeClass = (status: string) => {
     switch (normalizeStatus(status)) {
       case "pending":
-        return "border-amber-300/80 bg-amber-50 text-amber-700";
+        return "border-amber-300/80 bg-amber-50 text-amber-800";
       case "in progress":
-        return "border-orange-300/80 bg-orange-50 text-orange-700";
+        return "border-blue-300/80 bg-blue-50 text-blue-800";
       case "resolved":
-        return "border-emerald-300/80 bg-emerald-50 text-emerald-700";
+        return "border-emerald-300/80 bg-emerald-50 text-emerald-800";
       default:
         return "border-slate-300/80 bg-slate-50 text-slate-700";
     }
@@ -1176,6 +1176,17 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     [feedbacks],
   );
 
+  const notificationPanelMaxHeight = useMemo(() => {
+    const notificationCount = homeNotifications.length;
+    const viewportCap = isLargeScreen ? 387 : 520;
+    const contentAwareHeight =
+      notificationCount === 0
+        ? 180
+        : 136 + notificationCount * 76;
+
+    return Math.min(viewportCap, contentAwareHeight);
+  }, [homeNotifications.length, isLargeScreen]);
+
   const renderHomeSubmissionGrid = (
     items: Feedback[],
     emptyMessage: string,
@@ -1201,39 +1212,44 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             className="w-full text-left"
           >
             <Card className="h-full border shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
-              <CardContent className="space-y-3 p-4">
+              <CardContent className="flex h-full flex-col gap-3 p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="line-clamp-2 break-words font-semibold leading-snug">
-                    {feedback.subject}
+                  <p className="min-h-[1.25rem] break-all font-mono text-xs text-muted-foreground">
+                    {feedback.id}
                   </p>
                   <span className="whitespace-nowrap text-[11px] text-muted-foreground">
                     {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                   </span>
                 </div>
-                <p className="break-all font-mono text-xs text-muted-foreground">
-                  {feedback.id}
+                <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug">
+                  {feedback.subject}
                 </p>
-                <p className="line-clamp-2 text-sm text-muted-foreground">
+                <p
+                  className={`line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground ${
+                    feedback.message.trim().length > 70 && /\s/.test(feedback.message.trim())
+                      ? "indent-5"
+                      : ""
+                  }`}
+                >
                   {feedback.message}
                 </p>
-                <div className="flex items-center justify-between">
+                <div className="mt-auto flex items-center justify-between">
                   <span className="rounded-md border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
                     {feedback.category}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center">
                     {(() => {
                       const StatusIcon = getStatusIcon(feedback.status);
                       return (
-                        <>
-                          <span
-                            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${getStatusIndicatorClass(
-                              feedback.status,
-                            )}`}
-                          >
-                            <StatusIcon className="h-3 w-3" />
-                          </span>
+                        <Badge
+                          variant="outline"
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                            feedback.status,
+                          )}`}
+                        >
+                          <StatusIcon className="h-3.5 w-3.5" />
                           {feedback.status}
-                        </>
+                        </Badge>
                       );
                     })()}
                   </span>
@@ -1621,7 +1637,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       </AlertDialog>
       <div
         className={`mx-auto w-full px-4 ${
-          isHomeView ? "pt-4 pb-4 sm:px-6 sm:pt-5 sm:pb-5" : "py-6 sm:px-6 sm:py-8"
+          isHomeView || isMySubmissionsView
+            ? "pt-4 pb-4 sm:px-6 sm:pt-5 sm:pb-5"
+            : "py-6 sm:px-6 sm:py-8"
         } ${
           isMySubmissionsView || isHomeView ? "max-w-none" : "max-w-5xl"
         }`}
@@ -1690,10 +1708,25 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
                     <div className="min-w-0">
                       <Tabs defaultValue="latest">
-                        <TabsList className="grid w-full grid-cols-3 gap-2 p-1">
-                          <TabsTrigger value="latest" className="h-full">Latest</TabsTrigger>
-                          <TabsTrigger value="attention" className="h-full">Needs Attention</TabsTrigger>
-                          <TabsTrigger value="updated" className="h-full">Recently Updated</TabsTrigger>
+                        <TabsList className="grid h-11 w-full grid-cols-3 gap-1 rounded-xl border border-border/60 bg-muted/50 p-1">
+                          <TabsTrigger
+                            value="latest"
+                            className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                          >
+                            Latest
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="attention"
+                            className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                          >
+                            Needs Attention
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="updated"
+                            className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                          >
+                            Recently Updated
+                          </TabsTrigger>
                         </TabsList>
                         <TabsContent value="latest" className="mt-3">
                           {renderHomeSubmissionGrid(
@@ -1715,12 +1748,15 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                         </TabsContent>
                       </Tabs>
                     </div>
-                    <Card className="h-full max-h-[520px] xl:max-h-[387px] border shadow-sm flex flex-col overflow-hidden">
-                      <CardHeader className="pb-0">
+                    <Card
+                      className="h-full border border-border/80 bg-slate-50/45 shadow-sm flex flex-col overflow-hidden"
+                      style={{ maxHeight: `${notificationPanelMaxHeight}px` }}
+                    >
+                      <CardHeader className="pb-0 pt-4">
                         <CardTitle className="text-base">Notifications</CardTitle>
                         <CardDescription>Unresolved updates</CardDescription>
                       </CardHeader>
-                      <CardContent className="-mt-3 flex-1 min-h-0 space-y-1.5 pt-0 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                      <CardContent className="-mt-4 flex-1 min-h-0 space-y-1.5 bg-slate-50/35 pt-0 pb-3 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                         {homeNotifications.length === 0 ? (
                           <p className="text-sm text-muted-foreground">
                             No unread updates.
@@ -1731,7 +1767,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               key={feedback.id}
                               type="button"
                               onClick={() => handleViewFeedback(feedback)}
-                              className="w-full rounded-md border border-border/70 p-2 text-left hover:bg-muted/30"
+                              className="w-full rounded-md border border-border/70 bg-white/80 p-2 text-left shadow-[0_0_0_1px_rgba(15,23,42,0.05)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-muted/30 hover:shadow-md"
                             >
                               <p className="line-clamp-1 text-sm font-medium">
                                 {feedback.subject}
@@ -1943,18 +1979,17 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                   {(() => {
                                     const StatusIcon = getStatusIcon(feedback.status);
                                     return (
-                                      <>
-                                        <span
-                                          className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${getStatusIndicatorClass(
-                                            feedback.status,
-                                          )}`}
-                                        >
-                                          <StatusIcon className="h-3.5 w-3.5" />
-                                        </span>
-                                        <span className="text-xs text-muted-foreground">
+                                      <Badge
+                                        variant="outline"
+                                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                                          feedback.status,
+                                        )}`}
+                                      >
+                                        <StatusIcon className="h-3.5 w-3.5" />
+                                        <span className="leading-none">
                                           {feedback.status}
                                         </span>
-                                      </>
+                                      </Badge>
                                     );
                                   })()}
                                 </span>
