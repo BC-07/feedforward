@@ -56,16 +56,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
@@ -91,6 +81,8 @@ import {
   MessageCircle,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Trash2,
   X,
   Copy,
@@ -102,6 +94,7 @@ export type UserDashboardView = "home" | "my-submissions" | "submit-feedback";
 const FEEDBACK_MESSAGE_MAX_LENGTH = 250;
 const FEEDBACK_SUBJECT_MAX_LENGTH = 50;
 const CONVERSATION_MESSAGE_MAX_LENGTH = 2000;
+const USER_MESSAGE_BUBBLE_CLASS = "border border-[#E0A400] bg-[#F4B000] text-white";
 const SUBMISSION_FILTER_TEXT_COLOR = "#171717";
 const SUBMISSION_FILTER_CONTROL_CLASS =
   "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
@@ -645,18 +638,26 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+    const date = new Date(dateString);
+    const datePart = date.toLocaleDateString("en-US", {
       year: "numeric",
-      month: "long",
+      month: "short",
       day: "numeric",
-      hour: "2-digit",
+    });
+    const timePart = date.toLocaleTimeString("en-US", {
+      hour: "numeric",
       minute: "2-digit",
     });
+    return `${datePart} · ${timePart}`;
   };
 
   const closeSelectedFeedback = useCallback(() => {
     setMessageDraft("");
     setSelectedFeedback(null);
+  }, []);
+
+  const closeMiniChat = useCallback(() => {
+    setIsMiniChatOpen(false);
   }, []);
 
   const handleAttemptCloseSelectedFeedback = useCallback(() => {
@@ -1133,8 +1134,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         .sort(
           (a, b) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        )
-        .slice(0, 6),
+        ),
     [feedbacks],
   );
 
@@ -1148,8 +1148,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         .sort(
           (a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-        )
-        .slice(0, 6),
+        ),
     [feedbacks],
   );
 
@@ -1159,8 +1158,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         .sort(
           (a, b) =>
             new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-        )
-        .slice(0, 6),
+        ),
     [feedbacks],
   );
 
@@ -1203,62 +1201,80 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     }
 
     return (
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {visibleItems.map((feedback) => (
-          <button
-            key={feedback.id}
-            type="button"
-            onClick={() => handleViewFeedback(feedback)}
-            className="w-full text-left"
-          >
-            <Card className="h-full border shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
-              <CardContent className="flex h-full flex-col gap-3 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="min-h-[1.25rem] break-all font-mono text-xs text-muted-foreground">
-                    {feedback.id}
+      <>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {visibleItems.map((feedback) => (
+            <button
+              key={feedback.id}
+              type="button"
+              onClick={() => handleViewFeedback(feedback)}
+              className="w-full text-left"
+            >
+              <Card className="h-full border shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
+                <CardContent className="flex h-full flex-col gap-3 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-h-[1.25rem] break-all font-mono text-xs text-muted-foreground">
+                      {feedback.id}
+                    </p>
+                    <span className="whitespace-nowrap text-[11px] text-muted-foreground">
+                      {new Date(feedback.createdAt).toLocaleDateString("en-US")}
+                    </span>
+                  </div>
+                  <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug">
+                    {feedback.subject}
                   </p>
-                  <span className="whitespace-nowrap text-[11px] text-muted-foreground">
-                    {new Date(feedback.createdAt).toLocaleDateString("en-US")}
-                  </span>
-                </div>
-                <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug">
-                  {feedback.subject}
-                </p>
-                <p
-                  className={`line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground ${
-                    feedback.message.trim().length > 70 && /\s/.test(feedback.message.trim())
-                      ? "indent-5"
-                      : ""
-                  }`}
-                >
-                  {feedback.message}
-                </p>
-                <div className="mt-auto flex items-center justify-between">
-                  <span className="rounded-md border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
-                    {feedback.category}
-                  </span>
-                  <span className="inline-flex items-center">
-                    {(() => {
-                      const StatusIcon = getStatusIcon(feedback.status);
-                      return (
-                        <Badge
-                          variant="outline"
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
-                            feedback.status,
-                          )}`}
-                        >
-                          <StatusIcon className="h-3.5 w-3.5" />
-                          {feedback.status}
-                        </Badge>
-                      );
-                    })()}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </button>
-        ))}
-      </div>
+                  <p
+                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground ${
+                      feedback.message.trim().length > 70 && /\s/.test(feedback.message.trim())
+                        ? "indent-5"
+                        : ""
+                    }`}
+                  >
+                    {feedback.message}
+                  </p>
+                  <div className="mt-auto flex items-center justify-between">
+                    <span className="rounded-md border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
+                      {feedback.category}
+                    </span>
+                    <span className="inline-flex items-center">
+                      {(() => {
+                        const StatusIcon = getStatusIcon(feedback.status);
+                        return (
+                          <Badge
+                            variant="outline"
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                              feedback.status,
+                            )}`}
+                          >
+                            <StatusIcon className="h-3.5 w-3.5" />
+                            {feedback.status}
+                          </Badge>
+                        );
+                      })()}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </button>
+          ))}
+        </div>
+        <div className="mt-2 flex items-center justify-between px-1 text-xs text-muted-foreground">
+          <p>
+            {items.length > visibleItems.length
+              ? `Showing ${visibleItems.length} of ${items.length} items`
+              : `Showing all ${visibleItems.length} item${visibleItems.length === 1 ? "" : "s"}`}
+          </p>
+          {items.length > visibleItems.length ? (
+            <button
+              type="button"
+              className="font-medium text-accent hover:underline"
+              onClick={() => router.push("/user/my-submissions")}
+            >
+              View all
+            </button>
+          ) : null}
+        </div>
+      </>
     );
   };
 
@@ -1611,30 +1627,36 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           </div>
         </DialogContent>
       </Dialog>
-      <AlertDialog
-        open={isUnsentMessageDialogOpen}
-        onOpenChange={setIsUnsentMessageDialogOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard unsent message?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have a message that has not been sent yet.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setIsUnsentMessageDialogOpen(false);
-                closeSelectedFeedback();
-              }}
-            >
-              Discard
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {isUnsentMessageDialogOpen ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg">
+            <div className="space-y-2 text-left">
+              <h2 className="text-lg font-semibold">Discard unsent message?</h2>
+              <p className="text-muted-foreground text-sm">
+                You have a message that has not been sent yet.
+              </p>
+            </div>
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsUnsentMessageDialogOpen(false)}
+              >
+                Keep
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setIsUnsentMessageDialogOpen(false);
+                  closeSelectedFeedback();
+                }}
+              >
+                Discard
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div
         className={`mx-auto w-full px-4 ${
           isHomeView || isMySubmissionsView
@@ -2104,7 +2126,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   onClick={handleAttemptCloseSelectedFeedback}
                 />
                 <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
-                  <CardHeader className="space-y-3">
+                  <CardHeader className="space-y-0 pb-0">
                     <div className="flex items-center justify-between gap-3">
                       <CardTitle>Feedback Details</CardTitle>
                       <Button
@@ -2121,26 +2143,31 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       {selectedFeedback.id}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-6">
-                  <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-                  <FeedbackStatusCard
-                    feedback={selectedFeedback}
-                    formatDate={formatDate}
-                    className="xl:col-span-6 h-full"
-                  />
+                  <CardContent className="ff-hide-scrollbar flex-1 min-h-0 overflow-y-auto space-y-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="w-full">
+                    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                      <FeedbackStatusCard
+                        feedback={selectedFeedback}
+                        formatDate={formatDate}
+                        className="h-[27.5rem]"
+                      />
 
-                  <div className="xl:col-span-6">
-                    <FeedbackDetailsCard
-                      feedback={selectedFeedback}
-                      title="Feedback Details"
-                      formatDate={formatDate}
-                      className="h-full"
-                    />
-                  </div>
+                      <div>
+                        <FeedbackDetailsCard
+                          feedback={selectedFeedback}
+                          title="Feedback Details"
+                          formatDate={formatDate}
+                          className="h-[27.5rem]"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <Card className="shadow-lg bg-muted/40 border-border">
-                    <CardContent className="pt-6">
+                  <Card className="shadow-lg bg-muted/40 border-border gap-2">
+                    <CardHeader className="pb-0">
+                      <CardTitle className="text-base">Feedback Updates</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
                       <div className="grid max-h-[420px] min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-xl border border-border bg-white/70">
                         <div
                           ref={conversationScrollRef}
@@ -2219,18 +2246,18 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                       <div
                                         className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUser ? "text-right" : "text-left"}`}
                                       >
-                                        {showName ? (
+                                        {showName && !isUser ? (
                                           <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
                                             {name}
                                           </p>
                                         ) : null}
-                                        <div
-                                          className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                                            isUser
-                                              ? "bg-accent text-white"
-                                              : "border border-border bg-white text-foreground"
-                                          }`}
-                                        >
+                                          <div
+                                            className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                                              isUser
+                                                ? USER_MESSAGE_BUBBLE_CLASS
+                                                : "border border-border bg-slate-50 text-foreground"
+                                            }`}
+                                          >
                                           <p
                                             className={`whitespace-pre-line leading-relaxed ${
                                               hasVeryLongToken
@@ -2303,23 +2330,27 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   </Card>
                   </CardContent>
 
-                  <div className="pointer-events-none absolute bottom-0 right-5 z-20 flex flex-col items-end gap-2">
-                    {isMiniChatOpen ? (
-                      <div className="pointer-events-auto h-[360px] w-[320px] overflow-hidden rounded-xl border border-border bg-white shadow-xl">
-                        <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-2">
+                  <div className="pointer-events-none absolute bottom-0 right-6 z-20">
+                    <div className="relative h-[360px] w-[320px]">
+                      <div
+                        className={`pointer-events-auto absolute bottom-0 right-0 z-10 h-[360px] w-[320px] overflow-hidden rounded-t-xl border-2 border-slate-300 bg-white shadow-2xl transition-transform duration-500 ease-in-out ${
+                          isMiniChatOpen
+                            ? "translate-y-0"
+                            : "translate-y-[calc(100%-2.30rem)]"
+                        }`}
+                      >
+                        <div
+                          className="flex cursor-pointer items-center justify-between border-b border-border bg-muted/40 px-3 py-2 transition-colors hover:bg-muted/70"
+                          onClick={() => setIsMiniChatOpen((prev) => !prev)}
+                        >
                           <p className="text-sm font-semibold text-foreground">
-                            Quick Chat
+                            Message window
                           </p>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => setIsMiniChatOpen(false)}
-                            aria-label="Collapse quick chat"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                          {isMiniChatOpen ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          )}
                         </div>
                         <div className="grid h-[calc(100%-40px)] grid-rows-[minmax(0,1fr)_auto]">
                           <div
@@ -2395,7 +2426,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                         <div
                                           className={`group relative w-fit min-w-0 max-w-[85%] ${isUser ? "text-right" : "text-left"}`}
                                         >
-                                          {showName ? (
+                                          {showName && !isUser ? (
                                             <p className="mb-1 px-1 text-[11px] font-semibold text-muted-foreground">
                                               {name}
                                             </p>
@@ -2403,8 +2434,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                           <div
                                             className={`rounded-2xl px-3 py-2 text-xs ${
                                               isUser
-                                                ? "bg-accent text-white"
-                                                : "border border-border bg-white text-foreground"
+                                                ? USER_MESSAGE_BUBBLE_CLASS
+                                                : "border border-border bg-slate-50 text-foreground"
                                             }`}
                                           >
                                             <p className="whitespace-pre-line break-words">
@@ -2471,7 +2502,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           </div>
                         </div>
                       </div>
-                    ) : null}
+                    </div>
 
                     <button
                       type="button"
@@ -2481,9 +2512,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           : "Open quick chat"
                       }
                       onClick={() => setIsMiniChatOpen((prev) => !prev)}
-                      className="pointer-events-auto h-8 rounded-t-xl border border-b-0 border-border bg-muted/90 px-4 text-xs font-semibold text-foreground shadow-md transition-colors hover:bg-muted"
+                      className="pointer-events-auto absolute bottom-0 right-0 z-0 h-8 w-[320px] cursor-pointer rounded-t-md border border-b-0 border-border bg-muted/90 px-6 text-xs font-semibold text-foreground shadow-md transition-colors hover:bg-muted"
                     >
-                      {isMiniChatOpen ? "Hide Chat" : "Quick Chat"}
+                      {isMiniChatOpen ? "Updates" : "Updates"}
                     </button>
                   </div>
                 </Card>

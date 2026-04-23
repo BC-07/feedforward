@@ -12,6 +12,9 @@ type FeedbackDetailsCardProps = {
   preSubjectContent?: ReactNode;
 };
 
+const MESSAGE_VISIBLE_LINES = 5;
+const MESSAGE_LINE_HEIGHT_REM = 1.45;
+
 const defaultFormatDate = (value: string) =>
   new Date(value).toLocaleDateString("en-US", {
     year: "numeric",
@@ -41,18 +44,19 @@ export function FeedbackDetailsCard({
   className,
   preSubjectContent,
 }: FeedbackDetailsCardProps) {
+  const messageViewportHeightRem = MESSAGE_VISIBLE_LINES * MESSAGE_LINE_HEIGHT_REM;
   const hasTitle = Boolean(title?.trim());
   const contentClassName = hasTitle
-    ? "space-y-2.5 overflow-hidden"
+    ? "flex h-full min-h-0 flex-col space-y-2.5 overflow-hidden"
     : "space-y-8 overflow-hidden pt-4";
   const gridClassName = hasTitle
     ? "grid grid-cols-1 gap-2 sm:grid-cols-2"
     : "grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2";
 
   return (
-    <Card className={["shadow-lg", className].filter(Boolean).join(" ")}>
+    <Card className={["gap-2 shadow-lg", className].filter(Boolean).join(" ")}>
       {hasTitle ? (
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-1">
           <CardTitle className="text-lg">{title}</CardTitle>
         </CardHeader>
       ) : null}
@@ -76,9 +80,11 @@ export function FeedbackDetailsCard({
               {feedback.priority}
             </p>
           </div>
-          <div className={hasTitle ? undefined : "space-y-1"}>
+          <div className={hasTitle ? "sm:col-span-2" : "space-y-1"}>
             <p className="text-xs font-semibold text-muted-foreground">Last Updated</p>
-            <p className="mt-0.5 text-[0.98rem] font-medium">{formatDate(feedback.updatedAt)}</p>
+            <p className="mt-0.5 text-[0.96rem] font-medium whitespace-nowrap">
+              {formatDate(feedback.updatedAt)}
+            </p>
           </div>
         </div>
 
@@ -86,8 +92,17 @@ export function FeedbackDetailsCard({
 
         <div className={hasTitle ? "space-y-1" : "space-y-3"}>
           <p className="text-xs font-semibold text-muted-foreground">Subject</p>
-          <p className="text-[0.98rem] font-semibold break-words">{feedback.subject}</p>
-          <p className="mt-0.5 max-h-36 overflow-y-auto pr-1 text-[0.9rem] leading-relaxed [text-align:justify] [text-justify:inter-word] [text-indent:1rem] [overflow-wrap:anywhere] break-words hyphens-auto">
+          <p className="line-clamp-2 text-[0.98rem] font-semibold break-words">
+            {feedback.subject}
+          </p>
+          <p
+            className="ff-hide-scrollbar mt-0.5 overflow-y-auto pr-1 text-[0.9rem] leading-[1.45rem] [text-align:justify] [text-justify:inter-word] [text-indent:1rem] [overflow-wrap:anywhere] break-words hyphens-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            style={{
+              height: `${messageViewportHeightRem}rem`,
+              scrollbarWidth: "none",
+              msOverflowStyle: "none",
+            }}
+          >
             {feedback.message}
           </p>
         </div>
