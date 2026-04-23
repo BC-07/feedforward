@@ -800,9 +800,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           feedback={previewFeedback}
           title=""
           className="rounded-none border-0 bg-transparent shadow-none"
+          messageVisibleLines={4}
           compactNoTitleLayout
           indentMessageFirstLineIfMultiline
-          fitMessageToContent
           hidePriority
           dateLabel="Date"
           dateValue={previewFeedback.createdAt}
@@ -828,7 +828,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     idPrefix: string,
     onSubmit: (e: React.FormEvent) => void = handleSubmit,
   ) => (
-    <form onSubmit={onSubmit} className="space-y-2">
+    <form onSubmit={onSubmit} className="space-y-2 pt-2">
       <div className="grid gap-2">
         <div className="space-y-2">
           <Label htmlFor={`${idPrefix}-type`}>Feedback Type *</Label>
@@ -1442,18 +1442,21 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           </div>
         ) : null}
         {createSubmissionStep === "confirm" ? (
-          <div key={`create-step-confirm-${createSubmissionStepDirection}`} className={createSubmissionStepAnimationClass}>
+          <div
+            key={`create-step-confirm-${createSubmissionStepDirection}`}
+            className={`${createSubmissionStepAnimationClass} flex h-full min-h-0 flex-col`}
+          >
             <DialogHeader>
               <DialogTitle>Confirm Your Feedback</DialogTitle>
               <DialogDescription>
                 Review your details before we send this feedback.
               </DialogDescription>
             </DialogHeader>
-            <div className="ff-hide-scrollbar max-h-[284vh] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {renderConfirmSummary()}
             </div>
-            <div className="mx-auto mt-2 h-px w-[92%] bg-border/70" />
-            <div className="mt-[6px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <div className="mx-auto mt-5 h-px w-[92%] bg-border/70" />
+            <div className="mt-[10px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 variant="outline"
                 className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 sm:min-w-[160px]`}
@@ -1479,12 +1482,24 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                 email={currentUser?.email}
                 className="w-full max-w-none gap-4 border-0 bg-transparent shadow-none"
                 onCopyTrackingId={copyToClipboard}
-                onTrackSubmission={(id) => {
+                onTrackSubmission={async (id) => {
                   setIsCreateSubmissionOpen(false);
                   setCreateSubmissionStep("form");
                   setCreateSubmissionStepDirection("forward");
                   setCreateSubmissionTrackingId(null);
-                  router.push(`/track?trackingId=${encodeURIComponent(id)}`);
+
+                  const existingFeedback = feedbacks.find((feedback) => feedback.id === id);
+                  if (existingFeedback) {
+                    await handleViewFeedback(existingFeedback);
+                    return;
+                  }
+
+                  try {
+                    const latest = await getFeedback(id);
+                    setSelectedFeedback(latest);
+                  } catch {
+                    toast.error("Unable to open submission details right now.");
+                  }
                 }}
                 onSubmitAnother={() => {
                   goToCreateSubmissionStep("form");
@@ -1573,18 +1588,18 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         </div>
       )}
       <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <DialogContent className="w-[calc(100%-1.5rem)] max-w-lg max-h-[90vh] overflow-y-auto p-5 sm:w-full sm:p-6">
+      <DialogContent className="w-[calc(100%-1.5rem)] max-w-lg max-h-[90vh] flex flex-col overflow-hidden p-5 sm:w-full sm:p-6">
           <DialogHeader>
             <DialogTitle>Confirm Your Feedback</DialogTitle>
             <DialogDescription>
               Review your details before we send this feedback.
             </DialogDescription>
           </DialogHeader>
-          <div className="ff-hide-scrollbar max-h-[34vh] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {renderConfirmSummary()}
           </div>
-          <div className="mx-auto mt-3 h-px w-[92%] bg-border/70" />
-          <div className="mt-[6px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <div className="mx-auto mt-5 h-px w-[92%] bg-border/70" />
+          <div className="mt-[10px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button
               variant="outline"
               className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 sm:min-w-[160px]`}

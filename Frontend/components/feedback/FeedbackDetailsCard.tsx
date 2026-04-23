@@ -66,13 +66,14 @@ export function FeedbackDetailsCard({
   const contentClassName = hasTitle
     ? "flex h-full min-h-0 flex-col space-y-2.5 overflow-hidden"
     : compactNoTitleLayout
-      ? "space-y-4 overflow-visible pt-2 px-0"
+      ? "space-y-4 overflow-visible pt-4 px-0"
       : "space-y-8 overflow-hidden pt-4";
   const gridClassName = hasTitle
     ? "grid grid-cols-1 gap-2 sm:grid-cols-2"
     : compactNoTitleLayout
-      ? "grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2"
+      ? "grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2"
       : "grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2";
+  const compactMetaItemClass = compactNoTitleLayout ? "space-y-2" : "space-y-1";
   const shouldIndentMessage = indentMessageFirstLineIfMultiline && isMessageMultiline;
 
   useEffect(() => {
@@ -110,16 +111,16 @@ export function FeedbackDetailsCard({
       ) : null}
       <CardContent className={contentClassName}>
         <div className={gridClassName}>
-          <div className={hasTitle ? undefined : "space-y-1"}>
+          <div className={hasTitle ? undefined : compactMetaItemClass}>
             <p className="text-xs font-semibold text-muted-foreground">Type</p>
             <p className="mt-0.5 text-[0.98rem] font-medium capitalize">{feedback.type}</p>
           </div>
-          <div className={hasTitle ? undefined : "space-y-1"}>
+          <div className={hasTitle ? undefined : compactMetaItemClass}>
             <p className="text-xs font-semibold text-muted-foreground">Category</p>
             <p className="mt-0.5 text-[0.98rem] font-medium">{feedback.category}</p>
           </div>
           {!hidePriority ? (
-            <div className={hasTitle ? undefined : "space-y-1"}>
+            <div className={hasTitle ? undefined : compactMetaItemClass}>
               <p className="text-xs font-semibold text-muted-foreground">Priority</p>
               <p
                 className={`mt-0.5 text-[0.98rem] font-medium capitalize ${getPriorityColor(
@@ -130,7 +131,7 @@ export function FeedbackDetailsCard({
               </p>
             </div>
           ) : null}
-          <div className={hasTitle ? "sm:col-span-2" : "space-y-1"}>
+          <div className={hasTitle ? "sm:col-span-2" : compactMetaItemClass}>
             <p className="text-xs font-semibold text-muted-foreground">{dateLabel}</p>
             <p className="mt-0.5 text-[0.96rem] font-medium whitespace-nowrap">
               {renderedDate}
@@ -144,7 +145,7 @@ export function FeedbackDetailsCard({
           <div className="relative -mx-4 rounded-[1.75rem] bg-background/70 sm:-mx-5">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 z-20 rounded-[1.75rem] border border-border/70"
+              className="pointer-events-none absolute inset-0 z-20 rounded-[1.75rem] border-2 border-[#c8c8c8] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]"
             />
             <div className="relative z-10 px-4 py-4 sm:px-5">
               <p className="text-xs font-semibold text-muted-foreground">Subject</p>
