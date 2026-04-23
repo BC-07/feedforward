@@ -115,7 +115,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
+    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white via-orange-50 to-white px-4 py-8 sm:py-12">
       <div className="container mx-auto flex min-h-full max-w-md items-center justify-center">
         <Card className="w-full shadow-lg">
           <CardHeader className="text-center">

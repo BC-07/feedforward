@@ -96,7 +96,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
+    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white via-orange-50 to-white px-4 py-8 sm:py-12">
       <div className="container mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-6">
         <Card className="w-full shadow-lg">
           <CardHeader className="text-center">
