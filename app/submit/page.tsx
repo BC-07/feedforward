@@ -78,6 +78,14 @@ export default function Submit() {
 
   // Draft storage handled by useDraftStorage.
 
+  // Check if form is valid (all required fields filled)
+  const isFormValid = !!(
+    formData.type.trim() &&
+    formData.category.trim() &&
+    formData.subject.trim() &&
+    formData.message.trim()
+  );
+
   const copyToClipboard = (text: string) => {
     const textArea = document.createElement("textarea");
     textArea.value = text;
@@ -338,7 +346,7 @@ export default function Submit() {
                 type="submit"
                 className="w-full bg-accent hover:bg-accent/90"
                 size="lg"
-                disabled={isSubmittingFeedback}
+                disabled={isSubmittingFeedback || !isFormValid}
               >
                 <Send className="mr-2 h-4 w-4" />
                 {isSubmittingFeedback ? "Submitting feedback..." : "Submit Feedback"}

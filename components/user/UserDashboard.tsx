@@ -1924,11 +1924,18 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     </Card>
                   ) : (
                     paginatedFilteredFeedbacks.map((feedback) => (
-                      <button
+                      <div
                         key={`mobile-${feedback.id}`}
-                        type="button"
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleViewFeedback(feedback)}
-                        className="w-full text-left"
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            void handleViewFeedback(feedback);
+                          }
+                        }}
+                        className="w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2"
                       >
                         <Card className="border border-border/75 bg-white shadow-sm">
                           <CardContent className="space-y-3 p-4">
@@ -1991,7 +1998,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                             </div>
                           </CardContent>
                         </Card>
-                      </button>
+                      </div>
                     ))
                   )}
                 </div>
