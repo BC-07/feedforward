@@ -271,14 +271,66 @@ export const createFeedback = (data: {
     body: toBody(data),
   });
 
-export async function listFeedbacks(filters: { userId?: string; category?: string }): Promise<Feedback[]> {
+type ListFeedbackFilters = {
+  userId?: string;
+  category?: string;
+  search?: string;
+  type?: string;
+  status?: string;
+  priority?: string;
+};
+
+function normalizeStatusValue(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+export async function listFeedbacks(filters: ListFeedbackFilters = {}): Promise<Feedback[]> {
+  let result: Feedback[] = [];
+
   if (filters.userId && filters.userId.trim()) {
-    return apiFetch<Feedback[]>(`/feedbacks/user/${encodeURIComponent(filters.userId)}`, { method: "GET" });
+    result = await apiFetch<Feedback[]>(
+      `/feedbacks/user/${encodeURIComponent(filters.userId)}`,
+      { method: "GET" },
+    );
+  } else if (filters.category && filters.category.trim()) {
+    result = await apiFetch<Feedback[]>(
+      `/feedbacks/unit/${encodeURIComponent(filters.category)}`,
+      { method: "GET" },
+    );
+  } else {
+    return [];
   }
-  if (filters.category && filters.category.trim()) {
-    return apiFetch<Feedback[]>(`/feedbacks/unit/${encodeURIComponent(filters.category)}`, { method: "GET" });
+
+  const search = filters.search?.trim().toLowerCase();
+  const type = filters.type?.trim().toLowerCase();
+  const priority = filters.priority?.trim().toLowerCase();
+  const normalizedStatusFilter = filters.status
+    ? normalizeStatusValue(filters.status)
+    : undefined;
+
+  if (!search && !type && !priority && !normalizedStatusFilter) {
+    return result;
   }
-  return [];
+
+  return result.filter((feedback) => {
+    const matchesSearch =
+      !search ||
+      feedback.id.toLowerCase().includes(search) ||
+      feedback.subject.toLowerCase().includes(search) ||
+      feedback.message.toLowerCase().includes(search) ||
+      feedback.category.toLowerCase().includes(search);
+    const matchesType = !type || feedback.type.toLowerCase() === type;
+    const matchesPriority = !priority || feedback.priority.toLowerCase() === priority;
+    const matchesStatus =
+      !normalizedStatusFilter ||
+      normalizeStatusValue(feedback.status) === normalizedStatusFilter;
+
+    return matchesSearch && matchesType && matchesPriority && matchesStatus;
+  });
 }
 
 export const getFeedback = (id: string) =>

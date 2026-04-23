@@ -1,86 +1,95 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { type Feedback } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/components/ui/utils";
-
-const MESSAGE_PREVIEW_MAX_CHARS = 220;
+import type { ReactNode } from "react";
+import type { Feedback } from "@/lib/api";
 
 type FeedbackDetailsCardProps = {
   feedback: Feedback;
-  title?: string;
-  formatDate?: (dateString: string) => string;
+  title?: string | null;
+  formatDate?: (value: string) => string;
   className?: string;
+  preSubjectContent?: ReactNode;
+};
+
+const defaultFormatDate = (value: string) =>
+  new Date(value).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+const getPriorityColor = (priority: string) => {
+  switch (priority.trim().toLowerCase()) {
+    case "low":
+      return "text-gray-600";
+    case "medium":
+      return "text-yellow-600";
+    case "high":
+      return "text-orange-600";
+    default:
+      return "text-gray-600";
+  }
 };
 
 export function FeedbackDetailsCard({
   feedback,
   title = "Feedback Details",
-  formatDate,
+  formatDate = defaultFormatDate,
   className,
+  preSubjectContent,
 }: FeedbackDetailsCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  useEffect(() => {
-    setIsExpanded(false);
-  }, [feedback.id]);
-
-  const trimmedMessage = feedback.message.trim();
-  const canExpandMessage = trimmedMessage.length > MESSAGE_PREVIEW_MAX_CHARS;
-  const displayedMessage = useMemo(() => {
-    if (isExpanded || !canExpandMessage) return feedback.message;
-    return `${feedback.message.slice(0, MESSAGE_PREVIEW_MAX_CHARS)}...`;
-  }, [canExpandMessage, feedback.message, isExpanded]);
+  const hasTitle = Boolean(title?.trim());
+  const contentClassName = hasTitle
+    ? "space-y-2.5 overflow-hidden"
+    : "space-y-8 overflow-hidden pt-4";
+  const gridClassName = hasTitle
+    ? "grid grid-cols-1 gap-2 sm:grid-cols-2"
+    : "grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2";
 
   return (
-    <Card className={cn("shadow-lg", className)}>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border border-border bg-muted/30 p-3">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Type</p>
-            <p className="mt-1 text-sm font-medium text-foreground">{feedback.type}</p>
+    <Card className={["shadow-lg", className].filter(Boolean).join(" ")}>
+      {hasTitle ? (
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">{title}</CardTitle>
+        </CardHeader>
+      ) : null}
+      <CardContent className={contentClassName}>
+        <div className={gridClassName}>
+          <div className={hasTitle ? undefined : "space-y-1"}>
+            <p className="text-xs font-semibold text-muted-foreground">Type</p>
+            <p className="mt-0.5 text-[0.98rem] font-medium capitalize">{feedback.type}</p>
           </div>
-          <div className="rounded-lg border border-border bg-muted/30 p-3">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Category</p>
-            <p className="mt-1 text-sm font-medium text-foreground break-words [overflow-wrap:anywhere]">{feedback.category}</p>
+          <div className={hasTitle ? undefined : "space-y-1"}>
+            <p className="text-xs font-semibold text-muted-foreground">Category</p>
+            <p className="mt-0.5 text-[0.98rem] font-medium">{feedback.category}</p>
           </div>
-        </div>
-
-        <div className="rounded-lg border border-border bg-muted/30 p-3">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Subject</p>
-          <p className="mt-1 text-sm font-medium text-foreground break-words [overflow-wrap:anywhere]">{feedback.subject}</p>
-        </div>
-
-        <div className="rounded-lg border border-border bg-muted/30 p-3 overflow-hidden">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Message</p>
-          <p className="mt-1 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-foreground">
-            {displayedMessage}
-          </p>
-          {canExpandMessage ? (
-            <button
-              type="button"
-              onClick={() => setIsExpanded((current) => !current)}
-              className="mt-2 text-xs font-medium text-accent hover:underline"
+          <div className={hasTitle ? undefined : "space-y-1"}>
+            <p className="text-xs font-semibold text-muted-foreground">Priority</p>
+            <p
+              className={`mt-0.5 text-[0.98rem] font-medium capitalize ${getPriorityColor(
+                feedback.priority,
+              )}`}
             >
-              {isExpanded ? "See less" : "See all"}
-            </button>
-          ) : null}
+              {feedback.priority}
+            </p>
+          </div>
+          <div className={hasTitle ? undefined : "space-y-1"}>
+            <p className="text-xs font-semibold text-muted-foreground">Last Updated</p>
+            <p className="mt-0.5 text-[0.98rem] font-medium">{formatDate(feedback.updatedAt)}</p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 text-sm text-muted-foreground sm:grid-cols-2">
-          <div>
-            <span className="font-medium text-foreground">Submitted by:</span>{" "}
-            {feedback.isAnonymous ? "Anonymous" : feedback.userName}
-          </div>
-          {formatDate ? (
-            <div>
-              <span className="font-medium text-foreground">Created:</span> {formatDate(feedback.createdAt)}
-            </div>
-          ) : null}
+        {preSubjectContent}
+
+        <div className={hasTitle ? "space-y-1" : "space-y-3"}>
+          <p className="text-xs font-semibold text-muted-foreground">Subject</p>
+          <p className="text-[0.98rem] font-semibold break-words">{feedback.subject}</p>
+          <p className="mt-0.5 max-h-36 overflow-y-auto pr-1 text-[0.9rem] leading-relaxed [text-align:justify] [text-justify:inter-word] [text-indent:1rem] [overflow-wrap:anywhere] break-words hyphens-auto">
+            {feedback.message}
+          </p>
         </div>
       </CardContent>
     </Card>

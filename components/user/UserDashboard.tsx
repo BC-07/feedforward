@@ -72,6 +72,7 @@ import { formatLocalTime } from "@/lib/time";
 import { useDraftStorage } from "@/lib/useDraftStorage";
 import { toastApiError } from "@/lib/errorHandling";
 import { formatFilterChipLabel } from "@/lib/filterUtils";
+import { formatFeedbackText } from "@/lib/textFormat";
 import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
 import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
 import {
@@ -80,6 +81,7 @@ import {
 } from "@/components/filters/HoverFilterPopover";
 import {
   ArrowRight,
+  BarChart3,
   Send,
   Search,
   Clock,
@@ -97,8 +99,12 @@ import {
 
 export type UserDashboardView = "home" | "my-submissions" | "submit-feedback";
 
-const FEEDBACK_MESSAGE_MAX_LENGTH = 2000;
-const FEEDBACK_SUBJECT_MAX_LENGTH = 100;
+const FEEDBACK_MESSAGE_MAX_LENGTH = 250;
+const FEEDBACK_SUBJECT_MAX_LENGTH = 50;
+const CONVERSATION_MESSAGE_MAX_LENGTH = 2000;
+const SUBMISSION_FILTER_TEXT_COLOR = "#171717";
+const SUBMISSION_FILTER_CONTROL_CLASS =
+  "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
 
 export function UserDashboard({ view }: { view: UserDashboardView }) {
   const MY_SUBMISSIONS_PER_PAGE = 7;
@@ -169,6 +175,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [isLargeScreen, setIsLargeScreen] = useState(false);
   const leftColumnRef = useRef<HTMLDivElement | null>(null);
   const submissionsScrollRef = useRef<HTMLDivElement | null>(null);
+  const conversationScrollRef = useRef<HTMLDivElement | null>(null);
+  const miniConversationScrollRef = useRef<HTMLDivElement | null>(null);
   const submissionsScrollTop = useRef(0);
   const feedbackSubmitLockRef = useRef(false);
   const submissionsScrollKey = "userDashboardSubmissionsScrollTop";
@@ -346,6 +354,23 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     });
   }, [selectedFeedback, trackingId]);
 
+  const scrollConversationsToBottom = useCallback(
+    (behavior: ScrollBehavior = "auto") => {
+      [conversationScrollRef.current, miniConversationScrollRef.current].forEach(
+        (container) => {
+          if (!container) return;
+          window.requestAnimationFrame(() => {
+            container.scrollTo({
+              top: container.scrollHeight,
+              behavior,
+            });
+          });
+        },
+      );
+    },
+    [],
+  );
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem(submissionsScrollKey);
@@ -435,13 +460,15 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     feedbackSubmitLockRef.current = true;
     setIsSubmittingFeedback(true);
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
+    const normalizedSubject = formatFeedbackText(confirmData.subject);
+    const normalizedMessage = formatFeedbackText(confirmData.message);
     try {
       await createFeedback({
         id: newTrackingId,
         type: confirmData.type,
         category: confirmData.category.trim(),
-        subject: confirmData.subject,
-        message: confirmData.message,
+        subject: normalizedSubject,
+        message: normalizedMessage,
         status: "Pending",
         priority: "Medium",
         isAnonymous,
@@ -483,13 +510,15 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     feedbackSubmitLockRef.current = true;
     setIsSubmittingFeedback(true);
     const newTrackingId = `FF-${Date.now().toString(36).toUpperCase()}`;
+    const normalizedSubject = formatFeedbackText(confirmData.subject);
+    const normalizedMessage = formatFeedbackText(confirmData.message);
     try {
       await createFeedback({
         id: newTrackingId,
         type: confirmData.type,
         category: confirmData.category.trim(),
-        subject: confirmData.subject,
-        message: confirmData.message,
+        subject: normalizedSubject,
+        message: normalizedMessage,
         status: "Pending",
         priority: "Medium",
         isAnonymous,
@@ -556,19 +585,31 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       toast.error("Please enter a message.");
       return;
     }
+    if (trimmed.length > CONVERSATION_MESSAGE_MAX_LENGTH) {
+      toast.error(`Message must be ${CONVERSATION_MESSAGE_MAX_LENGTH} characters or less.`);
+      return;
+    }
+    const normalizedMessage = formatFeedbackText(trimmed);
     setIsSendingMessage(true);
     try {
       const created = await createFeedbackMessage(selectedFeedback.id, {
-        message: trimmed,
+        message: normalizedMessage,
       });
       setMessages((prev) => [...prev, created]);
       setMessageDraft("");
+      scrollConversationsToBottom("smooth");
     } catch (error) {
       toastApiError(error, "Failed to send message.");
     } finally {
       setIsSendingMessage(false);
     }
   };
+
+  useEffect(() => {
+    if (!selectedFeedback) return;
+    if (isMessagesLoading) return;
+    scrollConversationsToBottom();
+  }, [selectedFeedback, isMessagesLoading, messages.length, isMiniChatOpen, scrollConversationsToBottom]);
 
   const normalizeStatus = (status: string) =>
     status
@@ -577,14 +618,14 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       .replace(/[_-]+/g, " ")
       .replace(/\s+/g, " ");
 
-  const getStatusIndicatorClass = (status: string) => {
+  const getStatusBadgeClass = (status: string) => {
     switch (normalizeStatus(status)) {
       case "pending":
-        return "border-amber-300/80 bg-amber-50 text-amber-700";
+        return "border-amber-300/80 bg-amber-50 text-amber-800";
       case "in progress":
-        return "border-orange-300/80 bg-orange-50 text-orange-700";
+        return "border-blue-300/80 bg-blue-50 text-blue-800";
       case "resolved":
-        return "border-emerald-300/80 bg-emerald-50 text-emerald-700";
+        return "border-emerald-300/80 bg-emerald-50 text-emerald-800";
       default:
         return "border-slate-300/80 bg-slate-50 text-slate-700";
     }
@@ -752,7 +793,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         <Textarea
           id={`${idPrefix}-message`}
           placeholder="Provide detailed information about your feedback..."
-          rows={5}
+          rows={1}
+          className="ff-hide-scrollbar w-full max-w-full min-h-[2.5rem] overflow-hidden [field-sizing:content] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
           maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
           value={formData.message}
           disabled={isSubmittingFeedback}
@@ -913,27 +955,27 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   ].filter(Boolean).length;
   const activeFilterChips = [
     trimmedSearchQuery
-      ? { key: "search", label: `Search: ${searchQuery.trim()}` }
+      ? { key: "search", label: searchQuery.trim() }
       : null,
     filterTracking !== "asc"
-      ? { key: "tracking", label: "Tracking: Z - A" }
+      ? { key: "tracking", label: "Z - A" }
       : null,
     filterDate !== "recent"
-      ? { key: "date", label: "Date: Oldest" }
+      ? { key: "date", label: "Oldest" }
       : null,
     filterType !== "all"
-      ? { key: "type", label: `Type: ${formatFilterChipLabel(filterType)}` }
+      ? { key: "type", label: formatFilterChipLabel(filterType) }
       : null,
     filterCategory !== "all"
       ? {
           key: "category",
-          label: `Category: ${formatFilterChipLabel(filterCategory)}`,
+          label: formatFilterChipLabel(filterCategory),
         }
       : null,
     filterPriority !== "all"
       ? {
           key: "priority",
-          label: `Priority: ${formatFilterChipLabel(filterPriority)}`,
+          label: formatFilterChipLabel(filterPriority),
         }
       : null,
     filterStatus !== "all"
@@ -941,8 +983,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           key: "status",
           label:
             filterStatus === "inprogress"
-              ? "Status: In Progress"
-              : `Status: ${formatFilterChipLabel(filterStatus)}`,
+              ? "In Progress"
+              : formatFilterChipLabel(filterStatus),
         }
       : null,
   ].filter((chip): chip is { key: string; label: string } => Boolean(chip));
@@ -1061,6 +1103,13 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       ] satisfies HoverFilterItem<HoverFilterKey>[],
     [categories, filterCategory, filterDate, filterPriority, filterStatus, filterTracking, filterType],
   );
+  const desktopInlineFilterItems = useMemo(
+    () =>
+      hoverFilterItems.filter((item) =>
+        ["tracking", "date", "type", "priority", "status"].includes(item.key),
+      ),
+    [hoverFilterItems],
+  );
   const dashboardStats = useMemo(() => {
     const pending = feedbacks.filter(
       (item) => normalizeStatus(item.status) === "pending",
@@ -1127,6 +1176,17 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     [feedbacks],
   );
 
+  const notificationPanelMaxHeight = useMemo(() => {
+    const notificationCount = homeNotifications.length;
+    const viewportCap = isLargeScreen ? 387 : 520;
+    const contentAwareHeight =
+      notificationCount === 0
+        ? 180
+        : 136 + notificationCount * 76;
+
+    return Math.min(viewportCap, contentAwareHeight);
+  }, [homeNotifications.length, isLargeScreen]);
+
   const renderHomeSubmissionGrid = (
     items: Feedback[],
     emptyMessage: string,
@@ -1152,39 +1212,44 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             className="w-full text-left"
           >
             <Card className="h-full border shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
-              <CardContent className="space-y-3 p-4">
+              <CardContent className="flex h-full flex-col gap-3 p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="line-clamp-2 break-words font-semibold leading-snug">
-                    {feedback.subject}
+                  <p className="min-h-[1.25rem] break-all font-mono text-xs text-muted-foreground">
+                    {feedback.id}
                   </p>
                   <span className="whitespace-nowrap text-[11px] text-muted-foreground">
                     {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                   </span>
                 </div>
-                <p className="break-all font-mono text-xs text-muted-foreground">
-                  {feedback.id}
+                <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug">
+                  {feedback.subject}
                 </p>
-                <p className="line-clamp-2 text-sm text-muted-foreground">
+                <p
+                  className={`line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground ${
+                    feedback.message.trim().length > 70 && /\s/.test(feedback.message.trim())
+                      ? "indent-5"
+                      : ""
+                  }`}
+                >
                   {feedback.message}
                 </p>
-                <div className="flex items-center justify-between">
+                <div className="mt-auto flex items-center justify-between">
                   <span className="rounded-md border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
                     {feedback.category}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center">
                     {(() => {
                       const StatusIcon = getStatusIcon(feedback.status);
                       return (
-                        <>
-                          <span
-                            className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${getStatusIndicatorClass(
-                              feedback.status,
-                            )}`}
-                          >
-                            <StatusIcon className="h-3 w-3" />
-                          </span>
+                        <Badge
+                          variant="outline"
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                            feedback.status,
+                          )}`}
+                        >
+                          <StatusIcon className="h-3.5 w-3.5" />
                           {feedback.status}
-                        </>
+                        </Badge>
                       );
                     })()}
                   </span>
@@ -1208,7 +1273,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         }
       }}
     >
-      <DialogContent className="ff-modal-panel w-[calc(100%-1.5rem)] max-w-2xl p-5 sm:w-full sm:p-6">
+      <DialogContent className="w-[calc(100%-1rem)] max-w-2xl max-h-[90svh] overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl sm:w-full sm:p-6 ff-hide-scrollbar">
         {createSubmissionStep === "form" ? (
           <>
             <DialogHeader>
@@ -1271,9 +1336,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   <p className="text-xs font-semibold text-muted-foreground">
                     MESSAGE
                   </p>
-                  <p className="mt-1 text-sm leading-relaxed break-all">
-                    {formatMessagePreview(confirmData.message) || "—"}
-                  </p>
+                  <div className="ff-hide-scrollbar mt-1 max-h-[160px] min-h-[160px] overflow-y-auto pr-1">
+                    <p className="text-sm leading-relaxed break-all">
+                      {formatMessagePreview(confirmData.message) || "—"}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1349,7 +1416,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
   return (
     <>
-    <div className="min-h-[calc(100vh-200px)] bg-muted/20">
+    <div className="min-h-[calc(100svh-200px)] bg-muted/20">
       {trackingId && (
         <div
           className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center px-4 py-8 animate-in fade-in-0"
@@ -1422,7 +1489,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         </div>
       )}
       <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <DialogContent className="w-[calc(100%-1.5rem)] max-w-lg max-h-[90vh] overflow-y-auto p-5 sm:w-full sm:p-6">
+        <DialogContent className="w-[calc(100%-1.5rem)] max-w-lg max-h-[90svh] overflow-y-auto p-5 sm:w-full sm:p-6">
           <DialogHeader>
             <DialogTitle>Confirm Your Feedback</DialogTitle>
             <DialogDescription>
@@ -1468,9 +1535,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                 <p className="text-xs font-semibold text-muted-foreground">
                   MESSAGE
                 </p>
-                <p className="mt-1 text-sm leading-relaxed break-all">
-                  {formatMessagePreview(confirmData.message) || "—"}
-                </p>
+                <div className="ff-hide-scrollbar mt-1 max-h-[160px] min-h-[160px] overflow-y-auto pr-1">
+                  <p className="text-sm leading-relaxed break-all">
+                    {formatMessagePreview(confirmData.message) || "—"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -1568,7 +1637,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       </AlertDialog>
       <div
         className={`mx-auto w-full px-4 ${
-          isHomeView ? "pt-4 pb-4 sm:px-6 sm:pt-5 sm:pb-5" : "py-6 sm:px-6 sm:py-8"
+          isHomeView || isMySubmissionsView
+            ? "pt-4 pb-4 sm:px-6 sm:pt-5 sm:pb-5"
+            : "py-6 sm:px-6 sm:py-8"
         } ${
           isMySubmissionsView || isHomeView ? "max-w-none" : "max-w-5xl"
         }`}
@@ -1637,10 +1708,27 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
                     <div className="min-w-0">
                       <Tabs defaultValue="latest">
-                        <TabsList className="grid w-full grid-cols-3 gap-2 p-1.5">
-                          <TabsTrigger value="latest">Latest</TabsTrigger>
-                          <TabsTrigger value="attention">Needs Attention</TabsTrigger>
-                          <TabsTrigger value="updated">Recently Updated</TabsTrigger>
+                        <TabsList className="grid h-11 w-full grid-cols-3 gap-1 rounded-xl border border-border/60 bg-muted/50 p-1">
+                          <TabsTrigger
+                            value="latest"
+                            className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                          >
+                            <span className="truncate">Latest</span>
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="attention"
+                            className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                          >
+                            <span className="sm:hidden truncate">Attention</span>
+                            <span className="hidden sm:inline truncate">Needs Attention</span>
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="updated"
+                            className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                          >
+                            <span className="sm:hidden truncate">Updated</span>
+                            <span className="hidden sm:inline truncate">Recently Updated</span>
+                          </TabsTrigger>
                         </TabsList>
                         <TabsContent value="latest" className="mt-3">
                           {renderHomeSubmissionGrid(
@@ -1662,12 +1750,15 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                         </TabsContent>
                       </Tabs>
                     </div>
-                    <Card className="h-full max-h-[520px] xl:max-h-[387px] border shadow-sm flex flex-col overflow-hidden">
-                      <CardHeader className="pb-0">
+                    <Card
+                      className="h-full border border-border/80 bg-slate-50/45 shadow-sm flex flex-col overflow-hidden"
+                      style={{ maxHeight: `${notificationPanelMaxHeight}px` }}
+                    >
+                      <CardHeader className="pb-0 pt-4">
                         <CardTitle className="text-base">Notifications</CardTitle>
                         <CardDescription>Unresolved updates</CardDescription>
                       </CardHeader>
-                      <CardContent className="-mt-3 flex-1 min-h-0 space-y-1.5 pt-0 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                      <CardContent className="-mt-4 flex-1 min-h-0 space-y-1.5 bg-slate-50/35 pt-0 pb-3 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                         {homeNotifications.length === 0 ? (
                           <p className="text-sm text-muted-foreground">
                             No unread updates.
@@ -1678,7 +1769,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               key={feedback.id}
                               type="button"
                               onClick={() => handleViewFeedback(feedback)}
-                              className="w-full rounded-md border border-border/70 p-2 text-left hover:bg-muted/30"
+                              className="w-full rounded-md border border-border/70 bg-white/80 p-2 text-left shadow-[0_0_0_1px_rgba(15,23,42,0.05)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-muted/30 hover:shadow-md"
                             >
                               <p className="line-clamp-1 text-sm font-medium">
                                 {feedback.subject}
@@ -1695,67 +1786,218 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                 </div>
               </div>
             ) : isMySubmissionsView && feedbacks.length > 0 ? (
-              <div className="h-full min-h-0 flex flex-col bg-background">
-                <div className="px-1 pb-1">
-                  <div className="-mt-2 pb-1 sm:pb-2">
-                    <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex w-full gap-2 sm:max-w-md">
-                        <div className="relative flex-1">
-                          <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                          <Input
-                            placeholder="Search by ID, subject, message, or category"
-                            value={searchQuery}
-                            onChange={(event) => setSearchQuery(event.target.value)}
-                            className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
-                          />
-                        </div>
-                        <HoverFilterPopover
-                          items={hoverFilterItems}
-                          activeCount={activeFilterCount}
-                          onReset={clearAllFilters}
+              <div className="mx-auto flex h-full min-h-0 w-full flex-col gap-2 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex h-9 items-center gap-3">
+                    <div className="flex h-9 w-11 items-center justify-center rounded-2xl bg-muted/50 text-[#171717]">
+                      <BarChart3 className="h-5 w-5" />
+                    </div>
+                    <div className="flex h-9 items-center">
+                      <h2 className="text-[21px] font-semibold leading-none tracking-[-0.02em] text-[#171717]">
+                        Submission list
+                      </h2>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setCreateSubmissionStep("form");
+                      setCreateSubmissionTrackingId(null);
+                      setIsAnonymous(false);
+                      setIsCreateSubmissionOpen(true);
+                    }}
+                    className="h-9 sm:w-auto bg-accent hover:bg-accent/90 transition-colors duration-150 hover:-translate-y-px"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Submission
+                  </Button>
+                </div>
+                <div>
+                  <div className="mb-3">
+                    <div className="hidden gap-x-3 gap-y-2 md:grid xl:grid-cols-[minmax(0,1.9fr)_repeat(5,minmax(0,1fr))]">
+                      <div className="relative">
+                        <Search
+                          className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2"
+                          style={{ color: "#8f877d" }}
+                        />
+                        <Input
+                          placeholder="Search by ID, subject, or message."
+                          value={searchQuery}
+                          onChange={(event) => setSearchQuery(event.target.value)}
+                          className={`${SUBMISSION_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}
+                          style={{
+                            color: SUBMISSION_FILTER_TEXT_COLOR,
+                            paddingLeft: "2.75rem",
+                          }}
                         />
                       </div>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setCreateSubmissionStep("form");
-                          setCreateSubmissionTrackingId(null);
-                          setIsAnonymous(false);
-                          setIsCreateSubmissionOpen(true);
-                        }}
-                        className="h-9 sm:w-auto bg-accent hover:bg-accent/90 transition-colors duration-150 hover:-translate-y-px"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        New Submission
-                      </Button>
+                      {desktopInlineFilterItems.map((filter) => {
+                        const value =
+                          filter.key === "tracking"
+                            ? filterTracking
+                            : filter.key === "date"
+                              ? filterDate
+                              : filter.key === "type"
+                                ? filterType
+                                : filter.key === "priority"
+                                  ? filterPriority
+                                  : filterStatus;
+                        return (
+                          <Select
+                            key={filter.key}
+                            value={value}
+                            onValueChange={filter.onSelect}
+                          >
+                            <SelectTrigger
+                              className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`}
+                              style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
+                            >
+                              <SelectValue placeholder={filter.label} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {filter.options.map((option) => (
+                                <SelectItem key={`${filter.key}-${option.value}`} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        );
+                      })}
+                    </div>
+                    <div className="flex w-full gap-2 md:hidden">
+                      <div className="relative flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          placeholder="Search by ID, subject, message."
+                          value={searchQuery}
+                          onChange={(event) => setSearchQuery(event.target.value)}
+                          className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
+                        />
+                      </div>
+                      <HoverFilterPopover
+                        items={hoverFilterItems}
+                        activeCount={activeFilterCount}
+                        onReset={clearAllFilters}
+                      />
                     </div>
                     {activeFilterChips.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <div className="mt-5 mb-3 flex flex-wrap items-center gap-2">
                         {activeFilterChips.map((chip) => (
                           <span
                             key={chip.key}
-                            className="inline-flex items-center gap-1 rounded-full border border-foreground/20 bg-background px-3 py-1 text-xs text-foreground shadow-sm"
+                            className="inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-medium leading-none text-[#6f6255]"
+                            style={{ columnGap: "12px" }}
                           >
-                            {chip.label}
+                            <span>{chip.label}</span>
                               <button
                                 type="button"
                                 onClick={() => clearSingleFilter(chip.key)}
-                                className="rounded-full p-0.5 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                className="inline-flex items-center justify-center rounded-full p-0.5 text-[#6f6255] transition-colors hover:bg-[#efe5da] hover:text-[#4d463e]"
                                 aria-label={`Remove ${chip.label} filter`}
                                 title={`Remove ${chip.label} filter`}
                               >
-                              <X className="h-3 w-3" />
+                              <X className="h-3.5 w-3.5" />
                             </button>
                           </span>
                         ))}
+                        <button
+                          type="button"
+                          onClick={clearAllFilters}
+                          className="inline-flex min-h-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium leading-none transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
+                          style={{ color: "#171717" }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Clear all
+                        </button>
                       </div>
                     ) : null}
                   </div>
                 </div>
                 {renderCreateSubmissionDialog()}
+                <div className="space-y-3 md:hidden">
+                  {filteredFeedbacks.length === 0 ? (
+                    <Card className="border border-border/70">
+                      <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                        No submissions match the current filters.
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    paginatedFilteredFeedbacks.map((feedback) => (
+                      <button
+                        key={`mobile-${feedback.id}`}
+                        type="button"
+                        onClick={() => handleViewFeedback(feedback)}
+                        className="w-full text-left"
+                      >
+                        <Card className="border border-border/75 bg-white shadow-sm">
+                          <CardContent className="space-y-3 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="min-w-0 break-all font-mono text-xs text-muted-foreground">
+                                {feedback.id}
+                              </p>
+                              <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">
+                                {formatSubmittedAt(feedback.createdAt)}
+                              </span>
+                            </div>
+                            <p className="line-clamp-2 text-sm font-semibold leading-snug text-foreground">
+                              {feedback.subject}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-md border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
+                                {feedback.category}
+                              </span>
+                              <Badge
+                                className={getPriorityColor(feedback.priority)}
+                                variant="outline"
+                              >
+                                {feedback.priority}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="inline-flex items-center">
+                                {(() => {
+                                  const StatusIcon = getStatusIcon(feedback.status);
+                                  return (
+                                    <Badge
+                                      variant="outline"
+                                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                                        feedback.status,
+                                      )}`}
+                                    >
+                                      <StatusIcon className="h-3.5 w-3.5" />
+                                      <span className="leading-none">{feedback.status}</span>
+                                    </Badge>
+                                  );
+                                })()}
+                              </span>
+                              {feedback.status.toLowerCase() === "pending" ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 rounded-md text-rose-600 hover:bg-rose-600 hover:text-white"
+                                  aria-label="Delete submission"
+                                  title="Delete submission"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setDeleteTarget(feedback);
+                                    setIsDeleteOpen(true);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              ) : null}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </button>
+                    ))
+                  )}
+                </div>
                 <div
                   ref={submissionsScrollRef}
-                  className="flex-1 min-h-0 w-full max-w-full overflow-y-scroll overflow-x-hidden [scrollbar-gutter:stable_both-edges] h-[calc(100vh-260px)]"
+                  className="hidden md:block ff-hide-scrollbar flex-1 min-h-0 w-full max-w-full overflow-y-auto overflow-x-hidden md:[scrollbar-gutter:stable] md:h-[calc(100svh-260px)]"
                   onScroll={(event) => {
                     const top = event.currentTarget.scrollTop;
                     submissionsScrollTop.current = top;
@@ -1767,7 +2009,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     }
                   }}
                 >
-                  <div className="w-full max-w-full overflow-x-auto">
+                  <div className="w-full overflow-x-auto">
                     <Table className="w-full min-w-[980px] table-fixed text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
                       <TableHeader className="bg-muted/50 sticky top-0 z-10">
                         <TableRow className="bg-muted/50 hover:bg-muted/50">
@@ -1819,18 +2061,17 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                   {(() => {
                                     const StatusIcon = getStatusIcon(feedback.status);
                                     return (
-                                      <>
-                                        <span
-                                          className={`inline-flex h-6 w-6 items-center justify-center rounded-full border ${getStatusIndicatorClass(
-                                            feedback.status,
-                                          )}`}
-                                        >
-                                          <StatusIcon className="h-3.5 w-3.5" />
-                                        </span>
-                                        <span className="text-xs text-muted-foreground">
+                                      <Badge
+                                        variant="outline"
+                                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                                          feedback.status,
+                                        )}`}
+                                      >
+                                        <StatusIcon className="h-3.5 w-3.5" />
+                                        <span className="leading-none">
                                           {feedback.status}
                                         </span>
-                                      </>
+                                      </Badge>
                                     );
                                   })()}
                                 </span>
@@ -1944,7 +2185,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   className="ff-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px]"
                   onClick={handleAttemptCloseSelectedFeedback}
                 />
-                <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
+                <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90svh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
                   <CardHeader className="space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <CardTitle>Feedback Details</CardTitle>
@@ -1983,7 +2224,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   <Card className="shadow-lg bg-muted/40 border-border">
                     <CardContent className="pt-6">
                       <div className="grid max-h-[420px] min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-xl border border-border bg-white/70">
-                        <div className="ff-hide-scrollbar min-h-0 overflow-y-auto p-4">
+                        <div
+                          ref={conversationScrollRef}
+                          className="ff-hide-scrollbar min-h-0 overflow-y-auto p-4"
+                        >
                           {isMessagesLoading && (
                             <p className="text-sm text-muted-foreground">
                               Loading conversation...
@@ -2109,9 +2353,14 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               placeholder="Type your message..."
                               rows={1}
                               value={messageDraft}
-                              onChange={(e) => setMessageDraft(e.target.value)}
+                              onChange={(e) =>
+                                setMessageDraft(
+                                  e.target.value.slice(0, CONVERSATION_MESSAGE_MAX_LENGTH),
+                                )
+                              }
+                              maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
                               disabled={isSendingMessage}
-                              className="max-h-28 min-h-8 resize-none rounded-xl border border-border/70 bg-background px-4 py-2 leading-relaxed shadow-sm focus-visible:ring-2 focus-visible:ring-accent/30"
+                              className="ff-hide-scrollbar w-full max-w-full min-w-0 max-h-[10.5rem] min-h-8 resize-none overflow-y-auto rounded-xl border border-border/70 bg-background px-4 py-2 leading-relaxed shadow-sm [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap] focus-visible:ring-2 focus-visible:ring-accent/30"
                               onKeyDown={(event) => {
                                 if (event.key === "Enter" && !event.shiftKey) {
                                   event.preventDefault();
@@ -2155,7 +2404,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           </Button>
                         </div>
                         <div className="grid h-[calc(100%-40px)] grid-rows-[minmax(0,1fr)_auto]">
-                          <div className="ff-hide-scrollbar min-h-0 overflow-y-auto p-3">
+                          <div
+                            ref={miniConversationScrollRef}
+                            className="ff-hide-scrollbar min-h-0 overflow-y-auto p-3"
+                          >
                             {isMessagesLoading ? (
                               <p className="text-sm text-muted-foreground">
                                 Loading conversation...
@@ -2271,9 +2523,14 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                 placeholder="Type your message..."
                                 rows={1}
                                 value={messageDraft}
-                                onChange={(e) => setMessageDraft(e.target.value)}
+                                onChange={(e) =>
+                                  setMessageDraft(
+                                    e.target.value.slice(0, CONVERSATION_MESSAGE_MAX_LENGTH),
+                                  )
+                                }
+                                maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
                                 disabled={isSendingMessage}
-                                className="max-h-24 min-h-8 resize-none rounded-lg border border-border/70 bg-background px-3 py-2 text-xs leading-relaxed"
+                                className="ff-hide-scrollbar w-full max-w-full min-w-0 max-h-[8rem] min-h-8 resize-none overflow-y-auto rounded-lg border border-border/70 bg-background px-3 py-2 text-xs leading-relaxed [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
                                 onKeyDown={(event) => {
                                   if (event.key === "Enter" && !event.shiftKey) {
                                     event.preventDefault();
