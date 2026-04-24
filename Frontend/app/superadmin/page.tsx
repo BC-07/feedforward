@@ -63,7 +63,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TablePaginationFooter } from "@/components/ui/table-pagination-footer";
+import { TablePaginationFooter, SimplePaginationFooter } from "@/components/ui/table-pagination-footer";
 import {
   ChartContainer,
   ChartTooltip,
@@ -130,7 +130,7 @@ const dashboardBarChartConfig = {
 } satisfies ChartConfig;
 
 const ASSIGNMENT_PAGE_SIZE = 8;
-const RECENT_PAGE_SIZE = 3;
+const RECENT_PAGE_SIZE = 4;
 const TOP_RESOLVED_PAGE_SIZE = 6;
 const TOP_CATEGORIES_PAGE_SIZE = 6;
 const CATEGORY_CONTROL_PAGE_SIZE_OPTIONS = [10, 30, 50, 100] as const;
@@ -529,6 +529,9 @@ export default function SuperAdminDashboard() {
     const start = (currentAssignmentPage - 1) * ASSIGNMENT_PAGE_SIZE;
     return unitCoverageRows.slice(start, start + ASSIGNMENT_PAGE_SIZE);
   }, [unitCoverageRows, currentAssignmentPage]);
+  const assignmentPlaceholderRowCount = useMemo(() => {
+    return Math.max(0, ASSIGNMENT_PAGE_SIZE - paginatedAssignmentRows.length);
+  }, [paginatedAssignmentRows.length]);
   const recentTotalPages = Math.max(
     1,
     Math.ceil(recent7DayAdmins.length / RECENT_PAGE_SIZE),
@@ -1120,47 +1123,12 @@ export default function SuperAdminDashboard() {
                             ))}
                           </div>
                         </div>
-                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                          <span>
-                            Page {currentTopResolvedPage} of{" "}
-                            {topResolvedTotalPages}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-3"
-                              onClick={() =>
-                                setTopResolvedPage(
-                                  Math.max(1, currentTopResolvedPage - 1),
-                                )
-                              }
-                              disabled={currentTopResolvedPage <= 1}
-                            >
-                              Previous
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-3"
-                              onClick={() =>
-                                setTopResolvedPage(
-                                  Math.min(
-                                    topResolvedTotalPages,
-                                    currentTopResolvedPage + 1,
-                                  ),
-                                )
-                              }
-                              disabled={
-                                currentTopResolvedPage >= topResolvedTotalPages
-                              }
-                            >
-                              Next
-                            </Button>
-                          </div>
-                        </div>
+                        <SimplePaginationFooter
+                          page={currentTopResolvedPage}
+                          totalPages={topResolvedTotalPages}
+                          onPrevious={() => setTopResolvedPage(Math.max(1, currentTopResolvedPage - 1))}
+                          onNext={() => setTopResolvedPage(Math.min(topResolvedTotalPages, currentTopResolvedPage + 1))}
+                        />
                       </div>
                     )}
                     {isDashboardStatsLoading &&
@@ -1227,46 +1195,12 @@ export default function SuperAdminDashboard() {
                             ),
                           )}
                         </div>
-                        <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
-                          <span>
-                            Page {currentTopCategoriesPage} of{" "}
-                            {topCategoriesTotalPages}
-                          </span>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3"
-                            onClick={() =>
-                              setTopCategoriesPage(
-                                Math.max(1, currentTopCategoriesPage - 1),
-                              )
-                            }
-                            disabled={currentTopCategoriesPage <= 1}
-                          >
-                            Previous
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3"
-                            onClick={() =>
-                              setTopCategoriesPage(
-                                Math.min(
-                                  topCategoriesTotalPages,
-                                  currentTopCategoriesPage + 1,
-                                ),
-                              )
-                            }
-                            disabled={
-                              currentTopCategoriesPage >=
-                              topCategoriesTotalPages
-                            }
-                          >
-                            Next
-                          </Button>
-                        </div>
+                        <SimplePaginationFooter
+                          page={currentTopCategoriesPage}
+                          totalPages={topCategoriesTotalPages}
+                          onPrevious={() => setTopCategoriesPage(Math.max(1, currentTopCategoriesPage - 1))}
+                          onNext={() => setTopCategoriesPage(Math.min(topCategoriesTotalPages, currentTopCategoriesPage + 1))}
+                        />
                       </div>
                     )}
                     {isDashboardStatsLoading &&
@@ -1311,77 +1245,58 @@ export default function SuperAdminDashboard() {
                               </TableCell>
                             </TableRow>
                           ) : (
-                            paginatedAssignmentRows.map((row) => (
-                              <TableRow key={row.unit}>
-                                <TableCell className="font-medium break-words">
-                                  {row.unit}
-                                </TableCell>
-                                <TableCell className="align-top">
-                                  <div>
-                                    <p className="break-words">
-                                      {row.adminName}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground break-all">
-                                      {row.adminEmail}
-                                    </p>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="align-top">
-                                  <Badge
-                                    variant={
-                                      row.covered ? "default" : "outline"
-                                    }
+                            <>
+                              {paginatedAssignmentRows.map((row) => (
+                                <TableRow key={row.unit}>
+                                  <TableCell className="font-medium break-words">
+                                    {row.unit}
+                                  </TableCell>
+                                  <TableCell className="align-top">
+                                    <div>
+                                      <p className="break-words">
+                                        {row.adminName}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground break-all">
+                                        {row.adminEmail}
+                                      </p>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="align-top">
+                                    <Badge
+                                      variant={
+                                        row.covered ? "default" : "outline"
+                                      }
+                                    >
+                                      {row.covered ? "Covered" : "Vacant"}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                              {Array.from(
+                                { length: assignmentPlaceholderRowCount },
+                                (_, index) => (
+                                  <TableRow
+                                    key={`assignment-blank-${index}`}
+                                    className="h-14"
                                   >
-                                    {row.covered ? "Covered" : "Vacant"}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))
+                                    <TableCell>&nbsp;</TableCell>
+                                    <TableCell>&nbsp;</TableCell>
+                                    <TableCell>&nbsp;</TableCell>
+                                  </TableRow>
+                                ),
+                              )}
+                            </>
                           )}
                         </TableBody>
                       </Table>
                     </div>
                     {unitCoverageRows.length > 0 && (
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>
-                          Page {currentAssignmentPage} of {assignmentTotalPages}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3"
-                            onClick={() =>
-                              setAssignmentPage(
-                                Math.max(1, currentAssignmentPage - 1),
-                              )
-                            }
-                            disabled={currentAssignmentPage <= 1}
-                          >
-                            Previous
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3"
-                            onClick={() =>
-                              setAssignmentPage(
-                                Math.min(
-                                  assignmentTotalPages,
-                                  currentAssignmentPage + 1,
-                                ),
-                              )
-                            }
-                            disabled={
-                              currentAssignmentPage >= assignmentTotalPages
-                            }
-                          >
-                            Next
-                          </Button>
-                        </div>
-                      </div>
+                      <SimplePaginationFooter
+                        page={currentAssignmentPage}
+                        totalPages={assignmentTotalPages}
+                        onPrevious={() => setAssignmentPage(Math.max(1, currentAssignmentPage - 1))}
+                        onNext={() => setAssignmentPage(Math.min(assignmentTotalPages, currentAssignmentPage + 1))}
+                      />
                     )}
                   </CardContent>
                 </Card>
@@ -1497,42 +1412,12 @@ export default function SuperAdminDashboard() {
                       </Table>
                     </div>
                     {recent7DayAdmins.length > 0 && (
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>
-                          Page {currentRecentPage} of {recentTotalPages}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3"
-                            onClick={() =>
-                              setRecentPage(Math.max(1, currentRecentPage - 1))
-                            }
-                            disabled={currentRecentPage <= 1}
-                          >
-                            Previous
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-8 px-3"
-                            onClick={() =>
-                              setRecentPage(
-                                Math.min(
-                                  recentTotalPages,
-                                  currentRecentPage + 1,
-                                ),
-                              )
-                            }
-                            disabled={currentRecentPage >= recentTotalPages}
-                          >
-                            Next
-                          </Button>
-                        </div>
-                      </div>
+                      <SimplePaginationFooter
+                        page={currentRecentPage}
+                        totalPages={recentTotalPages}
+                        onPrevious={() => setRecentPage(Math.max(1, currentRecentPage - 1))}
+                        onNext={() => setRecentPage(Math.min(recentTotalPages, currentRecentPage + 1))}
+                      />
                     )}
                   </CardContent>
                 </Card>
@@ -1599,7 +1484,7 @@ export default function SuperAdminDashboard() {
                         <TableHead>Email</TableHead>
                         <TableHead>Unit</TableHead>
                         <TableHead>Created</TableHead>
-                        <TableHead className="text-right w-[120px]">
+                        <TableHead className="text-center w-[120px]">
                           Actions
                         </TableHead>
                       </TableRow>
@@ -1658,7 +1543,7 @@ export default function SuperAdminDashboard() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleEnableAdmin(admin)}
-                                    className="border-transparent bg-transparent text-black hover:bg-emerald-600 hover:text-black"
+                                    className="border-transparent bg-transparent text-black hover:bg-emerald-600 hover:text-white"
                                     aria-label="Enable admin"
                                   >
                                     <UserCheck className="h-4 w-4" />
@@ -2192,12 +2077,8 @@ export default function SuperAdminDashboard() {
                 id="edit-email"
                 type="email"
                 value={editForm.email}
-                onChange={(event) =>
-                  setEditForm((current) => ({
-                    ...current,
-                    email: event.target.value,
-                  }))
-                }
+                readOnly
+                className="cursor-not-allowed opacity-60"
               />
             </div>
             <div className="space-y-2">
