@@ -126,16 +126,10 @@ const dashboardBarChartConfig = {
   },
 } satisfies ChartConfig;
 
-const resolvedAdmins7DaysChartConfig = {
-  resolved: {
-    label: "Resolved",
-    color: "#16a34a",
-  },
-} satisfies ChartConfig;
-
 const ADMIN_PAGE_SIZE = 8;
 const ASSIGNMENT_PAGE_SIZE = 8;
 const RECENT_PAGE_SIZE = 3;
+const TOP_RESOLVED_PAGE_SIZE = 6;
 const TOP_CATEGORIES_PAGE_SIZE = 6;
 const statsRangeOptions: Array<{ value: StatsRange; label: string }> = [
   { value: "1d", label: "1 Day" },
@@ -143,9 +137,31 @@ const statsRangeOptions: Array<{ value: StatsRange; label: string }> = [
   { value: "30d", label: "1 Month" },
 ];
 
+const topResolvedLayout = {
+  gridGap: "gap-2.5",
+  columnSpace: "space-y-1.5",
+  row: "rounded-2xl border px-3 py-2.5",
+  rowInner: "flex items-center gap-2.5",
+  rank: "w-4 shrink-0 text-sm font-semibold leading-none",
+  avatar: "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+  name: "truncate text-sm font-semibold leading-tight text-foreground",
+  unit: "truncate text-xs leading-tight text-muted-foreground",
+  count: "shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold leading-none",
+} as const;
+
 function getDateKey(value: string | number | Date) {
   const date = new Date(value);
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+function getInitials(value: string) {
+  return value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 async function fetchAdmins(
@@ -214,6 +230,7 @@ export default function SuperAdminDashboard() {
   const [adminPage, setAdminPage] = useState(1);
   const [assignmentPage, setAssignmentPage] = useState(1);
   const [recentPage, setRecentPage] = useState(1);
+  const [topResolvedPage, setTopResolvedPage] = useState(1);
   const [topCategoriesPage, setTopCategoriesPage] = useState(1);
   const [statsRange, setStatsRange] = useState<StatsRange>("7d");
   const [categorySearch, setCategorySearch] = useState("");
@@ -423,12 +440,34 @@ export default function SuperAdminDashboard() {
     RECENT_PAGE_SIZE - paginatedRecentAdmins.length,
   );
 
-  const resolvedAdmins7DaysChartData = useMemo(() => {
-    return resolvedAdmins7Days.map((row) => ({
-      label: row.label,
-      resolved: row.count,
-    }));
-  }, [resolvedAdmins7Days]);
+  const topResolvedAdmins = useMemo(() => {
+    return resolvedAdmins7Days.map((row, index) => {
+      const matchedAdmin = admins.find((admin) => admin.name === row.label);
+      return {
+        rank: index + 1,
+        name: row.label,
+        unit: matchedAdmin?.unit?.trim() || "No assigned unit",
+        resolved: row.count,
+        initials: getInitials(row.label),
+      };
+    });
+  }, [admins, resolvedAdmins7Days]);
+  const topResolvedTotalPages = Math.max(
+    1,
+    Math.ceil(topResolvedAdmins.length / TOP_RESOLVED_PAGE_SIZE),
+  );
+  const currentTopResolvedPage = Math.min(topResolvedPage, topResolvedTotalPages);
+  const paginatedTopResolvedAdmins = useMemo(() => {
+    const start = (currentTopResolvedPage - 1) * TOP_RESOLVED_PAGE_SIZE;
+    return topResolvedAdmins.slice(start, start + TOP_RESOLVED_PAGE_SIZE);
+  }, [topResolvedAdmins, currentTopResolvedPage]);
+  const topResolvedColumns = useMemo(() => {
+    const midpoint = Math.ceil(paginatedTopResolvedAdmins.length / 2);
+    return [
+      paginatedTopResolvedAdmins.slice(0, midpoint),
+      paginatedTopResolvedAdmins.slice(midpoint),
+    ].filter((column) => column.length > 0);
+  }, [paginatedTopResolvedAdmins]);
 
   const categorySubmissions7DaysChartData = useMemo(() => {
     return categorySubmissions7Days.map((row) => ({
@@ -574,6 +613,7 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     setIsDashboardStatsLoading(true);
+    setTopResolvedPage(1);
     setTopCategoriesPage(1);
     void Promise.all([
       getResolvedAdminsLast7Days(statsRange),
@@ -806,14 +846,30 @@ export default function SuperAdminDashboard() {
           {isAdminDashboardPage && (
             <>
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5" />
-                    Admin Dashboard
-                  </CardTitle>
-                  <CardDescription>
-                    Operations snapshot for admin accounts, unit ownership, and category coverage.
-                  </CardDescription>
+                <CardHeader className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5" />
+                      Admin Dashboard
+                    </CardTitle>
+                    <CardDescription>
+                      Operations snapshot for admin accounts, unit ownership, and category coverage.
+                    </CardDescription>
+                  </div>
+                  <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-border/70 bg-background/80 p-1">
+                    {statsRangeOptions.map((option) => (
+                      <Button
+                        key={option.value}
+                        type="button"
+                        size="sm"
+                        variant={statsRange === option.value ? "default" : "ghost"}
+                        className="rounded-full px-4"
+                        onClick={() => setStatsRange(option.value)}
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -845,97 +901,135 @@ export default function SuperAdminDashboard() {
                 </CardContent>
               </Card>
 
-              <div className="flex justify-end">
-                <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-border/70 bg-background/80 p-1">
-                  {statsRangeOptions.map((option) => (
-                    <Button
-                      key={option.value}
-                      type="button"
-                      size="sm"
-                      variant={statsRange === option.value ? "default" : "ghost"}
-                      className="rounded-full px-4"
-                      onClick={() => setStatsRange(option.value)}
-                    >
-                      {option.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
               <div className="grid gap-6 xl:grid-cols-2">
-                <Card>
+                <Card className="flex flex-col gap-4 overflow-hidden">
                   <CardHeader>
                     <CardTitle className="text-base">Most Resolved</CardTitle>
                     <CardDescription>
-                      Resolved feedbacks counted per assigned admin category.
+                      Admins with the most resolved submissions for the selected range.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    {isDashboardStatsLoading ? (
+                  <CardContent className="relative flex h-full min-h-0 flex-col overflow-hidden">
+                    {topResolvedAdmins.length === 0 ? (
                       <p className="py-10 text-center text-sm text-muted-foreground">
-                        Loading statistics...
-                      </p>
-                    ) : resolvedAdmins7DaysChartData.length === 0 ? (
-                      <p className="py-10 text-center text-sm text-muted-foreground">
-                        No resolved feedbacks in the last 7 days.
+                        {isDashboardStatsLoading
+                          ? "Loading statistics..."
+                          : "No resolved feedbacks in the selected range."}
                       </p>
                     ) : (
-                      <ChartContainer
-                        config={resolvedAdmins7DaysChartConfig}
-                        className="h-[290px] w-full"
-                      >
-                        <BarChart
-                          data={resolvedAdmins7DaysChartData}
-                          layout="vertical"
-                          margin={{ top: 8, right: 18, left: 8, bottom: 0 }}
-                        >
-                          <CartesianGrid horizontal={false} />
-                          <XAxis
-                            type="number"
-                            allowDecimals={false}
-                            tickLine={false}
-                            axisLine={false}
-                            tickMargin={8}
-                          />
-                          <YAxis
-                            type="category"
-                            dataKey="label"
-                            tickLine={false}
-                            axisLine={false}
-                            width={120}
-                          />
-                          <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                          <Bar
-                            dataKey="resolved"
-                            fill="var(--color-resolved)"
-                            radius={[0, 8, 8, 0]}
-                            maxBarSize={34}
-                            isAnimationActive={false}
-                          />
-                        </BarChart>
-                      </ChartContainer>
+                      <div className="flex h-full min-h-0 flex-col justify-between gap-4">
+                        <div className="min-h-0 flex-1">
+                          <div className={`grid md:grid-cols-2 ${topResolvedLayout.gridGap}`}>
+                            {topResolvedColumns.map((column, columnIndex) => (
+                              <div
+                                key={`resolved-column-${columnIndex}`}
+                                className={topResolvedLayout.columnSpace}
+                              >
+                                {column.map((resolver) => (
+                                  <div
+                                    key={resolver.name}
+                                    className={`${topResolvedLayout.row} ${
+                                      resolver.rank <= 3
+                                        ? "border-amber-100 bg-white"
+                                        : "border-border/60 bg-white"
+                                    }`}
+                                  >
+                                    <div className={topResolvedLayout.rowInner}>
+                                      <span
+                                        className={`${topResolvedLayout.rank} ${
+                                          resolver.rank <= 3
+                                            ? "text-amber-600"
+                                            : "text-foreground"
+                                        }`}
+                                      >
+                                        {resolver.rank}
+                                      </span>
+                                      <div
+                                        className={`${topResolvedLayout.avatar} ${
+                                          resolver.rank <= 3
+                                            ? "bg-amber-100 text-amber-800"
+                                            : "bg-muted text-foreground"
+                                        }`}
+                                      >
+                                        {resolver.initials}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className={topResolvedLayout.name}>{resolver.name}</p>
+                                        <p className={topResolvedLayout.unit}>{resolver.unit}</p>
+                                      </div>
+                                      <span
+                                        className={`${topResolvedLayout.count} ${
+                                          resolver.rank <= 3
+                                            ? "bg-amber-50 text-amber-800"
+                                            : "bg-muted text-muted-foreground"
+                                        }`}
+                                      >
+                                        {resolver.resolved}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                          <span>
+                            Page {currentTopResolvedPage} of {topResolvedTotalPages}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3"
+                              onClick={() =>
+                                setTopResolvedPage(Math.max(1, currentTopResolvedPage - 1))
+                              }
+                              disabled={currentTopResolvedPage <= 1}
+                            >
+                              Previous
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-8 px-3"
+                              onClick={() =>
+                                setTopResolvedPage(
+                                  Math.min(topResolvedTotalPages, currentTopResolvedPage + 1),
+                                )
+                              }
+                              disabled={currentTopResolvedPage >= topResolvedTotalPages}
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {isDashboardStatsLoading && topResolvedAdmins.length > 0 && (
+                      <div className="pointer-events-none absolute inset-0 rounded-b-xl bg-gradient-to-br from-background/10 via-background/25 to-background/40 motion-safe:animate-pulse" />
                     )}
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="flex flex-col">
                   <CardHeader>
                     <CardTitle className="text-base">Top Categories</CardTitle>
                     <CardDescription>
                       Most used categories across all submissions for the selected range.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="flex h-full flex-col">
-                    {isDashboardStatsLoading ? (
+                  <CardContent className="relative flex flex-col">
+                    {categorySubmissions7DaysChartData.length === 0 ? (
                       <p className="py-10 text-center text-sm text-muted-foreground">
-                        Loading statistics...
-                      </p>
-                    ) : categorySubmissions7DaysChartData.length === 0 ? (
-                      <p className="py-10 text-center text-sm text-muted-foreground">
-                        No submissions in the last 7 days.
+                        {isDashboardStatsLoading
+                          ? "Loading statistics..."
+                          : "No submissions in the last 7 days."}
                       </p>
                     ) : (
-                      <div className="flex h-full flex-col justify-between gap-6">
+                      <div className="flex flex-col gap-6">
                         <div className="grid gap-6 md:grid-cols-2">
                           {categorySubmissionColumns.map((column, columnIndex) => (
                             <div key={`category-column-${columnIndex}`} className="space-y-4">
@@ -969,40 +1063,41 @@ export default function SuperAdminDashboard() {
                             </div>
                           ))}
                         </div>
-                        {topCategoriesTotalPages > 1 && (
-                          <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-3"
-                              onClick={() =>
-                                setTopCategoriesPage(Math.max(1, currentTopCategoriesPage - 1))
-                              }
-                              disabled={currentTopCategoriesPage <= 1}
-                            >
-                              Previous
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-8 px-3"
-                              onClick={() =>
-                                setTopCategoriesPage(
-                                  Math.min(
-                                    topCategoriesTotalPages,
-                                    currentTopCategoriesPage + 1,
-                                  ),
-                                )
-                              }
-                              disabled={currentTopCategoriesPage >= topCategoriesTotalPages}
-                            >
-                              Next
-                            </Button>
-                          </div>
-                        )}
+                        <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+                          <span>
+                            Page {currentTopCategoriesPage} of {topCategoriesTotalPages}
+                          </span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3"
+                            onClick={() =>
+                              setTopCategoriesPage(Math.max(1, currentTopCategoriesPage - 1))
+                            }
+                            disabled={currentTopCategoriesPage <= 1}
+                          >
+                            Previous
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-3"
+                            onClick={() =>
+                              setTopCategoriesPage(
+                                Math.min(topCategoriesTotalPages, currentTopCategoriesPage + 1),
+                              )
+                            }
+                            disabled={currentTopCategoriesPage >= topCategoriesTotalPages}
+                          >
+                            Next
+                          </Button>
+                        </div>
                       </div>
+                    )}
+                    {isDashboardStatsLoading && categorySubmissions7DaysChartData.length > 0 && (
+                      <div className="pointer-events-none absolute inset-0 rounded-b-xl bg-gradient-to-br from-background/10 via-background/25 to-background/40 motion-safe:animate-pulse" />
                     )}
                   </CardContent>
                 </Card>
@@ -1611,7 +1706,6 @@ export default function SuperAdminDashboard() {
                     }))
                   }
                   placeholder="e.g. Juan"
-                  className="h-11 rounded-xl border-slate-300 bg-slate-50 px-4 shadow-sm focus-visible:border-primary/70 focus-visible:ring-primary/20"
                   required
                 />
               </div>
@@ -1629,7 +1723,6 @@ export default function SuperAdminDashboard() {
                     }))
                   }
                   placeholder="e.g. Dela Cruz"
-                  className="h-11 rounded-xl border-slate-300 bg-slate-50 px-4 shadow-sm focus-visible:border-primary/70 focus-visible:ring-primary/20"
                   required
                 />
               </div>
@@ -1651,7 +1744,7 @@ export default function SuperAdminDashboard() {
                     }))
                   }
                   placeholder="admin@school.edu.ph"
-                  className="h-11 rounded-xl border-slate-300 bg-slate-50 pr-4 pl-11 shadow-sm focus-visible:border-primary/70 focus-visible:ring-primary/20"
+                  className="pr-4 pl-11"
                   required
                 />
               </div>
@@ -1664,7 +1757,7 @@ export default function SuperAdminDashboard() {
                   setCreateForm((current) => ({ ...current, unit: value }))
                 }
               >
-                <SelectTrigger className="h-11 rounded-xl border-slate-300 bg-slate-50 px-4 shadow-sm focus-visible:border-primary/70 focus-visible:ring-primary/20">
+                <SelectTrigger>
                   <SelectValue placeholder="Select a unit" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1686,14 +1779,6 @@ export default function SuperAdminDashboard() {
             <div className="space-y-3 pt-1">
               <Button type="submit" className="h-12 w-full rounded-full text-base font-semibold">
               Create Admin Account
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-10 w-full text-sm text-muted-foreground"
-                onClick={() => setIsCreateOpen(false)}
-              >
-                Cancel
               </Button>
             </div>
           </form>
