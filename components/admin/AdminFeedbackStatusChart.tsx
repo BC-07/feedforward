@@ -22,6 +22,7 @@ interface AdminFeedbackStatusChartProps {
   feedbacks: Feedback[];
 }
 
+
 const VISIBILITY_ORDER = ["anonymous", "notAnonymous"] as const;
 
 type VisibilityKey = (typeof VISIBILITY_ORDER)[number];

@@ -107,7 +107,7 @@ interface ReplyComposerProps {
 const FEEDBACKS_PER_PAGE = 7;
 const CONVERSATION_MESSAGE_MAX_LENGTH = 2000;
 const EXPORT_LOGO_PATH = "/favicon.ico";
-const ADMIN_FEEDBACK_DETAIL_LAYOUT: "split" | "modal" = "split";
+const ADMIN_FEEDBACK_DETAIL_LAYOUT: "split" | "modal" = "modal";
 type AdminHoverFilterKey = "name" | "date" | "type" | "priority" | "status";
 const ADMIN_FILTER_TEXT_COLOR = "#171717";
 const ADMIN_FILTER_MUTED_COLOR = "#8f877d";
@@ -1574,8 +1574,8 @@ export function AdminFeedbackWorkspace({
                               <DialogContent
                                 className={
                                   activeEditTab === "manage"
-                                    ? "flex h-[85vh] max-h-[85vh] max-w-2xl flex-col overflow-hidden"
-                                    : "flex max-h-[80vh] max-w-2xl flex-col overflow-hidden"
+                                    ? "top-1/2 flex max-h-[85vh] w-full max-w-2xl -translate-y-1/2 flex-col overflow-hidden"
+                                    : "top-1/2 flex max-h-[80vh] w-full max-w-2xl -translate-y-1/2 flex-col overflow-hidden"
                                 }
                                 onInteractOutside={(event) => event.preventDefault()}
                                 onEscapeKeyDown={(event) => event.preventDefault()}
