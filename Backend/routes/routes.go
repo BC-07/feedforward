@@ -11,13 +11,14 @@ func AppRoutes(app *fiber.App) {
 	// app.Get("/", func(c *fiber.Ctx) error {
 	// 	return c.SendString("Hello Golang World!")
 	// })
-	
 
 	// CREATE YOUR ENDPOINTS HERE
 
 	// Auth - Users
 	app.Post("/auth/users/register", controller.RegisterUser)
 	app.Post("/auth/users/login", controller.LoginUser)
+	app.Post("/auth/users/login/request-otp", controller.RequestUserLoginOTP)
+	app.Post("/auth/users/login/verify-otp", controller.VerifyUserLoginOTP)
 	app.Post("/auth/users/forgot-password", controller.ForgotPassword)
 	app.Post("/auth/users/verify-reset-otp", controller.VerifyResetOTP)
 	app.Post("/auth/users/reset-password", controller.ResetPassword)

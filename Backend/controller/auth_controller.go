@@ -1,15 +1,88 @@
 package controller
 
 import (
+	"crypto/rand"
 	"fmt"
 	"intern_template_v1/middleware"
 	"intern_template_v1/model"
+	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
 )
+
+type userLoginOTPRequest struct {
+	Email string `json:"email"`
+}
+
+type userLoginVerifyOTPRequest struct {
+	Email string `json:"email"`
+	OTP   string `json:"otp"`
+}
+
+type userLoginOTPEntry struct {
+	Email     string
+	ExpiresAt time.Time
+}
+
+var (
+	userLoginOTPs   = map[string]userLoginOTPEntry{}
+	userLoginOTPMux sync.Mutex
+)
+
+func normalizeEmail(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func normalizeOTP(value string) string {
+	var builder strings.Builder
+	for _, ch := range strings.TrimSpace(value) {
+		if (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') {
+			builder.WriteRune(ch)
+		}
+	}
+	return strings.ToUpper(builder.String())
+}
+
+func generateUserLoginOTP() (string, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%06d", n.Int64()), nil
+}
+
+func cleanupExpiredUserLoginOTPs(now time.Time) {
+	for otp, entry := range userLoginOTPs {
+		if now.After(entry.ExpiresAt) {
+			delete(userLoginOTPs, otp)
+		}
+	}
+}
+
+func buildUserLoginOTPHTML(otp string) string {
+	body := fmt.Sprintf(
+		`<p style="margin:0 0 12px 0;font-size:15px;line-height:22px;color:#111827;">Use this one-time code to sign in to FeedForward:</p>
+<div style="margin:20px 0;text-align:center;">
+  <div style="display:inline-block;padding:18px 22px;border-radius:14px;background:#fff3e0;font-size:30px;font-weight:800;letter-spacing:0.35em;color:#111827;">%s</div>
+</div>
+<p style="margin:16px 0 0 0;font-size:13px;line-height:20px;color:#6b7280;">This OTP expires in 5 minutes. If you did not request this login, you can ignore this email.</p>`,
+		esc(otp),
+	)
+	return buildEmailShell("Your FeedForward login OTP", body)
+}
+
+func buildUserLoginOTPText(otp string) string {
+	return strings.Join([]string{
+		"Use this one-time code to sign in to FeedForward:",
+		fmt.Sprintf("OTP: %s", otp),
+		"This OTP expires in 5 minutes.",
+		"If you did not request this login, you can ignore this email.",
+	}, "\n")
+}
 
 func RegisterUser(c *fiber.Ctx) error {
 	db := middleware.DBConn
@@ -170,6 +243,88 @@ func LoginUser(c *fiber.Ctx) error {
 	user, err := fetchUserByID(credential.ID)
 	if err != nil {
 		return serverError(c, "failed to load user profile", err)
+	}
+
+	session, err := createSession(sessionRoleUser, &user.ID, nil, nil, userSessionTTL)
+	if err != nil {
+		return serverError(c, "failed to create user session", err)
+	}
+	setSessionCookie(c, session)
+
+	return success(c, fiber.StatusOK, user)
+}
+
+func RequestUserLoginOTP(c *fiber.Ctx) error {
+	var payload userLoginOTPRequest
+	if err := parseBody(c, &payload); err != nil {
+		return parseError(c, "failed to parse request", err)
+	}
+
+	email := normalizeEmail(payload.Email)
+	if email == "" {
+		return invalidRequest(c, "email is required")
+	}
+
+	user, err := fetchUserByEmail(email)
+	if err != nil {
+		return serverError(c, "failed to check user account", err)
+	}
+	if strings.TrimSpace(user.ID) == "" {
+		return unauthorized(c, "invalid email or password")
+	}
+
+	otp, err := generateUserLoginOTP()
+	if err != nil {
+		return serverError(c, "failed to generate OTP", err)
+	}
+
+	now := utcNow()
+	userLoginOTPMux.Lock()
+	cleanupExpiredUserLoginOTPs(now)
+	userLoginOTPs[otp] = userLoginOTPEntry{
+		Email:     email,
+		ExpiresAt: now.Add(5 * time.Minute),
+	}
+	userLoginOTPMux.Unlock()
+
+	if err := sendEmail(email, "Your FeedForward login OTP", buildUserLoginOTPText(otp), buildUserLoginOTPHTML(otp)); err != nil {
+		return serverError(c, "failed to send OTP", err)
+	}
+
+	return success(c, fiber.StatusOK, map[string]any{"sent": true})
+}
+
+func VerifyUserLoginOTP(c *fiber.Ctx) error {
+	var payload userLoginVerifyOTPRequest
+	if err := parseBody(c, &payload); err != nil {
+		return parseError(c, "failed to parse request", err)
+	}
+
+	email := normalizeEmail(payload.Email)
+	otp := normalizeOTP(payload.OTP)
+	if email == "" || otp == "" {
+		return invalidRequest(c, "email and OTP are required")
+	}
+
+	now := utcNow()
+	userLoginOTPMux.Lock()
+	cleanupExpiredUserLoginOTPs(now)
+	entry, exists := userLoginOTPs[otp]
+	if exists && entry.Email == email {
+		delete(userLoginOTPs, otp)
+	}
+	userLoginOTPMux.Unlock()
+
+	if !exists || entry.Email != email {
+		return invalidRequest(c, "invalid or expired OTP")
+	}
+
+	user, err := fetchUserByEmail(email)
+	if err != nil {
+		return serverError(c, "failed to load user profile", err)
+	}
+	if strings.TrimSpace(user.ID) == "" {
+		return unauthorized(c, "invalid email or password")
 	}
 
 	session, err := createSession(sessionRoleUser, &user.ID, nil, nil, userSessionTTL)
@@ -506,11 +661,11 @@ func GetSessionInfo(c *fiber.Ctx) error {
 	}
 
 	return success(c, fiber.StatusOK, map[string]any{
-		"role":          session.Role,
-		"userId":        session.UserID,
-		"adminId":       session.AdminID,
+		"role":           session.Role,
+		"userId":         session.UserID,
+		"adminId":        session.AdminID,
 		"lastActivityAt": session.LastActivityAt,
-		"expiresAt":     session.ExpiresAt,
+		"expiresAt":      session.ExpiresAt,
 	})
 }
 
@@ -521,10 +676,10 @@ func PingSuperAdminSession(c *fiber.Ctx) error {
 	}
 
 	return success(c, fiber.StatusOK, map[string]any{
-		"role":          session.Role,
-		"adminId":       session.AdminID,
+		"role":           session.Role,
+		"adminId":        session.AdminID,
 		"lastActivityAt": session.LastActivityAt,
-		"expiresAt":     session.ExpiresAt,
+		"expiresAt":      session.ExpiresAt,
 	})
 }
 
