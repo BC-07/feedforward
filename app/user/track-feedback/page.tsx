@@ -1,5 +1,5 @@
-import UserProfile from "../page";
+import { UserDashboard } from "@/components/user/UserDashboard";
 
 export default function UserTrackFeedbackPage() {
-  return <UserProfile />;
+  return <UserDashboard view="my-submissions" />;
 }

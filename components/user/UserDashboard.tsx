@@ -102,12 +102,13 @@ export type UserDashboardView = "home" | "my-submissions" | "submit-feedback";
 const FEEDBACK_MESSAGE_MAX_LENGTH = 250;
 const FEEDBACK_SUBJECT_MAX_LENGTH = 50;
 const CONVERSATION_MESSAGE_MAX_LENGTH = 2000;
+const MY_SUBMISSIONS_DEFAULT_PER_PAGE = 7;
+const MY_SUBMISSIONS_PER_PAGE_OPTIONS = [5, 7, 10, 15, 20] as const;
 const SUBMISSION_FILTER_TEXT_COLOR = "#171717";
 const SUBMISSION_FILTER_CONTROL_CLASS =
   "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
 
 export function UserDashboard({ view }: { view: UserDashboardView }) {
-  const MY_SUBMISSIONS_PER_PAGE = 7;
   type HoverFilterKey =
     | "tracking"
     | "date"
@@ -148,6 +149,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [filterDate, setFilterDate] = useState("recent");
   const [filterTracking, setFilterTracking] = useState("asc");
   const [mySubmissionsPage, setMySubmissionsPage] = useState(1);
+  const [mySubmissionsPerPage, setMySubmissionsPerPage] = useState(
+    MY_SUBMISSIONS_DEFAULT_PER_PAGE,
+  );
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
@@ -912,19 +916,19 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
   const mySubmissionsTotalPages = Math.max(
     1,
-    Math.ceil(filteredFeedbacks.length / MY_SUBMISSIONS_PER_PAGE),
+    Math.ceil(filteredFeedbacks.length / mySubmissionsPerPage),
   );
 
   const paginatedFilteredFeedbacks = useMemo(() => {
-    const startIndex = (mySubmissionsPage - 1) * MY_SUBMISSIONS_PER_PAGE;
+    const startIndex = (mySubmissionsPage - 1) * mySubmissionsPerPage;
     return filteredFeedbacks.slice(
       startIndex,
-      startIndex + MY_SUBMISSIONS_PER_PAGE,
+      startIndex + mySubmissionsPerPage,
     );
-  }, [filteredFeedbacks, mySubmissionsPage]);
+  }, [filteredFeedbacks, mySubmissionsPage, mySubmissionsPerPage]);
   const mySubmissionsPlaceholderRowCount = Math.max(
     0,
-    MY_SUBMISSIONS_PER_PAGE - paginatedFilteredFeedbacks.length,
+    mySubmissionsPerPage - paginatedFilteredFeedbacks.length,
   );
 
   useEffect(() => {
@@ -937,6 +941,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     filterCategory,
     filterPriority,
     filterStatus,
+    mySubmissionsPerPage,
   ]);
 
   useEffect(() => {
@@ -2132,7 +2137,32 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                 </div>
                 {filteredFeedbacks.length > 0 ? (
                   <div className="shrink-0 border-t border-border/60 bg-background pt-3">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Show</span>
+                        <Select
+                          value={mySubmissionsPerPage.toString()}
+                          onValueChange={(value) => {
+                            const parsed = Number.parseInt(value, 10);
+                            if (!Number.isNaN(parsed) && parsed > 0) {
+                              setMySubmissionsPerPage(parsed);
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-9 w-[86px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MY_SUBMISSIONS_PER_PAGE_OPTIONS.map((option) => (
+                              <SelectItem key={option} value={option.toString()}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="text-sm text-muted-foreground">per page</span>
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -2164,6 +2194,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       >
                         <ChevronRight className="h-4 w-4" />
                       </Button>
+                      </div>
                     </div>
                   </div>
                 ) : null}
@@ -2192,7 +2223,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   className="ff-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px]"
                   onClick={handleAttemptCloseSelectedFeedback}
                 />
-                <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90svh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
+                <Card className="ff-modal-panel relative z-10 w-full max-w-4xl max-h-[90svh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
                   <CardHeader className="space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <CardTitle>Feedback Details</CardTitle>
@@ -2210,7 +2241,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       {selectedFeedback.id}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="flex-1 min-h-0 overflow-y-auto space-y-6">
+                  <CardContent className="overflow-y-auto space-y-6 pb-12">
                   <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
                   <FeedbackStatusCard
                     feedback={selectedFeedback}
@@ -2228,168 +2259,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   </div>
                   </div>
 
-                  <Card className="shadow-lg bg-muted/40 border-border">
-                    <CardContent className="pt-6">
-                      <div className="grid max-h-[420px] min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-xl border border-border bg-white/70">
-                        <div
-                          ref={conversationScrollRef}
-                          className="ff-hide-scrollbar min-h-0 overflow-y-auto p-4"
-                        >
-                          {isMessagesLoading && (
-                            <p className="text-sm text-muted-foreground">
-                              Loading conversation...
-                            </p>
-                          )}
-                          {!isMessagesLoading && messages.length === 0 && (
-                            <p className="text-sm text-muted-foreground">
-                              No messages yet. Updates from the admin team will appear here.
-                            </p>
-                          )}
-                          <div className="space-y-4">
-                            {(() => {
-                              let lastDayLabel = "";
-                              return messages.map((entry, index, allMessages) => {
-                                const createdAt = entry.createdAt
-                                  ? new Date(entry.createdAt)
-                                  : null;
-                                const today = new Date();
-                                const yesterday = new Date();
-                                yesterday.setDate(today.getDate() - 1);
-
-                                const dayLabel = createdAt
-                                  ? createdAt.toDateString() === today.toDateString()
-                                    ? "Today"
-                                    : createdAt.toDateString() === yesterday.toDateString()
-                                      ? "Yesterday"
-                                      : createdAt.toLocaleDateString(undefined, {
-                                          month: "short",
-                                          day: "numeric",
-                                          year: "numeric",
-                                        })
-                                  : "";
-                                const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
-                                if (showDayLabel) {
-                                  lastDayLabel = dayLabel;
-                                }
-
-                                const isUser = entry.senderRole === "user";
-                                const name = isUser ? "You" : entry.senderName || "Admin";
-                                const prev = index > 0 ? allMessages[index - 1] : null;
-                                const prevIsUser = prev ? prev.senderRole === "user" : false;
-                                const prevName = prev
-                                  ? prevIsUser
-                                    ? "You"
-                                    : prev.senderName || "Admin"
-                                  : "";
-                                const showName =
-                                  !prev ||
-                                  showDayLabel ||
-                                  prev.senderRole !== entry.senderRole ||
-                                  prevName !== name;
-                                const hasVeryLongToken = /\S{24,}/.test(
-                                  entry.message || "",
-                                );
-                                const isLikelyMultiLine =
-                                  (entry.message || "").includes("\n") ||
-                                  (entry.message || "").length > 60;
-
-                                return (
-                                  <div key={entry.id} className="space-y-3">
-                                    {showDayLabel ? (
-                                      <div className="flex justify-center">
-                                        <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                                          {dayLabel}
-                                        </span>
-                                      </div>
-                                    ) : null}
-                                    <div
-                                      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                                    >
-                                      <div
-                                        className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUser ? "text-right" : "text-left"}`}
-                                      >
-                                        {showName ? (
-                                          <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
-                                            {name}
-                                          </p>
-                                        ) : null}
-                                        <div
-                                          className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                                            isUser
-                                              ? "bg-accent text-white"
-                                              : "border border-border bg-white text-foreground"
-                                          }`}
-                                        >
-                                          <p
-                                            className={`whitespace-pre-line leading-relaxed ${
-                                              hasVeryLongToken
-                                                ? "break-all"
-                                                : "break-words"
-                                            }`}
-                                          >
-                                            {entry.message}
-                                          </p>
-                                        </div>
-                                        {entry.createdAt ? (
-                                          <span
-                                            className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-3 py-1.5 text-xs text-white shadow-sm group-hover:inline-flex ${
-                                              isUser
-                                                ? "-left-1 -translate-x-full"
-                                                : "-right-1 translate-x-full"
-                                            } ${
-                                              isLikelyMultiLine
-                                                ? "top-1/2"
-                                                : "top-[68%]"
-                                            }`}
-                                          >
-                                            {formatLocalTime(entry.createdAt)}
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              });
-                            })()}
-                          </div>
-                        </div>
-                        <div className="space-y-2 bg-background/85 p-4 backdrop-blur-sm">
-                          <div className="flex items-end gap-2">
-                            <Textarea
-                              id="reply-message"
-                              placeholder="Type your message..."
-                              rows={1}
-                              value={messageDraft}
-                              onChange={(e) =>
-                                setMessageDraft(
-                                  e.target.value.slice(0, CONVERSATION_MESSAGE_MAX_LENGTH),
-                                )
-                              }
-                              maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
-                              disabled={isSendingMessage}
-                              className="ff-hide-scrollbar w-full max-w-full min-w-0 max-h-[10.5rem] min-h-8 resize-none overflow-y-auto rounded-xl border border-border/70 bg-background px-4 py-2 leading-relaxed shadow-sm [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap] focus-visible:ring-2 focus-visible:ring-accent/30"
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" && !event.shiftKey) {
-                                  event.preventDefault();
-                                  void handleSendMessage();
-                                }
-                              }}
-                            />
-                            <Button
-                              type="button"
-                              onClick={handleSendMessage}
-                              size="icon"
-                              variant="secondary"
-                              className="h-12 w-12 shrink-0 rounded-xl border border-border/70 bg-muted/80 text-muted-foreground hover:bg-accent hover:text-white"
-                              disabled={isSendingMessage}
-                            >
-                              <Send className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
                   </CardContent>
 
                   <div className="pointer-events-none absolute bottom-0 right-5 z-20 flex flex-col items-end gap-2">
