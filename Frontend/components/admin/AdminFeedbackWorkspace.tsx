@@ -21,6 +21,7 @@ import {
   type Feedback,
   type FeedbackMessage,
 } from "@/lib/api";
+import { getPlaceholderRowCount } from "@/lib/tableUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -848,11 +849,13 @@ export function AdminFeedbackWorkspace({
     const startIndex = (currentPage - 1) * feedbacksPageSize;
     return visibleFeedbacks.slice(startIndex, startIndex + feedbacksPageSize);
   }, [currentPage, visibleFeedbacks, feedbacksPageSize]);
-  const adminPlaceholderRowCount =
-    feedbacksPageSize === FEEDBACKS_PER_PAGE
-      ? Math.max(0, FEEDBACKS_PER_PAGE - paginatedFeedbacks.length)
-      : 0;
-
+  const adminPlaceholderRowCount = getPlaceholderRowCount(
+    currentPage,
+    feedbacksPageSize,
+    FEEDBACKS_PER_PAGE,
+    paginatedFeedbacks.length,
+  );
+  
   useEffect(() => {
     setCurrentPage(1);
   }, [

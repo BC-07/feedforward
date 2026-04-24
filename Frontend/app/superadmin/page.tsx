@@ -20,6 +20,7 @@ import {
   type Category,
   type SuperAdminBarStatRow,
 } from "@/lib/api";
+import { getPlaceholderRowCount } from "@/lib/tableUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -263,6 +264,10 @@ export default function SuperAdminDashboard() {
   const [categoryControlPageSize, setCategoryControlPageSize] =
     useState<(typeof CATEGORY_CONTROL_PAGE_SIZE_OPTIONS)[number]>(10);
   const [statsRange, setStatsRange] = useState<StatsRange>("7d");
+  const [adminSearch, setAdminSearch] = useState("");
+  const [adminNameSort, setAdminNameSort] = useState<"az" | "za">("az");
+  const [adminUnitFilter, setAdminUnitFilter] = useState("all");
+  const [adminCreatedFilter, setAdminCreatedFilter] = useState<"latest" | "oldest">("latest");
   const [categorySearch, setCategorySearch] = useState("");
   const [categoryStatusFilter, setCategoryStatusFilter] = useState<
     "all" | "assigned" | "unassigned"
@@ -287,19 +292,40 @@ export default function SuperAdminDashboard() {
   };
   */
 
-  const visibleAdmins = admins
-    .filter((admin) => {
-      if (adminFilter === "disabled") {
-        return Boolean(admin.isDisabled);
-      }
-      return !admin.isDisabled;
-    })
-    .sort((a, b) => {
-      const aInactive = a.unit.trim().toLowerCase() === "inactive";
-      const bInactive = b.unit.trim().toLowerCase() === "inactive";
-      if (aInactive === bInactive) return 0;
-      return aInactive ? 1 : -1;
-    });
+  const visibleAdmins = useMemo(() => {
+    const normalizedSearch = adminSearch.trim().toLowerCase();
+    return admins
+      .filter((admin) => {
+        if (adminFilter === "disabled") return Boolean(admin.isDisabled);
+        return !admin.isDisabled;
+      })
+      .filter((admin) => {
+        if (!normalizedSearch) return true;
+        return (
+          admin.name.toLowerCase().includes(normalizedSearch) ||
+          admin.email.toLowerCase().includes(normalizedSearch) ||
+          admin.unit.toLowerCase().includes(normalizedSearch)
+        );
+      })
+      .filter((admin) => {
+        if (adminUnitFilter === "all") return true;
+        return admin.unit.trim().toLowerCase() === adminUnitFilter.toLowerCase();
+      })
+      .sort((a, b) => {
+        const createdDiff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (adminCreatedFilter === "latest" ? createdDiff !== 0 : createdDiff !== 0) {
+          return adminCreatedFilter === "latest" ? -createdDiff : createdDiff;
+        }
+        const nameDiff = a.name.localeCompare(b.name);
+        return adminNameSort === "az" ? nameDiff : -nameDiff;
+      })
+      .sort((a, b) => {
+        const aInactive = a.unit.trim().toLowerCase() === "inactive";
+        const bInactive = b.unit.trim().toLowerCase() === "inactive";
+        if (aInactive === bInactive) return 0;
+        return aInactive ? 1 : -1;
+      });
+  }, [admins, adminFilter, adminSearch, adminUnitFilter, adminNameSort, adminCreatedFilter]);
 
   const availableCategories = categories.filter((category) => {
     const name = category.name.trim().toLowerCase();
@@ -439,11 +465,12 @@ export default function SuperAdminDashboard() {
     currentCategoryControlPage,
     categoryControlPageSize,
   ]);
-  const categoryPlaceholderRowCount = useMemo(() => {
-    return categoryControlPageSize === 10
-      ? Math.max(0, 10 - paginatedCategoryControlRows.length)
-      : 0;
-  }, [paginatedCategoryControlRows.length, categoryControlPageSize]);
+  const categoryPlaceholderRowCount = getPlaceholderRowCount(
+  currentCategoryControlPage,
+  categoryControlPageSize,
+  10,
+  paginatedCategoryControlRows.length,
+  );
   const assignedCategoriesCount = categoryControlRows.filter(
     (row) => row.isAssigned,
   ).length;
@@ -468,7 +495,7 @@ export default function SuperAdminDashboard() {
 
   useEffect(() => {
     setAdminPage(1);
-  }, [adminFilter, adminPageSize]);
+  }, [adminFilter, adminPageSize, adminSearch, adminUnitFilter, adminNameSort, adminCreatedFilter]);
 
   const recentSignups7DaysData = useMemo(() => {
     const totalsByDay = new Map<string, number>();
@@ -517,9 +544,12 @@ export default function SuperAdminDashboard() {
     const start = (currentAdminPage - 1) * adminPageSize;
     return visibleAdmins.slice(start, start + adminPageSize);
   }, [visibleAdmins, currentAdminPage, adminPageSize]);
-  const adminPlaceholderRowCount = useMemo(() => {
-    return adminPageSize === 10 ? Math.max(0, 10 - paginatedAdmins.length) : 0;
-  }, [paginatedAdmins.length, adminPageSize]);
+  const adminPlaceholderRowCount = getPlaceholderRowCount(
+    currentAdminPage,
+    adminPageSize,
+    10,
+    paginatedAdmins.length,
+  );
   const assignmentTotalPages = Math.max(
     1,
     Math.ceil(unitCoverageRows.length / ASSIGNMENT_PAGE_SIZE),
@@ -1432,7 +1462,7 @@ export default function SuperAdminDashboard() {
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <UserCog className="h-5 w-5" />
-                      Admin Control
+                      Admin Directory
                     </CardTitle>
                     <CardDescription>
                       {adminFilter === "disabled"
@@ -1476,6 +1506,46 @@ export default function SuperAdminDashboard() {
                 </div>
               </CardHeader>
               <CardContent className="flex min-h-0 flex-1 flex-col gap-0 pt-0">
+                <div className="mb-3 hidden gap-x-3 gap-y-2 md:grid xl:grid-cols-[minmax(0,1.9fr)_repeat(3,minmax(0,1fr))]">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search name, email or unit."
+                      value={adminSearch}
+                      onChange={(event) => setAdminSearch(event.target.value)}
+                      className="h-8.5 border-border/60 bg-background pl-9 text-sm transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
+                    />
+                  </div>
+                  <Select value={adminNameSort} onValueChange={(v) => setAdminNameSort(v as "az" | "za")}>
+                    <SelectTrigger className="h-8.5 border-border/60 bg-background text-sm [&_svg]:text-[#6f6255]">
+                      <SelectValue placeholder="A - Z" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="az">A - Z</SelectItem>
+                      <SelectItem value="za">Z - A</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={adminCreatedFilter} onValueChange={(v) => setAdminCreatedFilter(v as "latest" | "oldest")}>
+                    <SelectTrigger className="h-8.5 border-border/60 bg-background text-sm [&_svg]:text-[#6f6255]">
+                      <SelectValue placeholder="Latest" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="latest">Latest</SelectItem>
+                      <SelectItem value="oldest">Oldest</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={adminUnitFilter} onValueChange={setAdminUnitFilter}>
+                    <SelectTrigger className="h-8.5 border-border/60 bg-background text-sm [&_svg]:text-[#6f6255]">
+                      <SelectValue placeholder="All Units" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Units</SelectItem>
+                      {[...new Set(admins.map((a) => a.unit.trim()).filter(Boolean))].sort().map((unit) => (
+                        <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="w-full overflow-x-auto">
                   <Table className={SUPERADMIN_ADMIN_TABLE_CLASS_NAME}>
                     <TableHeader className={SUPERADMIN_TABLE_HEADER_CLASS_NAME}>
@@ -1619,7 +1689,7 @@ export default function SuperAdminDashboard() {
                     </div>
                     <div className="flex h-9 items-center">
                       <CardTitle className="text-[21px] font-semibold leading-none tracking-[-0.02em] text-[#171717]">
-                        Category Control
+                        Category Directory
                       </CardTitle>
                     </div>
                   </div>

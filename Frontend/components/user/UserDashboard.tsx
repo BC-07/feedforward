@@ -20,6 +20,7 @@ import {
   type Feedback,
   type FeedbackMessage,
 } from "@/lib/api";
+import { getPlaceholderRowCount } from "@/lib/tableUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1089,10 +1090,12 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       startIndex + mySubmissionsPageSize,
     );
   }, [filteredFeedbacks, mySubmissionsPage, mySubmissionsPageSize]);
-  const mySubmissionsPlaceholderRowCount =
-    mySubmissionsPageSize === 10
-      ? Math.max(0, 10 - paginatedFilteredFeedbacks.length)
-      : 0;
+  const mySubmissionsPlaceholderRowCount = getPlaceholderRowCount(
+    mySubmissionsPage,
+    mySubmissionsPageSize,
+    10,
+    paginatedFilteredFeedbacks.length,
+  );
 
   useEffect(() => {
     setMySubmissionsPage(1);
