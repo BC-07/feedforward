@@ -264,7 +264,7 @@ export function AdminFeedbackWorkspace({
   >(null);
   const PAGE_SIZE_OPTIONS = [10, 30, 50, 100] as const;
   const [feedbacksPageSize, setFeedbacksPageSize] =
-    useState<number>(FEEDBACKS_PER_PAGE);
+    useState<number>(10);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const trimmedSearchQuery = searchQuery.trim();
   const isSplitPaneLayout = false;
