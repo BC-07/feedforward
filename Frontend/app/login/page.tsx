@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { loginAdmin, requestUserLoginOTP, verifyUserLoginOTP } from "@/lib/api";
+import {
+  loginAdmin,
+  loginUser,
+  requestUserLoginOTP,
+  verifyUserLoginOTP,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,7 +103,30 @@ export default function Login() {
         router.push("/dashboard");
         return;
       } catch {
-        // Fall through to user OTP login.
+        try {
+          const user = await loginUser({
+            email: normalizedEmail,
+            password: normalizedPassword,
+          });
+          localStorage.setItem("isUserLoggedIn", "true");
+          localStorage.setItem("currentUserId", user.id);
+          localStorage.setItem("currentUserName", user.name);
+          localStorage.setItem("currentUserEmail", user.email);
+          localStorage.removeItem("isAdminLoggedIn");
+          localStorage.removeItem("currentAdminId");
+          localStorage.removeItem("currentAdminName");
+          localStorage.removeItem("currentAdminEmail");
+          localStorage.removeItem("currentAdminDepartment");
+          localStorage.removeItem("isSuperAdminLoggedIn");
+          localStorage.removeItem("superAdminName");
+          localStorage.removeItem("superAdminExpiresAt");
+          toast.success(`Welcome back, ${user.name}!`);
+          router.push("/user/home");
+          return;
+        } catch (error) {
+          toastApiError(error, "Invalid email or password");
+          return;
+        }
       }
     }
 

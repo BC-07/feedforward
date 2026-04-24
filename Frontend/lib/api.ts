@@ -53,6 +53,11 @@ export interface SuperAdminSession {
   expiresAt: string;
 }
 
+export interface LoginRoleResponse {
+  role: "none" | "user" | "admin" | "superadmin";
+  isSuperAdmin?: boolean;
+}
+
 export interface Category {
   id: number;
   name: string;
@@ -383,6 +388,12 @@ export async function loginSuperAdmin(payload: {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function getLoginRole(email: string): Promise<LoginRoleResponse> {
+  const params = new URLSearchParams();
+  params.set("email", email);
+  return apiFetch<LoginRoleResponse>(`/auth/login-role?${params.toString()}`);
 }
 
 export async function listAdmins(): Promise<Admin[]> {

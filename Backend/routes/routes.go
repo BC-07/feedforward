@@ -15,6 +15,7 @@ func AppRoutes(app *fiber.App) {
 	// CREATE YOUR ENDPOINTS HERE
 
 	// Auth - Users
+	app.Get("/auth/login-role", controller.GetLoginRole)
 	app.Post("/auth/users/register", controller.RegisterUser)
 	app.Post("/auth/users/login", controller.LoginUser)
 	app.Post("/auth/users/login/request-otp", controller.RequestUserLoginOTP)

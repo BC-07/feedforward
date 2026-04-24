@@ -28,6 +28,11 @@ type userLoginOTPEntry struct {
 	ExpiresAt time.Time
 }
 
+type loginRoleResponse struct {
+	Role         string `json:"role"`
+	IsSuperAdmin bool   `json:"isSuperAdmin,omitempty"`
+}
+
 var (
 	userLoginOTPs   = map[string]userLoginOTPEntry{}
 	userLoginOTPMux sync.Mutex
@@ -334,6 +339,38 @@ func VerifyUserLoginOTP(c *fiber.Ctx) error {
 	setSessionCookie(c, session)
 
 	return success(c, fiber.StatusOK, user)
+}
+
+func GetLoginRole(c *fiber.Ctx) error {
+	email := normalizeEmail(c.Query("email"))
+	if email == "" {
+		return invalidRequest(c, "email is required")
+	}
+
+	admin, err := fetchAdminByEmail(email)
+	if err != nil {
+		return serverError(c, "failed to check login role", err)
+	}
+	if strings.TrimSpace(admin.ID) != "" {
+		role := sessionRoleAdmin
+		if admin.IsSuperAdmin {
+			role = sessionRoleSuperAdmin
+		}
+		return success(c, fiber.StatusOK, loginRoleResponse{
+			Role:         role,
+			IsSuperAdmin: admin.IsSuperAdmin,
+		})
+	}
+
+	user, err := fetchUserByEmail(email)
+	if err != nil {
+		return serverError(c, "failed to check login role", err)
+	}
+	if strings.TrimSpace(user.ID) != "" {
+		return success(c, fiber.StatusOK, loginRoleResponse{Role: sessionRoleUser})
+	}
+
+	return success(c, fiber.StatusOK, loginRoleResponse{Role: "none"})
 }
 
 func LoginAdmin(c *fiber.Ctx) error {
