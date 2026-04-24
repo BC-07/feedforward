@@ -71,7 +71,7 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white to-muted p-4 sm:p-6">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-white via-orange-50 to-white p-4 sm:p-6">
       <Card className="max-w-2xl w-full shadow-lg">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">

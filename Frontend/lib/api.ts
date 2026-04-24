@@ -290,6 +290,25 @@ export async function loginUser(payload: {
   });
 }
 
+export async function requestUserLoginOTP(payload: {
+  email: string;
+}): Promise<{ sent: boolean }> {
+  return apiFetch<{ sent: boolean }>("/auth/users/login/request-otp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function verifyUserLoginOTP(payload: {
+  email: string;
+  otp: string;
+}): Promise<User> {
+  return apiFetch<User>("/auth/users/login/verify-otp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function forgotPassword(payload: {
   email: string;
 }): Promise<{ sent: boolean }> {
