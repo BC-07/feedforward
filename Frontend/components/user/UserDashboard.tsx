@@ -1737,38 +1737,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             </div>
           </DialogContent>
         </Dialog>
-        {isUnsentMessageDialogOpen ? (
-          <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
-            <div className="w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg">
-              <div className="space-y-2 text-left">
-                <h2 className="text-lg font-semibold">
-                  Discard unsent message?
-                </h2>
-                <p className="text-muted-foreground text-sm">
-                  You have a message that has not been sent yet.
-                </p>
-              </div>
-              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsUnsentMessageDialogOpen(false)}
-                >
-                  Keep
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setIsUnsentMessageDialogOpen(false);
-                    closeSelectedFeedback();
-                  }}
-                >
-                  Discard
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+
         <div
           className={`mx-auto w-full px-4 ${
             isHomeView || isMySubmissionsView
@@ -2291,7 +2260,24 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       className="ff-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px]"
                       onClick={handleAttemptCloseSelectedFeedback}
                     />
-                    <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
+                    <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl" style={isUnsentMessageDialogOpen ? {borderColor: "transparent"} : {}}>
+                      {isUnsentMessageDialogOpen && (
+                        <>
+                          <div className="absolute -inset-px z-20 rounded-2x1 bg-black/40 backdrop-blur-[1px]" />
+                          <div className="absolute inset-0 z-30 flex items-center justify-center p-4">
+                            <div className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
+                              <div className="space-y-2 text-left">
+                                <h2 className="text-lg font-semibold">Discard unsent message?</h2>
+                                <p className="text-sm text-muted-foreground">You have a message that has not been sent yet.</p>
+                              </div>
+                              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                                <Button type="button" variant="outline" onClick={() => setIsUnsentMessageDialogOpen(false)}>Keep</Button>
+                                <Button type="button" onClick={() => { setIsUnsentMessageDialogOpen(false); closeSelectedFeedback(); }}>Discard</Button>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
                       <CardHeader className="space-y-0 pb-0">
                         <div className="flex items-center justify-between gap-3">
                           <CardTitle>Feedback Details</CardTitle>
@@ -2329,208 +2315,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           </div>
                         </div>
 
-                        <Card className="shadow-lg bg-muted/40 border-border gap-2">
-                          <CardHeader className="pb-0">
-                            <CardTitle className="text-base">
-                              Feedback Updates
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent className="pt-0">
-                            <div className="grid max-h-[420px] min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-xl border border-border bg-white/70">
-                              <div
-                                ref={conversationScrollRef}
-                                className="ff-hide-scrollbar min-h-0 overflow-y-auto p-4"
-                              >
-                                {isMessagesLoading && (
-                                  <p className="text-sm text-muted-foreground">
-                                    Loading conversation...
-                                  </p>
-                                )}
-                                {!isMessagesLoading &&
-                                  messages.length === 0 && (
-                                    <p className="text-sm text-muted-foreground">
-                                      No messages yet. Updates from the admin
-                                      team will appear here.
-                                    </p>
-                                  )}
-                                <div className="space-y-4">
-                                  {(() => {
-                                    let lastDayLabel = "";
-                                    return messages.map(
-                                      (entry, index, allMessages) => {
-                                        const createdAt = entry.createdAt
-                                          ? new Date(entry.createdAt)
-                                          : null;
-                                        const today = new Date();
-                                        const yesterday = new Date();
-                                        yesterday.setDate(today.getDate() - 1);
-
-                                        const dayLabel = createdAt
-                                          ? createdAt.toDateString() ===
-                                            today.toDateString()
-                                            ? "Today"
-                                            : createdAt.toDateString() ===
-                                                yesterday.toDateString()
-                                              ? "Yesterday"
-                                              : createdAt.toLocaleDateString(
-                                                  undefined,
-                                                  {
-                                                    month: "short",
-                                                    day: "numeric",
-                                                    year: "numeric",
-                                                  },
-                                                )
-                                          : "";
-                                        const showDayLabel =
-                                          dayLabel && dayLabel !== lastDayLabel;
-                                        if (showDayLabel) {
-                                          lastDayLabel = dayLabel;
-                                        }
-
-                                        const isUser =
-                                          entry.senderRole === "user";
-                                        const name = isUser
-                                          ? "You"
-                                          : entry.senderName || "Admin";
-                                        const prev =
-                                          index > 0
-                                            ? allMessages[index - 1]
-                                            : null;
-                                        const prevIsUser = prev
-                                          ? prev.senderRole === "user"
-                                          : false;
-                                        const prevName = prev
-                                          ? prevIsUser
-                                            ? "You"
-                                            : prev.senderName || "Admin"
-                                          : "";
-                                        const showName =
-                                          !prev ||
-                                          showDayLabel ||
-                                          prev.senderRole !==
-                                            entry.senderRole ||
-                                          prevName !== name;
-                                        const hasVeryLongToken = /\S{24,}/.test(
-                                          entry.message || "",
-                                        );
-                                        const isLikelyMultiLine =
-                                          (entry.message || "").includes(
-                                            "\n",
-                                          ) ||
-                                          (entry.message || "").length > 60;
-
-                                        return (
-                                          <div
-                                            key={entry.id}
-                                            className="space-y-3"
-                                          >
-                                            {showDayLabel ? (
-                                              <div className="flex justify-center">
-                                                <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                                                  {dayLabel}
-                                                </span>
-                                              </div>
-                                            ) : null}
-                                            <div
-                                              className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                                            >
-                                              <div
-                                                className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUser ? "text-right" : "text-left"}`}
-                                              >
-                                                {showName && !isUser ? (
-                                                  <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
-                                                    {name}
-                                                  </p>
-                                                ) : null}
-                                                <div
-                                                  className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                                                    isUser
-                                                      ? USER_MESSAGE_BUBBLE_CLASS
-                                                      : "border border-border bg-slate-50 text-foreground"
-                                                  }`}
-                                                >
-                                                  <p
-                                                    className={`whitespace-pre-line leading-relaxed ${
-                                                      hasVeryLongToken
-                                                        ? "break-all"
-                                                        : "break-words"
-                                                    }`}
-                                                  >
-                                                    {entry.message}
-                                                  </p>
-                                                </div>
-                                                {entry.createdAt ? (
-                                                  <span
-                                                    className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-3 py-1.5 text-xs text-white shadow-sm group-hover:inline-flex ${
-                                                      isUser
-                                                        ? "-left-1 -translate-x-full"
-                                                        : "-right-1 translate-x-full"
-                                                    } ${
-                                                      isLikelyMultiLine
-                                                        ? "top-1/2"
-                                                        : "top-[68%]"
-                                                    }`}
-                                                  >
-                                                    {formatLocalTime(
-                                                      entry.createdAt,
-                                                    )}
-                                                  </span>
-                                                ) : null}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        );
-                                      },
-                                    );
-                                  })()}
-                                </div>
-                              </div>
-                              <div className="space-y-2 bg-background/85 p-4 backdrop-blur-sm">
-                                <div className="flex items-end gap-2">
-                                  <Textarea
-                                    id="reply-message"
-                                    placeholder="Type your message..."
-                                    rows={1}
-                                    value={messageDraft}
-                                    onChange={(e) =>
-                                      setMessageDraft(
-                                        e.target.value.slice(
-                                          0,
-                                          CONVERSATION_MESSAGE_MAX_LENGTH,
-                                        ),
-                                      )
-                                    }
-                                    maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
-                                    disabled={isSendingMessage}
-                                    className="ff-hide-scrollbar w-full max-w-full min-w-0 max-h-[10.5rem] min-h-8 resize-none overflow-y-auto rounded-xl border border-border/70 bg-background px-4 py-2 leading-relaxed shadow-sm [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap] focus-visible:ring-2 focus-visible:ring-accent/30"
-                                    onKeyDown={(event) => {
-                                      if (
-                                        event.key === "Enter" &&
-                                        !event.shiftKey
-                                      ) {
-                                        event.preventDefault();
-                                        void handleSendMessage();
-                                      }
-                                    }}
-                                  />
-                                  <Button
-                                    type="button"
-                                    onClick={handleSendMessage}
-                                    size="icon"
-                                    variant="secondary"
-                                    className="h-12 w-12 shrink-0 rounded-xl border border-border/70 bg-muted/80 text-muted-foreground hover:bg-accent hover:text-white"
-                                    disabled={isSendingMessage}
-                                  >
-                                    <Send className="h-5 w-5" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
                       </CardContent>
 
                       <div className="pointer-events-none absolute bottom-0 right-6 z-20">
+                        {isUnsentMessageDialogOpen && <div className="absolute inset-0 z-40 rounded-t-xl bg-black/40 backdrop-blur-[1px]" />}
                         <div className="relative h-[360px] w-[320px]">
                           <div
                             className={`pointer-events-auto absolute bottom-0 right-0 z-10 h-[360px] w-[320px] overflow-hidden rounded-t-xl border-2 border-slate-300 bg-white shadow-2xl transition-transform duration-500 ease-in-out ${
