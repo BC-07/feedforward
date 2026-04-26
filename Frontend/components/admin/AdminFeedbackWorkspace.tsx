@@ -81,7 +81,6 @@ import {
   ChevronRight,
   Download,
   MessageSquare,
-  MessageSquare,
   Pencil,
   Search,
   SendHorizontal,
