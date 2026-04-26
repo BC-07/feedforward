@@ -53,11 +53,21 @@ export interface SuperAdminSession {
   expiresAt: string;
 }
 
+export interface LoginRoleResponse {
+  role: "none" | "user" | "admin" | "superadmin";
+  isSuperAdmin?: boolean;
+}
+
 export interface Category {
   id: number;
   name: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SuperAdminBarStatRow {
+  label: string;
+  count: number;
 }
 
 interface ApiResponse<T> {
@@ -285,6 +295,25 @@ export async function loginUser(payload: {
   });
 }
 
+export async function requestUserLoginOTP(payload: {
+  email: string;
+}): Promise<{ sent: boolean }> {
+  return apiFetch<{ sent: boolean }>("/auth/users/login/request-otp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function verifyUserLoginOTP(payload: {
+  email: string;
+  otp: string;
+}): Promise<User> {
+  return apiFetch<User>("/auth/users/login/verify-otp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function forgotPassword(payload: {
   email: string;
 }): Promise<{ sent: boolean }> {
@@ -361,8 +390,32 @@ export async function loginSuperAdmin(payload: {
   });
 }
 
+export async function getLoginRole(email: string): Promise<LoginRoleResponse> {
+  const params = new URLSearchParams();
+  params.set("email", email);
+  return apiFetch<LoginRoleResponse>(`/auth/login-role?${params.toString()}`);
+}
+
 export async function listAdmins(): Promise<Admin[]> {
   const data = await apiFetch<Admin[] | null>("/superadmin/admins");
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getResolvedAdminsLast7Days(
+  range: "1d" | "7d" | "30d" = "7d",
+): Promise<SuperAdminBarStatRow[]> {
+  const data = await apiFetch<SuperAdminBarStatRow[] | null>(
+    `/superadmin/stats/resolved-admins?range=${encodeURIComponent(range)}`,
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getCategorySubmissionsLast7Days(
+  range: "1d" | "7d" | "30d" = "7d",
+): Promise<SuperAdminBarStatRow[]> {
+  const data = await apiFetch<SuperAdminBarStatRow[] | null>(
+    `/superadmin/stats/submissions-categories?range=${encodeURIComponent(range)}`,
+  );
   return Array.isArray(data) ? data : [];
 }
 

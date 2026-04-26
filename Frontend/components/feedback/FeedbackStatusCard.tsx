@@ -2,7 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import type { Feedback } from "@/lib/api";
-import { CheckCircle, Circle, Clock, Wrench } from "lucide-react";
+import { CheckCircle, Circle, Clock } from "lucide-react";
 
 type FeedbackStatusCardProps = {
   feedback: Feedback;
@@ -25,8 +25,6 @@ const renderStatusIcon = (status: string, className: string) => {
   switch (status.trim().toLowerCase()) {
     case "resolved":
       return <CheckCircle className={className} />;
-    case "in progress":
-      return <Wrench className={className} />;
     default:
       return <Clock className={className} />;
   }
@@ -72,56 +70,81 @@ export function FeedbackStatusCard({
   className,
 }: FeedbackStatusCardProps) {
   const steps = getStatusSteps(feedback.status);
+  const statusMessage = getStatusMessage(feedback.status);
+  const normalizedStatus = feedback.status.trim().toLowerCase();
 
   return (
     <Card className={["shadow-lg", className].filter(Boolean).join(" ")}>
-      <CardContent className="pt-5">
-        <div className="mb-5 flex items-start justify-between">
-          <h3 className="mb-1 text-lg font-semibold">
+      <CardContent className="flex h-full flex-col pt-4">
+        <div className="mb-4 flex items-start justify-between">
+          <h3 className="mb-1 text-[1.1rem] font-semibold">
             Status: <span className="uppercase">{feedback.status}</span>
           </h3>
         </div>
 
-        <div className="space-y-3">
+        <div className="flex h-full flex-1 flex-col">
           {steps.map((step, index) => (
-            <div key={index} className="flex gap-3">
-              <div className="flex flex-col items-center">
+            <div
+              key={index}
+              className={`grid grid-cols-[1.6rem_minmax(0,1fr)] gap-3 ${
+                index < steps.length - 1 ? "flex-1" : ""
+              } ${
+                index === steps.length - 1 ? "mb-4" : index === 1 ? "mb-2" : ""
+              }`}
+            >
+              <div className="relative flex justify-center">
                 <div
-                  className={`h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  className={`h-6.5 w-6.5 rounded-full flex items-center justify-center flex-shrink-0 ${
                     step.completed ? "bg-green-500/20" : "bg-gray-200"
                   }`}
                 >
                   {step.completed ? (
-                    <CheckCircle className="h-4.5 w-4.5 text-green-700" />
+                    <CheckCircle className="h-4 w-4 text-green-700" />
                   ) : (
-                    <Circle className="h-4.5 w-4.5 text-gray-400" />
+                    <Circle className="h-4 w-4 text-gray-400" />
                   )}
                 </div>
-                {index < steps.length - 1 && <div className="h-14 w-px bg-border"></div>}
+                {index < steps.length - 1 ? (
+                  <div className="pointer-events-none absolute left-1/2 top-7 bottom-0 w-px -translate-x-1/2 bg-border" />
+                ) : null}
               </div>
-              <div className="pb-3 flex-1">
-                <p className="font-semibold">{step.name}</p>
-                {step.name === "Submitted" && (
-                  <p className="text-sm text-muted-foreground">
-                    {formatDate(feedback.createdAt)}
-                  </p>
-                )}
-                {step.description && (
-                  <p className="text-sm text-muted-foreground">{step.description}</p>
-                )}
+              <div className="flex-1">
+                <p className="text-[1.1rem] font-semibold">{step.name}</p>
+                {(() => {
+                  const stepTimestamp =
+                    step.name === "Submitted"
+                      ? feedback.createdAt
+                      : step.name === "In Progress" && normalizedStatus === "in progress"
+                        ? feedback.updatedAt
+                        : step.name === "Resolved" && normalizedStatus === "resolved"
+                          ? feedback.updatedAt
+                          : null;
+
+                  if (stepTimestamp) {
+                    return (
+                      <p className="text-[0.9rem] text-muted-foreground">
+                        {formatDate(stepTimestamp)}
+                      </p>
+                    );
+                  }
+
+                  return step.description ? (
+                    <p className="text-[0.9rem] text-muted-foreground">{step.description}</p>
+                  ) : null;
+                })()}
               </div>
             </div>
           ))}
         </div>
 
-        <div className="mt-5 flex items-start gap-2.5 rounded-lg bg-muted/50 p-3.5">
-          {renderStatusIcon(
-            feedback.status,
-            `mt-0.5 h-5 w-5 flex-shrink-0 ${getStatusIconTone(
+        <div className="mt-auto border-t border-border/80 pt-3.5">
+          <div className="flex items-start gap-2.5">
+            {renderStatusIcon(
               feedback.status,
-            )}`,
-          )}
-          <p className="text-sm">{getStatusMessage(feedback.status)}</p>
+              `mt-0.5 h-4 w-4 flex-shrink-0 ${getStatusIconTone(feedback.status)}`,
+            )}
+            <p className="text-[0.9rem] text-muted-foreground">{statusMessage}</p>
+          </div>
         </div>
       </CardContent>
     </Card>

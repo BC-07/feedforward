@@ -11,13 +11,15 @@ func AppRoutes(app *fiber.App) {
 	// app.Get("/", func(c *fiber.Ctx) error {
 	// 	return c.SendString("Hello Golang World!")
 	// })
-	
 
 	// CREATE YOUR ENDPOINTS HERE
 
 	// Auth - Users
+	app.Get("/auth/login-role", controller.GetLoginRole)
 	app.Post("/auth/users/register", controller.RegisterUser)
 	app.Post("/auth/users/login", controller.LoginUser)
+	app.Post("/auth/users/login/request-otp", controller.RequestUserLoginOTP)
+	app.Post("/auth/users/login/verify-otp", controller.VerifyUserLoginOTP)
 	app.Post("/auth/users/forgot-password", controller.ForgotPassword)
 	app.Post("/auth/users/verify-reset-otp", controller.VerifyResetOTP)
 	app.Post("/auth/users/reset-password", controller.ResetPassword)
@@ -55,6 +57,10 @@ func AppRoutes(app *fiber.App) {
 	app.Post("/superadmin/categories", controller.CreateCategoryBySuperAdmin)
 	app.Put("/superadmin/categories/:id", controller.UpdateCategoryBySuperAdmin)
 	app.Delete("/superadmin/categories/:id", controller.DeleteCategoryBySuperAdmin)
+
+	// Superadmin - Stats
+	app.Get("/superadmin/stats/resolved-admins", controller.GetResolvedAdminsStats)
+	app.Get("/superadmin/stats/submissions-categories", controller.GetCategorySubmissionsStats)
 
 	// Feedbacks
 	app.Get("/feedbacks", controller.GetFeedbacks)

@@ -520,3 +520,74 @@ func EnableAdminBySuperAdmin(c *fiber.Ctx) error {
 
 	return success(c, fiber.StatusOK, admin)
 }
+
+type superAdminBarStatRow struct {
+	Label string `json:"label" gorm:"column:label"`
+	Count int64  `json:"count" gorm:"column:count"`
+}
+
+func getStatsSince(rangeValue string) time.Time {
+	switch rangeValue {
+	case "1d":
+		return utcNow().AddDate(0, 0, -1)
+	case "30d":
+		return utcNow().AddDate(0, 0, -30)
+	default:
+		return utcNow().AddDate(0, 0, -7)
+	}
+}
+
+func GetResolvedAdminsStats(c *fiber.Ctx) error {
+	if _, err := requireSuperAdminSession(c); err != nil {
+		return err
+	}
+
+	since := getStatsSince(c.Query("range"))
+
+	var rows []superAdminBarStatRow
+	if err := middleware.DBConn.Raw(
+		`SELECT a.first_name || ' ' || a.last_name AS label, COUNT(f.id) AS count
+		 FROM `+adminTable+` a
+		 LEFT JOIN `+feedbackTable+` f
+		   ON LOWER(TRIM(f.category)) = LOWER(TRIM(a.unit))
+		  AND f.status = 'Resolved'
+		  AND f.updated_at >= ?
+		 WHERE COALESCE(a.is_superadmin, FALSE) = FALSE
+		   AND COALESCE(a.is_disabled, FALSE) = FALSE
+		 GROUP BY a.id, a.first_name, a.last_name
+		 ORDER BY count DESC, label ASC
+		 LIMIT 7`,
+		since,
+	).Scan(&rows).Error; err != nil {
+		return serverError(c, "failed to fetch resolved admin stats", err)
+	}
+
+	return success(c, fiber.StatusOK, rows)
+}
+
+func GetCategorySubmissionsStats(c *fiber.Ctx) error {
+	if _, err := requireSuperAdminSession(c); err != nil {
+		return err
+	}
+
+	since := getStatsSince(c.Query("range"))
+
+	var rows []superAdminBarStatRow
+	if err := middleware.DBConn.Raw(
+		`SELECT TRIM(category) AS label, COUNT(*) AS count
+		 FROM `+feedbackTable+`
+		 WHERE created_at >= ?
+		   AND LOWER(TRIM(category)) <> LOWER(?)
+		   AND LOWER(TRIM(category)) <> LOWER(?)
+		 GROUP BY TRIM(category)
+		 ORDER BY count DESC, label ASC
+		 LIMIT 7`,
+		since,
+		disabledCategoryName,
+		inactiveCategoryName,
+	).Scan(&rows).Error; err != nil {
+		return serverError(c, "failed to fetch category submission stats", err)
+	}
+
+	return success(c, fiber.StatusOK, rows)
+}

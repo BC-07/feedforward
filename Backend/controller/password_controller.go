@@ -43,10 +43,10 @@ type adminSetPasswordEntry struct {
 }
 
 var (
-	passwordResetTokens = map[string]passwordResetEntry{}
-	passwordResetMu     sync.Mutex
-	verifiedResetEmails = map[string]time.Time{}
-	verifiedResetMu     sync.Mutex
+	passwordResetTokens    = map[string]passwordResetEntry{}
+	passwordResetMu        sync.Mutex
+	verifiedResetEmails    = map[string]time.Time{}
+	verifiedResetMu        sync.Mutex
 	adminSetPasswordTokens = map[string]adminSetPasswordEntry{}
 	adminSetPasswordMu     sync.Mutex
 )
@@ -206,7 +206,7 @@ func VerifyResetOTP(c *fiber.Ctx) error {
 	}
 
 	email := strings.ToLower(strings.TrimSpace(req.Email))
-	otp := strings.TrimSpace(req.OTP)
+	otp := normalizeOTP(req.OTP)
 	if email == "" || otp == "" {
 		return invalidRequest(c, "email and OTP are required")
 	}

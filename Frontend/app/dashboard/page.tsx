@@ -42,7 +42,7 @@ export default function AdminDashboardHome() {
       description="Use the burger menu on the left to switch between the dashboard home and the feedback submission workspace."
       currentAdmin={currentAdmin}
     >
-      <div className="space-y-6">
+      <div className="mx-auto w-full max-w-[1680px] space-y-6 px-4 pb-6 pt-4 sm:px-6 sm:pt-6 lg:px-8">
         <AdminStatsGrid stats={stats} />
         <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
           <AdminFeedbackTypeChart feedbacks={feedbacks} />

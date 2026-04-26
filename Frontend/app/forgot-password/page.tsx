@@ -39,10 +39,12 @@ export default function ForgotPasswordPage() {
     }
     setIsRequesting(true);
     try {
-      await forgotPassword({ email: normalizedEmail });
-      toast.success("If your email exists, an OTP was sent.");
-      setStep("verify");
-      setOtp("");
+      const response = await forgotPassword({ email: normalizedEmail });
+      if (response.sent) {
+        toast.success("If your email exists, an OTP was sent.");
+        setStep("verify");
+        setOtp("");
+      }
     } catch (error) {
       toastApiError(error, "Failed to send OTP");
     } finally {
@@ -53,11 +55,12 @@ export default function ForgotPasswordPage() {
   const handleVerifyOTP = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalizedEmail = email.trim();
+    const normalizedOtp = otp.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
     if (!normalizedEmail) {
       toast.error("Please enter your email.");
       return;
     }
-    if (otp.trim().length !== 6) {
+    if (normalizedOtp.length !== 6) {
       toast.error("Enter the 6-digit OTP sent to your email.");
       return;
     }
@@ -66,7 +69,7 @@ export default function ForgotPasswordPage() {
     try {
       const verification = await verifyResetOTP({
         email: normalizedEmail,
-        otp: otp.trim(),
+        otp: normalizedOtp,
       });
       localStorage.setItem("passwordResetEmail", normalizedEmail);
       if (verification.role) {
@@ -83,7 +86,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
+    <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white via-orange-50 to-white px-4 py-8 sm:py-12">
       <div className="container mx-auto flex min-h-full max-w-md flex-col items-center justify-center gap-6">
         <Card className="w-full shadow-lg">
           <CardHeader className="text-center">
@@ -176,9 +179,11 @@ export default function ForgotPasswordPage() {
                     }
                     setIsRequesting(true);
                     try {
-                      await forgotPassword({ email: normalizedEmail });
-                      toast.success("If your email exists, an OTP was sent.");
-                      setOtp("");
+                      const response = await forgotPassword({ email: normalizedEmail });
+                      if (response.sent) {
+                        toast.success("If your email exists, an OTP was sent.");
+                        setOtp("");
+                      }
                     } catch (error) {
                       toastApiError(error, "Failed to send OTP");
                     } finally {
