@@ -250,7 +250,7 @@ export function AdminFeedbackWorkspace({
   const [filterName, setFilterName] = useState("asc");
   const [filterDate, setFilterDate] = useState("recent");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [activeEditTab, setActiveEditTab] = useState<"details" | "manage">(
+  const [activeEditTab, setActiveEditTab] = useState<"details" | "manage" | "messages">(
     "details",
   );
   const [currentPage, setCurrentPage] = useState(1);
@@ -1646,11 +1646,11 @@ export function AdminFeedbackWorkspace({
                                     </Button>
                                   </DialogTrigger>
                                   <DialogContent
-                                    className={
-                                      activeEditTab === "manage"
-                                        ? "flex h-[85vh] max-h-[85vh] max-w-2xl flex-col overflow-hidden"
-                                        : "flex max-h-[80vh] max-w-2xl flex-col overflow-hidden"
-                                    }
+                                    className="flex max-w-xl flex-col overflow-hidden transition-[height,max-height] duration-300 ease-in-out"
+                                    style={{
+                                      height: activeEditTab === "manage" ? "auto" : "85vh",
+                                      maxHeight: activeEditTab === "manage" ? "340px" : "85vh",
+                                    }}
                                     onInteractOutside={(event) =>
                                       event.preventDefault()
                                     }
@@ -1671,14 +1671,17 @@ export function AdminFeedbackWorkspace({
                                         value={activeEditTab}
                                         onValueChange={(value) =>
                                           setActiveEditTab(
-                                            value as "details" | "manage",
+                                            value as "details" | "manage" | "messages",
                                           )
                                         }
                                         className="flex min-h-0 w-full flex-1 flex-col"
                                       >
-                                        <TabsList className="grid w-full shrink-0 grid-cols-2 rounded-full">
+                                        <TabsList className="grid w-full shrink-0 grid-cols-3 rounded-full">
                                           <TabsTrigger value="details">
                                             Details
+                                          </TabsTrigger>
+                                          <TabsTrigger value="messages">
+                                            Messages
                                           </TabsTrigger>
                                           <TabsTrigger value="manage">
                                             Manage
@@ -1746,283 +1749,230 @@ export function AdminFeedbackWorkspace({
 
                                         <TabsContent
                                           value="manage"
-                                          className="flex min-h-0 flex-1 flex-col space-y-4"
+                                          className="flex min-h-0 flex-1 flex-col"
                                         >
-                                          <div className="space-y-2">
-                                            <Label htmlFor="status">
-                                              Update Status
-                                            </Label>
-                                            <Select
-                                              value={newStatus}
-                                              onValueChange={setNewStatus}
-                                            >
-                                              <SelectTrigger id="status">
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                <SelectItem value="Pending">
-                                                  Pending
-                                                </SelectItem>
-                                                <SelectItem value="In Progress">
-                                                  In Progress
-                                                </SelectItem>
-                                                <SelectItem value="Resolved">
-                                                  Resolved
-                                                </SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-
-                                          <div className="space-y-2">
-                                            <Label htmlFor="priority">
-                                              Update Priority
-                                            </Label>
-                                            <Select
-                                              value={newPriority}
-                                              onValueChange={setNewPriority}
-                                            >
-                                              <SelectTrigger id="priority">
-                                                <SelectValue />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                <SelectItem value="Low">
-                                                  Low
-                                                </SelectItem>
-                                                <SelectItem value="Medium">
-                                                  Medium
-                                                </SelectItem>
-                                                <SelectItem value="High">
-                                                  High
-                                                </SelectItem>
-                                              </SelectContent>
-                                            </Select>
-                                          </div>
-
-                                          <div className="flex min-h-0 flex-1 flex-col space-y-3">
-                                            <div className="flex items-center gap-2">
-                                              <MessageSquare className="h-5 w-5 text-foreground" />
-                                              <p className="text-base font-semibold">
-                                                Message
-                                              </p>
+                                          {/* ── Controls ── */}
+                                          <div className="flex flex-1 flex-col justify-start gap-3">
+                                            {/* Status row */}
+                                            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
+                                              <span className="w-16 shrink-0 text-sm font-medium text-muted-foreground">
+                                                Status
+                                              </span>
+                                              <div className="flex flex-1 gap-1.5">
+                                                {(["Pending", "In Progress", "Resolved"] as const).map((s) => {
+                                                  const isActive = newStatus === s;
+                                                  const activeClass: Record<string, string> = {
+                                                    Pending: "bg-amber-500 border-amber-500 text-white",
+                                                    "In Progress": "bg-blue-500 border-blue-500 text-white",
+                                                    Resolved: "bg-emerald-500 border-emerald-500 text-white",
+                                                  };
+                                                  return (
+                                                    <button
+                                                      key={s}
+                                                      type="button"
+                                                      onClick={() => setNewStatus(s)}
+                                                      className={`flex-1 rounded-md border py-1.5 text-xs font-semibold transition-all ${
+                                                        isActive
+                                                          ? activeClass[s]
+                                                          : "border-border bg-background text-muted-foreground hover:border-border/80 hover:bg-muted/60"
+                                                      }`}
+                                                    >
+                                                      {s}
+                                                    </button>
+                                                  );
+                                                })}
+                                              </div>
                                             </div>
 
-                                            <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-white/70">
-                                              <div className="flex h-full min-h-0 flex-col">
-                                                <div
-                                                  ref={messageScrollRef}
-                                                  className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto p-4"
-                                                >
-                                                  {isMessagesLoading ? (
-                                                    <p className="text-sm text-muted-foreground">
-                                                      Loading conversation...
-                                                    </p>
-                                                  ) : null}
-                                                  {!isMessagesLoading &&
-                                                  messages.length === 0 ? (
-                                                    <p className="text-sm text-muted-foreground">
-                                                      No messages yet.
-                                                    </p>
-                                                  ) : null}
-                                                  <div className="space-y-4">
-                                                    {(() => {
-                                                      let lastDayLabel = "";
-                                                      return messages.map(
-                                                        (
-                                                          entry,
-                                                          index,
-                                                          allMessages,
-                                                        ) => {
-                                                          const createdAt =
-                                                            entry.createdAt
-                                                              ? new Date(
-                                                                  entry.createdAt,
-                                                                )
-                                                              : null;
-                                                          const today =
-                                                            new Date();
-                                                          const yesterday =
-                                                            new Date();
-                                                          yesterday.setDate(
-                                                            today.getDate() - 1,
-                                                          );
-
-                                                          const dayLabel =
-                                                            createdAt
-                                                              ? createdAt.toDateString() ===
-                                                                today.toDateString()
-                                                                ? "Today"
-                                                                : createdAt.toDateString() ===
-                                                                    yesterday.toDateString()
-                                                                  ? "Yesterday"
-                                                                  : createdAt.toLocaleDateString(
-                                                                      undefined,
-                                                                      {
-                                                                        month:
-                                                                          "short",
-                                                                        day: "numeric",
-                                                                        year: "numeric",
-                                                                      },
-                                                                    )
-                                                              : "";
-                                                          const showDayLabel =
-                                                            dayLabel &&
-                                                            dayLabel !==
-                                                              lastDayLabel;
-                                                          if (showDayLabel) {
-                                                            lastDayLabel =
-                                                              dayLabel;
-                                                          }
-
-                                                          const isUserMessage =
-                                                            entry.senderRole ===
-                                                            "user";
-                                                          const name =
-                                                            isUserMessage
-                                                              ? selectedFeedback?.isAnonymous
-                                                                ? "Anonymous"
-                                                                : entry.senderName ||
-                                                                  "User"
-                                                              : "You";
-                                                          const prev =
-                                                            index > 0
-                                                              ? allMessages[
-                                                                  index - 1
-                                                                ]
-                                                              : null;
-                                                          const prevIsUser =
-                                                            prev
-                                                              ? prev.senderRole ===
-                                                                "user"
-                                                              : false;
-                                                          const prevName = prev
-                                                            ? prevIsUser
-                                                              ? selectedFeedback?.isAnonymous
-                                                                ? "Anonymous"
-                                                                : prev.senderName ||
-                                                                  "User"
-                                                              : "You"
-                                                            : "";
-                                                          const showName =
-                                                            !prev ||
-                                                            showDayLabel ||
-                                                            prev.senderRole !==
-                                                              entry.senderRole ||
-                                                            prevName !== name;
-                                                          const hasVeryLongToken =
-                                                            /\S{24,}/.test(
-                                                              entry.message ||
-                                                                "",
-                                                            );
-                                                          const isLikelyMultiLine =
-                                                            (
-                                                              entry.message ||
-                                                              ""
-                                                            ).includes("\n") ||
-                                                            (
-                                                              entry.message ||
-                                                              ""
-                                                            ).length > 60;
-
-                                                          return (
-                                                            <div
-                                                              key={entry.id}
-                                                              className="space-y-2"
-                                                            >
-                                                              {showDayLabel ? (
-                                                                <div className="flex justify-center">
-                                                                  <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                                                                    {dayLabel}
-                                                                  </span>
-                                                                </div>
-                                                              ) : null}
-                                                              <div
-                                                                className={`flex ${isUserMessage ? "justify-start" : "justify-end"}`}
-                                                              >
-                                                                <div
-                                                                  className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUserMessage ? "text-left" : "text-right"}`}
-                                                                >
-                                                                  {showName ? (
-                                                                    <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
-                                                                      {name}
-                                                                    </p>
-                                                                  ) : null}
-                                                                  <div
-                                                                    className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                                                                      isUserMessage
-                                                                        ? "border border-border bg-white text-foreground"
-                                                                        : "bg-accent text-white"
-                                                                    }`}
-                                                                  >
-                                                                    <p
-                                                                      className={`whitespace-pre-line leading-relaxed ${
-                                                                        hasVeryLongToken
-                                                                          ? "break-all"
-                                                                          : "break-words"
-                                                                      }`}
-                                                                    >
-                                                                      {isUserMessage
-                                                                        ? formatFeedbackText(
-                                                                            entry.message ||
-                                                                              "",
-                                                                          )
-                                                                        : entry.message}
-                                                                    </p>
-                                                                  </div>
-                                                                  {entry.createdAt ? (
-                                                                    <span
-                                                                      className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-3 py-1.5 text-xs text-white shadow-sm group-hover:inline-flex ${
-                                                                        isUserMessage
-                                                                          ? "-right-1 translate-x-full"
-                                                                          : "-left-1 -translate-x-full"
-                                                                      } ${
-                                                                        isLikelyMultiLine
-                                                                          ? "top-1/2"
-                                                                          : "top-[68%]"
-                                                                      }`}
-                                                                    >
-                                                                      {formatLocalTime(
-                                                                        entry.createdAt,
-                                                                      )}
-                                                                    </span>
-                                                                  ) : null}
-                                                                </div>
-                                                              </div>
-                                                            </div>
-                                                          );
-                                                        },
-                                                      );
-                                                    })()}
-                                                  </div>
-                                                </div>
-
-                                                <ReplyComposer
-                                                  key={selectedFeedback.id}
-                                                  draft={messageDraft}
-                                                  onDraftChange={
-                                                    setMessageDraft
-                                                  }
-                                                  isSendingMessage={
-                                                    isSendingMessage
-                                                  }
-                                                  onSend={handleSendMessage}
-                                                />
+                                            {/* Priority row */}
+                                            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
+                                              <span className="w-16 shrink-0 text-sm font-medium text-muted-foreground">
+                                                Priority
+                                              </span>
+                                              <div className="flex flex-1 gap-1.5">
+                                                {(["Low", "Medium", "High"] as const).map((p) => {
+                                                  const isActive = newPriority === p;
+                                                  const activeClass: Record<string, string> = {
+                                                    Low: "bg-slate-500 border-slate-500 text-white",
+                                                    Medium: "bg-orange-500 border-orange-500 text-white",
+                                                    High: "bg-red-500 border-red-500 text-white",
+                                                  };
+                                                  return (
+                                                    <button
+                                                      key={p}
+                                                      type="button"
+                                                      onClick={() => setNewPriority(p)}
+                                                      className={`flex-1 rounded-md border py-1.5 text-xs font-semibold transition-all ${
+                                                        isActive
+                                                          ? activeClass[p]
+                                                          : "border-border bg-background text-muted-foreground hover:border-border/80 hover:bg-muted/60"
+                                                      }`}
+                                                    >
+                                                      {p}
+                                                    </button>
+                                                  );
+                                                })}
                                               </div>
                                             </div>
                                           </div>
 
-                                          <div className="-mt-px shrink-0 rounded-b-lg border-x border-b border-border bg-muted/30 px-3 pb-3 pt-6">
+                                          {/* ── Save button pinned to bottom ── */}
+                                          <div className="shrink-0 space-y-2 pt-4">
                                             <Button
                                               onClick={handleUpdateFeedback}
-                                              className="mx-auto block w-3/5 bg-accent hover:bg-accent/90"
                                               disabled={!hasFeedbackChanges}
+                                              className="w-full bg-accent hover:bg-accent/90 disabled:opacity-40"
                                             >
-                                              Update Feedback
+                                              Save Changes
                                             </Button>
-                                            <p className="pt-2 text-center text-xs text-muted-foreground">
-                                              Marking a submission as Resolved
-                                              will email the user if they
-                                              registered an account.
+                                            <p className="text-center text-[11px] text-muted-foreground/70">
+                                              Marking as Resolved will email the user if they registered an account.
                                             </p>
+                                          </div>
+                                        </TabsContent>
+
+                                        {/* ── Messages tab ── */}
+                                        <TabsContent
+                                          value="messages"
+                                          className="flex min-h-0 flex-1 flex-col"
+                                        >
+                                          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-muted/20">
+                                            <div
+                                              ref={messageScrollRef}
+                                              className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto p-3"
+                                            >
+                                              {isMessagesLoading ? (
+                                                <div className="flex h-full items-center justify-center">
+                                                  <p className="text-sm text-muted-foreground">
+                                                    Loading conversation...
+                                                  </p>
+                                                </div>
+                                              ) : null}
+                                              {!isMessagesLoading && messages.length === 0 ? (
+                                                <div className="flex h-full items-center justify-center">
+                                                  <div className="text-center">
+                                                    <MessageSquare className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                                                    <p className="text-sm text-muted-foreground">
+                                                      No messages yet
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground/60">
+                                                      Send a message to start the conversation
+                                                    </p>
+                                                  </div>
+                                                </div>
+                                              ) : null}
+                                              <div className="space-y-3">
+                                                {(() => {
+                                                  let lastDayLabel = "";
+                                                  return messages.map(
+                                                    (entry, index, allMessages) => {
+                                                      const createdAt = entry.createdAt
+                                                        ? new Date(entry.createdAt)
+                                                        : null;
+                                                      const today = new Date();
+                                                      const yesterday = new Date();
+                                                      yesterday.setDate(today.getDate() - 1);
+
+                                                      const dayLabel = createdAt
+                                                        ? createdAt.toDateString() === today.toDateString()
+                                                          ? "Today"
+                                                          : createdAt.toDateString() === yesterday.toDateString()
+                                                            ? "Yesterday"
+                                                            : createdAt.toLocaleDateString(undefined, {
+                                                                month: "short",
+                                                                day: "numeric",
+                                                                year: "numeric",
+                                                              })
+                                                        : "";
+                                                      const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
+                                                      if (showDayLabel) lastDayLabel = dayLabel;
+
+                                                      const isUserMessage = entry.senderRole === "user";
+                                                      const name = isUserMessage
+                                                        ? selectedFeedback?.isAnonymous
+                                                          ? "Anonymous"
+                                                          : entry.senderName || "User"
+                                                        : "You";
+                                                      const prev = index > 0 ? allMessages[index - 1] : null;
+                                                      const prevIsUser = prev ? prev.senderRole === "user" : false;
+                                                      const prevName = prev
+                                                        ? prevIsUser
+                                                          ? selectedFeedback?.isAnonymous
+                                                            ? "Anonymous"
+                                                            : prev.senderName || "User"
+                                                          : "You"
+                                                        : "";
+                                                      const showName =
+                                                        !prev ||
+                                                        showDayLabel ||
+                                                        prev.senderRole !== entry.senderRole ||
+                                                        prevName !== name;
+                                                      const hasVeryLongToken = /\S{24,}/.test(entry.message || "");
+                                                      const isLikelyMultiLine =
+                                                        (entry.message || "").includes("\n") ||
+                                                        (entry.message || "").length > 60;
+
+                                                      return (
+                                                        <div key={entry.id} className="space-y-1.5">
+                                                          {showDayLabel ? (
+                                                            <div className="flex justify-center py-1">
+                                                              <span className="rounded-full border border-border bg-background px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                                                {dayLabel}
+                                                              </span>
+                                                            </div>
+                                                          ) : null}
+                                                          <div className={`flex ${isUserMessage ? "justify-start" : "justify-end"}`}>
+                                                            <div className={`group relative min-w-0 max-w-[80%] ${isUserMessage ? "text-left" : "text-right"}`}>
+                                                              {showName ? (
+                                                                <p className="mb-1 px-1 text-[11px] font-semibold text-muted-foreground">
+                                                                  {name}
+                                                                </p>
+                                                              ) : null}
+                                                              <div
+                                                                className={`inline-block rounded-2xl px-3 py-2 text-sm ${
+                                                                  isUserMessage
+                                                                    ? "border border-border bg-white text-foreground shadow-sm"
+                                                                    : "bg-accent text-white shadow-sm"
+                                                                }`}
+                                                              >
+                                                                <p
+                                                                  className={`whitespace-pre-line leading-relaxed ${
+                                                                    hasVeryLongToken ? "break-all" : "break-words"
+                                                                  }`}
+                                                                >
+                                                                  {isUserMessage
+                                                                    ? formatFeedbackText(entry.message || "")
+                                                                    : entry.message}
+                                                                </p>
+                                                              </div>
+                                                              {entry.createdAt ? (
+                                                                <span
+                                                                  className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-black/50 px-2 py-1 text-[10px] text-white shadow-sm group-hover:inline-flex ${
+                                                                    isUserMessage ? "-right-1 translate-x-full" : "-left-1 -translate-x-full"
+                                                                  } ${isLikelyMultiLine ? "top-1/2" : "top-[68%]"}`}
+                                                                >
+                                                                  {formatLocalTime(entry.createdAt)}
+                                                                </span>
+                                                              ) : null}
+                                                            </div>
+                                                          </div>
+                                                        </div>
+                                                      );
+                                                    },
+                                                  );
+                                                })()}
+                                              </div>
+                                            </div>
+
+                                            <div className="shrink-0 border-t border-border/60">
+                                              <ReplyComposer
+                                                key={selectedFeedback.id}
+                                                draft={messageDraft}
+                                                onDraftChange={setMessageDraft}
+                                                isSendingMessage={isSendingMessage}
+                                                onSend={handleSendMessage}
+                                              />
+                                            </div>
                                           </div>
                                         </TabsContent>
                                       </Tabs>
@@ -2114,7 +2064,7 @@ export function AdminFeedbackWorkspace({
                       <Tabs
                         value={activeEditTab}
                         onValueChange={(value) =>
-                          setActiveEditTab(value as "details" | "manage")
+                          setActiveEditTab(value as "details" | "manage" | "messages")
                         }
                         className="flex h-full min-h-[480px] flex-col"
                       >

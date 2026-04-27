@@ -419,6 +419,13 @@ export async function getCategorySubmissionsLast7Days(
   return Array.isArray(data) ? data : [];
 }
 
+export async function getCategorySubmissionCounts(): Promise<SuperAdminBarStatRow[]> {
+  const data = await apiFetch<SuperAdminBarStatRow[] | null>(
+    "/superadmin/stats/category-counts",
+  );
+  return Array.isArray(data) ? data : [];
+}
+
 export async function listCategories(): Promise<Category[]> {
   const data = await apiFetch<Category[] | null>("/categories");
   return Array.isArray(data) ? data : [];
@@ -593,4 +600,3 @@ export async function updateAdminProfile(
     body: JSON.stringify(payload),
   });
 }
-

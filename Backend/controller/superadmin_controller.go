@@ -591,3 +591,25 @@ func GetCategorySubmissionsStats(c *fiber.Ctx) error {
 
 	return success(c, fiber.StatusOK, rows)
 }
+
+func GetCategorySubmissionCounts(c *fiber.Ctx) error {
+	if _, err := requireSuperAdminSession(c); err != nil {
+		return err
+	}
+
+	var rows []superAdminBarStatRow
+	if err := middleware.DBConn.Raw(
+		`SELECT TRIM(category) AS label, COUNT(*) AS count
+		 FROM `+feedbackTable+`
+		 WHERE LOWER(TRIM(category)) <> LOWER(?)
+		   AND LOWER(TRIM(category)) <> LOWER(?)
+		 GROUP BY TRIM(category)
+		 ORDER BY label ASC`,
+		disabledCategoryName,
+		inactiveCategoryName,
+	).Scan(&rows).Error; err != nil {
+		return serverError(c, "failed to fetch category submission counts", err)
+	}
+
+	return success(c, fiber.StatusOK, rows)
+}

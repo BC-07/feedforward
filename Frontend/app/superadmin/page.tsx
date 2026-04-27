@@ -9,6 +9,7 @@ import {
   enableAdminBySuperAdmin,
   deleteCategoryBySuperAdmin,
   getCategorySubmissionsLast7Days,
+  getCategorySubmissionCounts,
   getResolvedAdminsLast7Days,
   getSessionMe,
   listAdmins,
@@ -232,6 +233,9 @@ export default function SuperAdminDashboard() {
   const [categorySubmissions7Days, setCategorySubmissions7Days] = useState<
     SuperAdminBarStatRow[]
   >([]);
+  const [categorySubmissionCounts, setCategorySubmissionCounts] = useState<
+    SuperAdminBarStatRow[]
+  >([]);
   const [isDashboardStatsLoading, setIsDashboardStatsLoading] = useState(false);
   const [createForm, setCreateForm] =
     useState<CreateAdminForm>(emptyCreateForm);
@@ -312,18 +316,15 @@ export default function SuperAdminDashboard() {
         return admin.unit.trim().toLowerCase() === adminUnitFilter.toLowerCase();
       })
       .sort((a, b) => {
+        const aInactive = a.unit.trim().toLowerCase() === "inactive";
+        const bInactive = b.unit.trim().toLowerCase() === "inactive";
+        if (aInactive !== bInactive) return aInactive ? 1 : -1;
         const createdDiff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        if (adminCreatedFilter === "latest" ? createdDiff !== 0 : createdDiff !== 0) {
+        if (createdDiff !== 0) {
           return adminCreatedFilter === "latest" ? -createdDiff : createdDiff;
         }
         const nameDiff = a.name.localeCompare(b.name);
         return adminNameSort === "az" ? nameDiff : -nameDiff;
-      })
-      .sort((a, b) => {
-        const aInactive = a.unit.trim().toLowerCase() === "inactive";
-        const bInactive = b.unit.trim().toLowerCase() === "inactive";
-        if (aInactive === bInactive) return 0;
-        return aInactive ? 1 : -1;
       });
   }, [admins, adminFilter, adminSearch, adminUnitFilter, adminNameSort, adminCreatedFilter]);
 
@@ -409,6 +410,10 @@ export default function SuperAdminDashboard() {
         const assignedAdmin = activeAdmins.find(
           (admin) => admin.unit.trim().toLowerCase() === normalizedName,
         );
+        const submissionCount =
+          categorySubmissionCounts.find(
+            (row) => row.label.trim().toLowerCase() === normalizedName,
+          )?.count ?? 0;
         return {
           category,
           isAssigned: Boolean(assignedAdmin),
@@ -416,13 +421,14 @@ export default function SuperAdminDashboard() {
           assignedAdminEmail:
             assignedAdmin?.email ?? "No active admin assigned",
           createdAt: category.createdAt,
+          submissionCount,
         };
       })
       .sort((a, b) => {
         if (a.isAssigned !== b.isAssigned) return a.isAssigned ? -1 : 1;
         return a.category.name.localeCompare(b.category.name);
       });
-  }, [manageableCategories, activeAdmins]);
+  }, [manageableCategories, activeAdmins, categorySubmissionCounts]);
   const filteredCategoryControlRows = useMemo(() => {
     const normalizedSearch = categorySearch.trim().toLowerCase();
     const filtered = categoryControlRows.filter((row) => {
@@ -466,10 +472,10 @@ export default function SuperAdminDashboard() {
     categoryControlPageSize,
   ]);
   const categoryPlaceholderRowCount = getPlaceholderRowCount(
-  currentCategoryControlPage,
-  categoryControlPageSize,
-  10,
-  paginatedCategoryControlRows.length,
+    currentCategoryControlPage,
+    categoryControlPageSize,
+    10,
+    paginatedCategoryControlRows.length,
   );
   const assignedCategoriesCount = categoryControlRows.filter(
     (row) => row.isAssigned,
@@ -753,6 +759,14 @@ export default function SuperAdminDashboard() {
       .catch((error) => {
         toastApiError(error, "Failed to load categories.");
       });
+
+    void getCategorySubmissionCounts()
+      .then((data) => {
+        setCategorySubmissionCounts(data);
+      })
+      .catch((error) => {
+        toastApiError(error, "Failed to load category submission counts.");
+      });
   }, [router]);
 
   useEffect(() => {
@@ -917,6 +931,7 @@ export default function SuperAdminDashboard() {
       });
       setCategories(updated);
       setNewCategoryName("");
+      setIsCreateCategoryOpen(false);
       toast.success("Category created successfully");
     } catch (error) {
       toastApiError(error, "Failed to create category.");
@@ -1799,22 +1814,22 @@ export default function SuperAdminDashboard() {
                   <Table className={SUPERADMIN_CATEGORY_TABLE_CLASS_NAME}>
                     <TableHeader className={SUPERADMIN_TABLE_HEADER_CLASS_NAME}>
                       <TableRow>
-                        <TableHead className="w-[24%] px-2 py-2.5">
+                        <TableHead className="w-[25%] px-2 py-2.5">
                           Category
                         </TableHead>
-                        <TableHead className="w-[12%] px-2 py-2.5">
+                        <TableHead className="w-[12%] px-2 py-2.5 !pl-7">
                           Status
                         </TableHead>
-                        <TableHead className="w-[28%] px-2 py-2.5">
+                        <TableHead className="w-[24%] px-2 py-2.5">
                           Assigned Admin
                         </TableHead>
                         <TableHead className="w-[16%] px-2 py-2.5">
                           Created
                         </TableHead>
-                        <TableHead className="w-[12%] px-2 py-2.5">
-                          Updated
+                        <TableHead className="w-[13%] px-2 py-2.5 text-center">
+                          Submissions
                         </TableHead>
-                        <TableHead className="w-[8%] px-2 py-2.5 text-right">
+                        <TableHead className="w-[10%] px-2 py-2.5 text-center">
                           Actions
                         </TableHead>
                       </TableRow>
@@ -1868,17 +1883,13 @@ export default function SuperAdminDashboard() {
                                 },
                               )}
                             </TableCell>
-                            <TableCell className="py-2 align-top">
-                              {new Date(
-                                row.category.updatedAt,
-                              ).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
+                            <TableCell className="py-2 align-top text-center">
+                              <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                                {row.submissionCount}
+                              </span>
                             </TableCell>
-                            <TableCell className="py-2 text-right align-top">
-                              <div className="flex justify-end gap-2">
+                            <TableCell className="py-2 text-center align-top">
+                              <div className="flex justify-center gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -2085,8 +2096,8 @@ export default function SuperAdminDashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex gap-3 rounded-2xl border border-primary/15 bg-primary/8 px-4 py-3 text-sm text-foreground">
-              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <div className="flex gap-3 rounded-2xl border border-secondary/30 bg-secondary/10 px-4 py-3 text-sm text-foreground">
+              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-secondary" />
               <p className="leading-6 text-muted-foreground">
                 A verification email will be sent to the provided address. Make
                 sure the email is correct so the new admin can set their

@@ -27,13 +27,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Card,
   CardContent,
   CardDescription,
@@ -41,15 +34,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +41,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
@@ -68,15 +53,27 @@ import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
 import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
 import { FeedbackSuccessCard } from "@/components/feedback/FeedbackSuccessCard";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TablePaginationFooter } from "@/components/ui/table-pagination-footer";
+import {
   HoverFilterPopover,
   type HoverFilterItem,
 } from "@/components/filters/HoverFilterPopover";
-import { TablePaginationFooter } from "@/components/ui/table-pagination-footer";
 import {
-  ArrowRight,
-  BarChart3,
   Send,
-  Search,
   Clock,
   CheckCircle,
   Circle,
@@ -86,47 +83,48 @@ import {
   ChevronRight,
   ChevronUp,
   ChevronDown,
-  Trash2,
   X,
-  Copy,
+  BarChart3,
   Plus,
+  Search,
+  Trash2,
 } from "lucide-react";
 
-export type UserDashboardView = "home" | "my-submissions" | "submit-feedback";
-type CreateSubmissionStep = "form" | "confirm" | "success";
-const CREATE_SUBMISSION_STEP_ORDER: Record<CreateSubmissionStep, number> = {
-  form: 0,
-  confirm: 1,
-  success: 2,
-};
+// Import constants and types
+import {
+  CREATE_SUBMISSION_STEP_ORDER,
+  FEEDBACK_MESSAGE_MAX_LENGTH,
+  FEEDBACK_SUBJECT_MAX_LENGTH,
+  CONVERSATION_MESSAGE_MAX_LENGTH,
+  USER_MESSAGE_BUBBLE_CLASS,
+  MY_SUBMISSIONS_PAGE_SIZE_OPTIONS,
+  SUBMISSION_FILTER_TEXT_COLOR,
+  SUBMISSION_FILTER_CONTROL_CLASS,
+  USER_FEEDBACK_DRAFT_KEY,
+  USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY,
+  EMPTY_FORM,
+  type UserDashboardView,
+  type CreateSubmissionStep,
+  type HoverFilterKey,
+} from "./constants";
 
-const FEEDBACK_MESSAGE_MAX_LENGTH = 250;
-const FEEDBACK_SUBJECT_MAX_LENGTH = 50;
-const CONVERSATION_MESSAGE_MAX_LENGTH = 2000;
-const USER_MESSAGE_BUBBLE_CLASS =
-  "border border-[#E0A400] bg-[#F4B000] text-white";
-const MY_SUBMISSIONS_PAGE_SIZE_OPTIONS = [10, 30, 50, 100] as const;
-const SUBMISSION_FILTER_TEXT_COLOR = "#171717";
-const SUBMISSION_FILTER_CONTROL_CLASS =
-  "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
+// Import dialog and view components
+import {
+  TrackingIdSuccess,
+  CreateSubmissionDialog,
+  ConfirmationDialog,
+  DeleteConfirmationDialog,
+  UnsentMessageWarning,
+} from "./UserDashboard.Dialogs";
+import { UserDashboardSubmitView } from "./UserDashboard.SubmitView";
+import { UserDashboardMySubmissionsView } from "./UserDashboard.MySubmissionsView";
+import { UserDashboardHomeView } from "./UserDashboard.HomeView";
 
 export function UserDashboard({ view }: { view: UserDashboardView }) {
-  type HoverFilterKey =
-    | "tracking"
-    | "date"
-    | "type"
-    | "category"
-    | "priority"
-    | "status";
   const router = useRouter();
-  const draftKey = "userFeedbackDraft";
-  const emptyForm = {
-    type: "",
-    category: "",
-    priority: "",
-    subject: "",
-    message: "",
-  };
+  const draftKey = USER_FEEDBACK_DRAFT_KEY;
+  const emptyForm = EMPTY_FORM;
+  const submissionsScrollKey = USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY;
   const [currentUser, setCurrentUser] = useState<{
     id: string;
     fullName: string;
@@ -187,7 +185,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const createSubmissionDialogContentRef = useRef<HTMLDivElement | null>(null);
   const submissionsScrollTop = useRef(0);
   const feedbackSubmitLockRef = useRef(false);
-  const submissionsScrollKey = "userDashboardSubmissionsScrollTop";
   const [createSubmissionFormModalHeight, setCreateSubmissionFormModalHeight] =
     useState<number | null>(null);
   const isHomeView = view === "home";
@@ -1582,161 +1579,40 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   return (
     <>
       <div className="min-h-[calc(100vh-200px)] bg-muted/20">
-        {trackingId && (
-          <div
-            className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center px-4 py-8 animate-in fade-in-0"
-            onClick={() => {
-              setTrackingId(null);
-              setSelectedFeedback(null);
-              setTimeout(() => {
-                restoreSubmissionsScroll(true);
-              }, 200);
-            }}
-          >
-            <div className="w-full max-w-lg -translate-y-[10%]">
-              <Card
-                className="relative shadow-lg animate-in zoom-in-95 fade-in-0"
-                onClick={(event) => event.stopPropagation()}
-              >
-                <button
-                  type="button"
-                  className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Close"
-                  onClick={() => {
-                    setTrackingId(null);
-                    setSelectedFeedback(null);
-                    setTimeout(() => {
-                      restoreSubmissionsScroll(true);
-                    }, 200);
-                  }}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-                <CardHeader className="text-center">
-                  <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
-                    <ArrowRight className="h-8 w-8 text-accent" />
-                  </div>
-                  <CardTitle>Feedback Submitted!</CardTitle>
-                  <CardDescription>
-                    Your feedback has been received successfully
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="w-full bg-muted rounded-lg p-4 text-center relative">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Your Tracking ID
-                    </p>
-                    <p className="text-2xl font-bold text-primary">
-                      {trackingId}
-                    </p>
-                    <button
-                      type="button"
-                      className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-white/80 text-muted-foreground hover:bg-white hover:text-foreground"
-                      onClick={() => copyToClipboard(trackingId)}
-                      aria-label="Copy tracking ID"
-                      title="Copy tracking ID"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <p className="text-sm text-muted-foreground text-center">
-                    Please save this tracking ID to check the status of your
-                    submission.
-                  </p>
-                  {currentUser?.email && (
-                    <p className="text-xs text-muted-foreground text-center">
-                      A copy of this tracking ID was sent to {currentUser.email}
-                      .
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        )}
-        <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-          <DialogContent className="w-[calc(100%-1.5rem)] max-w-lg max-h-[90vh] flex flex-col overflow-hidden p-5 sm:w-full sm:p-6">
-            <DialogHeader>
-              <DialogTitle>Confirm Your Feedback</DialogTitle>
-              <DialogDescription>
-                Review your details before we send this feedback.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {renderConfirmSummary()}
-            </div>
-            <div className="mx-auto mt-5 h-px w-[92%] bg-border/70" />
-            <div className="mt-[10px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                variant="outline"
-                className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 sm:min-w-[160px]`}
-                onClick={() => setIsConfirmOpen(false)}
-              >
-                Back
-              </Button>
-              <Button
-                className={`${submissionActionButtonHeightClass} rounded-lg bg-accent text-white hover:bg-accent/90 sm:min-w-[190px]`}
-                onClick={handleConfirmSubmit}
-                disabled={isSubmittingFeedback}
-              >
-                {isSubmittingFeedback
-                  ? "Submitting feedback..."
-                  : "Confirm & Submit"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-        <Dialog
-          open={isDeleteOpen}
+        {/* Tracking ID Success Modal */}
+        <TrackingIdSuccess
+          trackingId={trackingId}
+          currentUserEmail={currentUser?.email}
+          onClose={() => {
+            setTrackingId(null);
+            setSelectedFeedback(null);
+            setTimeout(() => {
+              restoreSubmissionsScroll(true);
+            }, 200);
+          }}
+          onCopyTrackingId={copyToClipboard}
+        />
+
+        {/* Confirmation Dialog */}
+        <ConfirmationDialog
+          isOpen={isConfirmOpen}
+          onOpenChange={setIsConfirmOpen}
+          onConfirm={handleConfirmSubmit}
+          isLoading={isSubmittingFeedback}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          isOpen={isDeleteOpen}
+          deleteTarget={deleteTarget}
           onOpenChange={(open) => {
             setIsDeleteOpen(open);
             if (!open) {
               setDeleteTarget(null);
             }
           }}
-        >
-          <DialogContent className="w-full max-w-md">
-            <DialogHeader>
-              <DialogTitle>Delete Submission?</DialogTitle>
-              <DialogDescription>
-                This will permanently remove your pending feedback.
-              </DialogDescription>
-            </DialogHeader>
-            {deleteTarget && (
-              <div className="min-w-0 rounded-lg border bg-muted/30 p-3 text-sm">
-                <p className="font-semibold break-words break-all">
-                  {deleteTarget.subject}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground font-mono break-all">
-                  {deleteTarget.id}
-                </p>
-              </div>
-            )}
-            <div className="mt-4 flex justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsDeleteOpen(false);
-                  setDeleteTarget(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                onClick={async () => {
-                  if (deleteTarget) {
-                    await handleDeleteFeedback(deleteTarget);
-                  }
-                  setIsDeleteOpen(false);
-                  setDeleteTarget(null);
-                }}
-              >
-                Delete
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+          onDelete={handleDeleteFeedback}
+        />
 
         <div
           className={`mx-auto w-full px-4 ${
