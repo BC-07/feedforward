@@ -38,15 +38,15 @@ export default function Login() {
   const [isRequestingOTP, setIsRequestingOTP] = useState(false);
   const [isVerifyingOTP, setIsVerifyingOTP] = useState(false);
   const [otpStep, setOtpStep] = useState<"none" | "verify">("none");
-  const isMounted = typeof window !== "undefined";
-  const [expiredMessage] = useState(() => {
-    if (typeof window === "undefined") return "";
+  const [expiredMessage, setExpiredMessage] = useState("");
+
+  useEffect(() => {
     const storedMessage = localStorage.getItem("sessionExpiredMessage") || "";
     if (storedMessage) {
       localStorage.removeItem("sessionExpiredMessage");
+      setExpiredMessage(storedMessage);
     }
-    return storedMessage;
-  });
+  }, []);
 
   useEffect(() => {
     if (expiredMessage) {
@@ -200,7 +200,7 @@ export default function Login() {
           </CardHeader>
 
           <CardContent>
-            {isMounted && expiredMessage ? (
+            {expiredMessage ? (
               <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 {expiredMessage}
               </div>
