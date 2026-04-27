@@ -110,7 +110,7 @@ const EXPORT_LOGO_PATH = "/favicon.ico";
 const ADMIN_FEEDBACK_DETAIL_LAYOUT: "split" | "modal" = "modal";
 type AdminHoverFilterKey = "name" | "date" | "type" | "priority" | "status";
 const ADMIN_FILTER_TEXT_COLOR = "#171717";
-const ADMIN_FILTER_MUTED_COLOR = "#8f877d";
+const ADMIN_FILTER_MUTED_COLOR = "#171717";
 const ADMIN_FILTER_CONTROL_CLASS =
   "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
 const ADMIN_FILTER_CHIP_CLASS =
@@ -244,9 +244,9 @@ export function AdminFeedbackWorkspace({
   const [newStatus, setNewStatus] = useState("");
   const [newPriority, setNewPriority] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterPriority, setFilterPriority] = useState("all");
+  const [filterType, setFilterType] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string[]>([]);
+  const [filterPriority, setFilterPriority] = useState<string[]>([]);
   const [filterName, setFilterName] = useState("asc");
   const [filterDate, setFilterDate] = useState("recent");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -332,9 +332,6 @@ export function AdminFeedbackWorkspace({
       const data = await listFeedbacks({
         category: currentAdmin.unit,
         search: deferredSearchQuery.trim() || undefined,
-        type: filterType === "all" ? undefined : filterType,
-        status: normalizeStatusFilterValue(filterStatus),
-        priority: filterPriority === "all" ? undefined : filterPriority,
       });
       startTransition(() => {
         setFeedbacks(data);
@@ -347,9 +344,6 @@ export function AdminFeedbackWorkspace({
   }, [
     currentAdmin?.unit,
     deferredSearchQuery,
-    filterPriority,
-    filterStatus,
-    filterType,
   ]);
 
   useEffect(() => {
@@ -586,6 +580,8 @@ export function AdminFeedbackWorkspace({
       setMessages([]);
       setNewStatus("");
       setNewPriority("");
+      setActiveEditTab("details");
+      previousTabRef.current = "details";
       setIsEditDialogOpen(false);
     } catch (error) {
       toastApiError(error, "Failed to update feedback.");
@@ -622,18 +618,18 @@ export function AdminFeedbackWorkspace({
     setSearchQuery("");
     setFilterName("asc");
     setFilterDate("recent");
-    setFilterType("all");
-    setFilterPriority("all");
-    setFilterStatus("all");
+    setFilterType([]);
+    setFilterPriority([]);
+    setFilterStatus([]);
   }, []);
 
   const hasActiveFilters =
     trimmedSearchQuery.length > 0 ||
     filterName !== "asc" ||
     filterDate !== "recent" ||
-    filterType !== "all" ||
-    filterPriority !== "all" ||
-    filterStatus !== "all";
+    filterType.length > 0 ||
+    filterPriority.length > 0 ||
+    filterStatus.length > 0;
 
   const inlineFilterChips = useMemo(
     () =>
@@ -660,58 +656,6 @@ export function AdminFeedbackWorkspace({
           ],
           onChange: setFilterDate,
         },
-        {
-          key: "type" as const,
-          value: filterType,
-          chipLabel:
-            filterType === "all"
-              ? "All Types"
-              : formatFilterChipLabel(filterType),
-          showChip: filterType !== "all",
-          options: [
-            { value: "all", label: "All Types" },
-            { value: "suggestion", label: "Suggestion" },
-            { value: "complaint", label: "Complaint" },
-            { value: "inquiry", label: "Inquiry" },
-            { value: "request", label: "Request" },
-            { value: "compliment", label: "Compliment" },
-          ],
-          onChange: setFilterType,
-        },
-        {
-          key: "priority" as const,
-          value: filterPriority,
-          chipLabel:
-            filterPriority === "all"
-              ? "All Priorities"
-              : formatFilterChipLabel(filterPriority),
-          showChip: filterPriority !== "all",
-          options: [
-            { value: "all", label: "All Priorities" },
-            { value: "low", label: "Low" },
-            { value: "medium", label: "Medium" },
-            { value: "high", label: "High" },
-          ],
-          onChange: setFilterPriority,
-        },
-        {
-          key: "status" as const,
-          value: filterStatus,
-          chipLabel:
-            filterStatus === "all"
-              ? "All Status"
-              : filterStatus === "inprogress"
-                ? "In Progress"
-                : formatFilterChipLabel(filterStatus),
-          showChip: filterStatus !== "all",
-          options: [
-            { value: "all", label: "All Status" },
-            { value: "pending", label: "Pending" },
-            { value: "inprogress", label: "In Progress" },
-            { value: "resolved", label: "Resolved" },
-          ],
-          onChange: setFilterStatus,
-        },
       ] satisfies Array<{
         key: AdminHoverFilterKey;
         value: string;
@@ -720,7 +664,7 @@ export function AdminFeedbackWorkspace({
         options: { value: string; label: string }[];
         onChange: (value: string) => void;
       }>,
-    [filterDate, filterName, filterPriority, filterStatus, filterType],
+    [filterDate, filterName],
   );
   const activeFilterPills = useMemo(
     () =>
@@ -730,24 +674,12 @@ export function AdminFeedbackWorkspace({
           : null,
         filterName !== "asc" ? { key: "name", label: "Z - A" } : null,
         filterDate !== "recent" ? { key: "date", label: "Oldest" } : null,
-        filterType !== "all"
-          ? { key: "type", label: formatFilterChipLabel(filterType) }
-          : null,
-        filterPriority !== "all"
-          ? {
-              key: "priority",
-              label: formatFilterChipLabel(filterPriority),
-            }
-          : null,
-        filterStatus !== "all"
-          ? {
-              key: "status",
-              label:
-                filterStatus === "inprogress"
-                  ? "In Progress"
-                  : formatFilterChipLabel(filterStatus),
-            }
-          : null,
+        ...filterType.map((t) => ({ key: `type:${t}`, label: formatFilterChipLabel(t) })),
+        ...filterPriority.map((p) => ({ key: `priority:${p}`, label: formatFilterChipLabel(p) })),
+        ...filterStatus.map((s) => ({
+          key: `status:${s}`,
+          label: s === "inprogress" ? "In Progress" : formatFilterChipLabel(s),
+        })),
       ].filter((pill): pill is { key: string; label: string } => Boolean(pill)),
     [
       filterDate,
@@ -806,21 +738,53 @@ export function AdminFeedbackWorkspace({
         setFilterDate("recent");
         break;
       case "type":
-        setFilterType("all");
+        setFilterType([]);
         break;
       case "priority":
-        setFilterPriority("all");
+        setFilterPriority([]);
         break;
       case "status":
-        setFilterStatus("all");
+        setFilterStatus([]);
         break;
       default:
+        if (key.startsWith("type:")) {
+          const typeToRemove = key.slice(5);
+          setFilterType((prev) => prev.filter((t) => t !== typeToRemove));
+        } else if (key.startsWith("priority:")) {
+          const priorityToRemove = key.slice(9);
+          setFilterPriority((prev) => prev.filter((p) => p !== priorityToRemove));
+        } else if (key.startsWith("status:")) {
+          const statusToRemove = key.slice(7);
+          setFilterStatus((prev) => prev.filter((s) => s !== statusToRemove));
+        }
         break;
     }
   }, []);
 
   const visibleFeedbacks = useMemo(() => {
-    const items = [...feedbacks];
+    let items = [...feedbacks];
+
+    // OR within each filter group, AND between groups
+    if (filterType.length > 0) {
+      items = items.filter((f) =>
+        filterType.some((t) => f.type?.toLowerCase() === t.toLowerCase()),
+      );
+    }
+    if (filterPriority.length > 0) {
+      items = items.filter((f) =>
+        filterPriority.some((p) => f.priority?.toLowerCase() === p.toLowerCase()),
+      );
+    }
+    if (filterStatus.length > 0) {
+      items = items.filter((f) => {
+        const normalized = f.status?.trim().toLowerCase();
+        return filterStatus.some((s) => {
+          if (s === "inprogress") return normalized === "in progress";
+          return normalized === s.toLowerCase();
+        });
+      });
+    }
+
     const getStatusOrder = (status: string) => {
       const normalized = status.trim().toLowerCase();
       if (normalized === "pending") return 0;
@@ -861,7 +825,7 @@ export function AdminFeedbackWorkspace({
     });
 
     return items;
-  }, [feedbacks, filterDate, filterName]);
+  }, [feedbacks, filterDate, filterName, filterType, filterPriority, filterStatus]);
 
   const totalPages = Math.max(
     1,
@@ -960,11 +924,9 @@ export function AdminFeedbackWorkspace({
       .replace(/\s+/g, "-")
       .replace(/[^a-zA-Z0-9-_]/g, "");
     const statusStamp =
-      filterStatus === "all"
+      filterStatus.length === 0
         ? "All"
-        : filterStatus === "inprogress"
-          ? "In-Progress"
-          : filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1);
+        : filterStatus.map((s) => s === "inprogress" ? "In-Progress" : s.charAt(0).toUpperCase() + s.slice(1)).join("-");
 
     return `feedback-report_${categoryStamp}_${statusStamp}_${dateStamp}_${timeStamp}`;
   };
@@ -980,11 +942,11 @@ export function AdminFeedbackWorkspace({
 
   const getFilterSummary = () => {
     const filterParts = [
-      filterType !== "all" ? `Type = ${filterType}` : null,
-      filterStatus !== "all"
-        ? `Status = ${filterStatus === "inprogress" ? "In Progress" : filterStatus}`
+      filterType.length > 0 ? `Type = ${filterType.join(", ")}` : null,
+      filterStatus.length > 0
+        ? `Status = ${filterStatus.map((s) => s === "inprogress" ? "In Progress" : s).join(", ")}`
         : null,
-      filterPriority !== "all" ? `Priority = ${filterPriority}` : null,
+      filterPriority.length > 0 ? `Priority = ${filterPriority.join(", ")}` : null,
       filterDate === "recent" ? "Date = Most Recent" : "Date = Oldest",
       currentAdmin?.unit ? `Category = ${currentAdmin.unit}` : null,
       trimmedSearchQuery ? `Search = "${trimmedSearchQuery}"` : null,
@@ -1437,6 +1399,7 @@ export function AdminFeedbackWorkspace({
               </div>
             </div>
 
+            {/* A-Z and Most Recent selects */}
             {inlineFilterChips.map((filter) => (
               <div key={filter.key} className="space-y-1.5">
                 <Select value={filter.value} onValueChange={filter.onChange}>
@@ -1459,6 +1422,160 @@ export function AdminFeedbackWorkspace({
                 </Select>
               </div>
             ))}
+
+            {/* Multi-select Type filter */}
+            <div className="space-y-1.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={`${ADMIN_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                    style={{ color: ADMIN_FILTER_TEXT_COLOR }}
+                  >
+                    <span
+                      className="truncate"
+                      style={{ color: filterType.length === 0 ? ADMIN_FILTER_MUTED_COLOR : ADMIN_FILTER_TEXT_COLOR }}
+                    >
+                      {filterType.length === 0
+                        ? "All Types"
+                        : formatFilterChipLabel(filterType[filterType.length - 1]!)}
+                    </span>
+                    <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48 p-1">
+                  {[
+                    { value: "suggestion", label: "Suggestion" },
+                    { value: "complaint", label: "Complaint" },
+                    { value: "inquiry", label: "Inquiry" },
+                    { value: "request", label: "Request" },
+                    { value: "compliment", label: "Compliment" },
+                  ].map((option) => {
+                    const isSelected = filterType.includes(option.value);
+                    return (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onSelect={() => {
+                          setFilterType((prev) =>
+                            isSelected
+                              ? prev.filter((t) => t !== option.value)
+                              : [...prev, option.value],
+                          );
+                        }}
+                        className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
+                      >
+                        <span>{option.label}</span>
+                        {isSelected && (
+                          <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Multi-select Priority filter */}
+            <div className="space-y-1.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={`${ADMIN_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                    style={{ color: ADMIN_FILTER_TEXT_COLOR }}
+                  >
+                    <span
+                      className="truncate"
+                      style={{ color: filterPriority.length === 0 ? ADMIN_FILTER_MUTED_COLOR : ADMIN_FILTER_TEXT_COLOR }}
+                    >
+                      {filterPriority.length === 0
+                        ? "All Priorities"
+                        : formatFilterChipLabel(filterPriority[filterPriority.length - 1]!)}
+                    </span>
+                    <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48 p-1">
+                  {[
+                    { value: "low", label: "Low" },
+                    { value: "medium", label: "Medium" },
+                    { value: "high", label: "High" },
+                  ].map((option) => {
+                    const isSelected = filterPriority.includes(option.value);
+                    return (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onSelect={() => {
+                          setFilterPriority((prev) =>
+                            isSelected
+                              ? prev.filter((p) => p !== option.value)
+                              : [...prev, option.value],
+                          );
+                        }}
+                        className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
+                      >
+                        <span>{option.label}</span>
+                        {isSelected && (
+                          <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Multi-select Status filter */}
+            <div className="space-y-1.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={`${ADMIN_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                    style={{ color: ADMIN_FILTER_TEXT_COLOR }}
+                  >
+                    <span
+                      className="truncate"
+                      style={{ color: filterStatus.length === 0 ? ADMIN_FILTER_MUTED_COLOR : ADMIN_FILTER_TEXT_COLOR }}
+                    >
+                      {filterStatus.length === 0
+                        ? "All Status"
+                        : filterStatus[filterStatus.length - 1] === "inprogress"
+                          ? "In Progress"
+                          : formatFilterChipLabel(filterStatus[filterStatus.length - 1]!)}
+                    </span>
+                    <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48 p-1">
+                  {[
+                    { value: "pending", label: "Pending" },
+                    { value: "inprogress", label: "In Progress" },
+                    { value: "resolved", label: "Resolved" },
+                  ].map((option) => {
+                    const isSelected = filterStatus.includes(option.value);
+                    return (
+                      <DropdownMenuItem
+                        key={option.value}
+                        onSelect={() => {
+                          setFilterStatus((prev) =>
+                            isSelected
+                              ? prev.filter((s) => s !== option.value)
+                              : [...prev, option.value],
+                          );
+                        }}
+                        className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
+                      >
+                        <span>{option.label}</span>
+                        {isSelected && (
+                          <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           {activeFilterPills.length > 0 ? (
