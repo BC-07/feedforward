@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { loginAdmin, loginUser } from "@/lib/api";
+import {
+  loginAdmin,
+  loginUser,
+} from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,15 +26,16 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const isMounted = typeof window !== "undefined";
-  const [expiredMessage] = useState(() => {
-    if (typeof window === "undefined") return "";
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [expiredMessage, setExpiredMessage] = useState("");
+
+  useEffect(() => {
     const storedMessage = localStorage.getItem("sessionExpiredMessage") || "";
     if (storedMessage) {
       localStorage.removeItem("sessionExpiredMessage");
+      setExpiredMessage(storedMessage);
     }
-    return storedMessage;
-  });
+  }, []);
 
   useEffect(() => {
     if (expiredMessage) {
@@ -44,34 +48,11 @@ export default function Login() {
     const normalizedEmail = email.trim();
     const normalizedPassword = password.trim();
     if (!normalizedEmail || !normalizedPassword) {
-      toast.error("Email and password are required.");
+      toast.error("Invalid email or password.");
       return;
     }
 
-    try {
-      const user = await loginUser({
-        email: normalizedEmail,
-        password: normalizedPassword,
-      });
-      localStorage.setItem("isUserLoggedIn", "true");
-      localStorage.setItem("currentUserId", user.id);
-      localStorage.setItem("currentUserName", user.name);
-      localStorage.setItem("currentUserEmail", user.email);
-      localStorage.removeItem("isAdminLoggedIn");
-      localStorage.removeItem("currentAdminId");
-      localStorage.removeItem("currentAdminName");
-      localStorage.removeItem("currentAdminEmail");
-      localStorage.removeItem("currentAdminDepartment");
-      localStorage.removeItem("isSuperAdminLoggedIn");
-      localStorage.removeItem("superAdminName");
-      localStorage.removeItem("superAdminExpiresAt");
-      toast.success(`Welcome back, ${user.name}!`);
-      router.push("/user/home");
-      return;
-    } catch {
-      // Try admin login with the same form credentials.
-    }
-
+    setIsLoggingIn(true);
     try {
       const admin = await loginAdmin({
         email: normalizedEmail,
@@ -109,8 +90,34 @@ export default function Login() {
       localStorage.removeItem("superAdminExpiresAt");
       toast.success(`Welcome back, ${admin.name}!`);
       router.push("/dashboard");
-    } catch (error) {
-      toastApiError(error, "Invalid email or password");
+      return;
+    } catch {
+      try {
+        const user = await loginUser({
+          email: normalizedEmail,
+          password: normalizedPassword,
+        });
+        localStorage.setItem("isUserLoggedIn", "true");
+        localStorage.setItem("currentUserId", user.id);
+        localStorage.setItem("currentUserName", user.name);
+        localStorage.setItem("currentUserEmail", user.email);
+        localStorage.removeItem("isAdminLoggedIn");
+        localStorage.removeItem("currentAdminId");
+        localStorage.removeItem("currentAdminName");
+        localStorage.removeItem("currentAdminEmail");
+        localStorage.removeItem("currentAdminDepartment");
+        localStorage.removeItem("isSuperAdminLoggedIn");
+        localStorage.removeItem("superAdminName");
+        localStorage.removeItem("superAdminExpiresAt");
+        toast.success(`Welcome back, ${user.name}!`);
+        router.push("/user/home");
+        return;
+      } catch (error) {
+        toastApiError(error, "Invalid email or password");
+        return;
+      }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -127,7 +134,7 @@ export default function Login() {
           </CardHeader>
 
           <CardContent>
-            {isMounted && expiredMessage ? (
+            {expiredMessage ? (
               <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 {expiredMessage}
               </div>
@@ -182,8 +189,9 @@ export default function Login() {
                 type="submit"
                 className="w-full bg-accent hover:bg-accent/90"
                 size="lg"
+                disabled={isLoggingIn}
               >
-                Log In
+                {isLoggingIn ? "Logging in..." : "Log In"}
               </Button>
               <div className="text-center">
                 <Link

@@ -46,6 +46,7 @@ export type Feedback = {
   priority: string;
   userId?: string | null;
   userName: string;
+  userEmail?: string;
   isAnonymous: boolean;
   response?: string;
   createdAt: string;
@@ -79,6 +80,11 @@ export type Category = {
   name: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type SuperAdminBarStatRow = {
+  label: string;
+  count: number;
 };
 
 type RequestErrorPayload = {
@@ -162,6 +168,9 @@ export const forgotPassword = (data: { email: string }) =>
     body: toBody(data),
   });
 
+// Backward-compatible aliases used by pages copied from another branch.
+export const requestUserLoginOTP = forgotPassword;
+
 export const verifyResetOTP = (data: { email: string; otp: string }) =>
   apiFetch<{ verified: boolean; id: string; name: string; email: string; role?: string }>(
     "/users/verify-reset-otp",
@@ -170,6 +179,9 @@ export const verifyResetOTP = (data: { email: string; otp: string }) =>
       body: toBody(data),
     },
   );
+
+// Backward-compatible alias used by pages copied from another branch.
+export const verifyUserLoginOTP = verifyResetOTP;
 
 export const getSessionMe = () => apiFetch<SessionData>("/sessions/current", { method: "GET" });
 
@@ -203,7 +215,12 @@ export const createAdminBySuperAdmin = (data: {
 }) =>
   superAdminRequest<Admin>("/superadmin/admins", {
     method: "POST",
-    body: toBody(data),
+    body: toBody({
+      firstName: data.firstName.trim(),
+      lastName: data.lastName.trim(),
+      email: data.email.trim(),
+      unit: data.unit.trim(),
+    }),
   });
 
 export const updateAdminBySuperAdmin = (
@@ -238,7 +255,7 @@ export const listCategories = () =>
 export const createCategoryBySuperAdmin = (data: { name: string }) =>
   superAdminRequest<Category[]>("/superadmin/categories", {
     method: "POST",
-    body: toBody(data),
+    body: toBody({ name: data.name.trim() }),
   });
 
 export const updateCategoryBySuperAdmin = (id: number, data: { name: string }) =>
@@ -331,6 +348,91 @@ export async function listFeedbacks(filters: ListFeedbackFilters = {}): Promise<
 
     return matchesSearch && matchesType && matchesPriority && matchesStatus;
   });
+}
+
+function getRangeStart(statsRange: "1d" | "7d" | "30d") {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const range = new Date(now);
+  switch (statsRange) {
+    case "1d":
+      range.setDate(now.getDate());
+      break;
+    case "7d":
+      range.setDate(now.getDate() - 6);
+      break;
+    case "30d":
+      range.setDate(now.getDate() - 29);
+      break;
+  }
+  return range;
+}
+
+async function getSuperAdminFeedbacks(): Promise<Feedback[]> {
+  const categories = await listCategories();
+  const activeCategories = categories.filter((category) => {
+    const normalized = category.name.trim().toLowerCase();
+    return normalized !== "disabled" && normalized !== "inactive";
+  });
+
+  const feedbackGroups = await Promise.all(
+    activeCategories.map((category) => listFeedbacks({ category: category.name })),
+  );
+
+  return feedbackGroups.flat();
+}
+
+export async function getResolvedAdminsLast7Days(
+  statsRange: "1d" | "7d" | "30d",
+): Promise<SuperAdminBarStatRow[]> {
+  const feedbacks = await getSuperAdminFeedbacks();
+  const rangeStart = getRangeStart(statsRange);
+  const grouped = new Map<string, number>();
+
+  feedbacks.forEach((feedback) => {
+    const resolvedAt = new Date(feedback.updatedAt || feedback.createdAt);
+    if (resolvedAt < rangeStart) return;
+    if (feedback.status.trim().toLowerCase() !== "resolved") return;
+    const label = feedback.userName?.trim() || "Unassigned";
+    grouped.set(label, (grouped.get(label) || 0) + 1);
+  });
+
+  return Array.from(grouped.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+export async function getCategorySubmissionsLast7Days(
+  statsRange: "1d" | "7d" | "30d",
+): Promise<SuperAdminBarStatRow[]> {
+  const feedbacks = await getSuperAdminFeedbacks();
+  const rangeStart = getRangeStart(statsRange);
+  const grouped = new Map<string, number>();
+
+  feedbacks.forEach((feedback) => {
+    const createdAt = new Date(feedback.createdAt);
+    if (createdAt < rangeStart) return;
+    const label = feedback.category?.trim() || "Uncategorized";
+    grouped.set(label, (grouped.get(label) || 0) + 1);
+  });
+
+  return Array.from(grouped.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+export async function getCategorySubmissionCounts(): Promise<SuperAdminBarStatRow[]> {
+  const feedbacks = await getSuperAdminFeedbacks();
+  const grouped = new Map<string, number>();
+
+  feedbacks.forEach((feedback) => {
+    const label = feedback.category?.trim() || "Uncategorized";
+    grouped.set(label, (grouped.get(label) || 0) + 1);
+  });
+
+  return Array.from(grouped.entries())
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 
 export const getFeedback = (id: string) =>

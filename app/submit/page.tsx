@@ -107,6 +107,16 @@ export default function Submit() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (submitLockRef.current) return;
+    const normalizedType = formData.type.trim();
+    const normalizedCategory = formData.category.trim();
+    if (!normalizedType) {
+      toast.error("Feedback type is required.");
+      return;
+    }
+    if (!normalizedCategory) {
+      toast.error("Category is required.");
+      return;
+    }
     if (formData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
       toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
       return;
@@ -132,6 +142,8 @@ export default function Submit() {
       await createFeedback({
         id: newTrackingId,
         ...formData,
+        type: normalizedType,
+        category: normalizedCategory,
         subject: normalizedSubject,
         message: normalizedMessage,
         userId,

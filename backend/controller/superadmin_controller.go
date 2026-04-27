@@ -61,10 +61,6 @@ func cleanupExpiredAdminSetupTokens(now time.Time) {
 
 func superAdminAuth(c *fiber.Ctx) bool {
 	db := middleware.DBConn
-	superAdminID := strings.TrimSpace(c.Get("X-SuperAdmin-Id"))
-	if superAdminID == "" {
-		return false
-	}
 
 	sessionID := middleware.GetSessionIDFromCookies(c, middleware.SessionRoleSuperAdmin)
 	if sessionID == "" {
@@ -75,7 +71,11 @@ func superAdminAuth(c *fiber.Ctx) bool {
 	if err != nil || session == nil {
 		return false
 	}
-	if session.AdminID == nil || strings.TrimSpace(*session.AdminID) != superAdminID {
+	if session.AdminID == nil || strings.TrimSpace(*session.AdminID) == "" {
+		return false
+	}
+	superAdminID := strings.TrimSpace(*session.AdminID)
+	if headerID := strings.TrimSpace(c.Get("X-SuperAdmin-Id")); headerID != "" && headerID != superAdminID {
 		return false
 	}
 	middleware.TouchSession(sessionID)
