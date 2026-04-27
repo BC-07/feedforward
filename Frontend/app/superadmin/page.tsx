@@ -149,7 +149,7 @@ const SUPERADMIN_CATEGORY_TABLE_PLACEHOLDER_ROW_CLASS_NAME = "h-12";
 const SUPERADMIN_ADMIN_TABLE_CLASS_NAME =
   "w-full min-w-full md:min-w-[980px] md:table-fixed text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3";
 const SUPERADMIN_CATEGORY_TABLE_CLASS_NAME =
-  "w-full min-w-full md:min-w-[1100px] md:table-fixed text-xs sm:text-sm [&_td]:px-1.5 [&_th]:px-1.5";
+  "w-full min-w-full md:min-w-[1100px] md:table-fixed text-xs sm:text-sm [&_td]:px-1.5 [&_th]:px-1.5 ";
 const statsRangeOptions: Array<{ value: StatsRange; label: string }> = [
   { value: "1d", label: "1 Day" },
   { value: "7d", label: "7 Days" },
@@ -1471,7 +1471,7 @@ export default function SuperAdminDashboard() {
           )}
 
           {isAdminControlPage && (
-            <Card className={SUPERADMIN_TABLE_SHELL_CLASS_NAME}>
+            <Card className={SUPERADMIN_TABLE_SHELL_CLASS_NAME + " h-[calc(100vh-4rem)]"}>
               <CardHeader className="pb-0 pt-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -1520,6 +1520,7 @@ export default function SuperAdminDashboard() {
                   </div>
                 </div>
               </CardHeader>
+              
               <CardContent className="flex min-h-0 flex-1 flex-col gap-0 pt-0">
                 <div className="mb-3 hidden gap-x-3 gap-y-2 md:grid xl:grid-cols-[minmax(0,1.9fr)_repeat(3,minmax(0,1fr))]">
                   <div className="relative">
@@ -1561,6 +1562,7 @@ export default function SuperAdminDashboard() {
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="w-full overflow-x-auto">
                   <Table className={SUPERADMIN_ADMIN_TABLE_CLASS_NAME}>
                     <TableHeader className={SUPERADMIN_TABLE_HEADER_CLASS_NAME}>
@@ -1694,7 +1696,7 @@ export default function SuperAdminDashboard() {
 
           {isCategoryControlPage && (
             <Card
-              className={`${SUPERADMIN_CATEGORY_TABLE_SHELL_CLASS_NAME} h-fit`}
+              className={`${SUPERADMIN_CATEGORY_TABLE_SHELL_CLASS_NAME} h-[calc(100vh-4rem)]`}
             >
               <CardHeader className="pb-0 pt-2.5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -1718,6 +1720,7 @@ export default function SuperAdminDashboard() {
                   </Button>
                 </div>
               </CardHeader>
+
               <CardContent className="flex min-h-0 flex-1 flex-col gap-3 pt-0">
                 <div className="mb-0">
                   <div className="hidden gap-x-3 gap-y-2 md:grid xl:grid-cols-[minmax(0,1.9fr)_repeat(2,minmax(0,1fr))]">
