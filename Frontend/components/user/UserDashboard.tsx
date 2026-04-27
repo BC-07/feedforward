@@ -2136,24 +2136,29 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       className="ff-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px]"
                       onClick={handleAttemptCloseSelectedFeedback}
                     />
-                    <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl" style={isUnsentMessageDialogOpen ? {borderColor: "transparent"} : {}}>
-                      {isUnsentMessageDialogOpen && (
-                        <>
-                          <div className="absolute -inset-px z-20 rounded-2x1 bg-black/40 backdrop-blur-[1px]" />
-                          <div className="absolute inset-0 z-30 flex items-center justify-center p-4">
-                            <div className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
-                              <div className="space-y-2 text-left">
-                                <h2 className="text-lg font-semibold">Discard unsent message?</h2>
-                                <p className="text-sm text-muted-foreground">You have a message that has not been sent yet.</p>
-                              </div>
-                              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                                <Button type="button" variant="outline" onClick={() => setIsUnsentMessageDialogOpen(false)}>Keep</Button>
-                                <Button type="button" onClick={() => { setIsUnsentMessageDialogOpen(false); closeSelectedFeedback(); }}>Discard</Button>
-                              </div>
+                    {/* Unsent message overlay — outside Card so overflow-hidden doesn't clip it */}
+                    {isUnsentMessageDialogOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-[1px]"
+                          onClick={() => { setIsUnsentMessageDialogOpen(false); closeSelectedFeedback(); }}
+                        />
+                        <div className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none">
+                          <div className="pointer-events-auto w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
+                            <div className="space-y-2 text-left">
+                              <h2 className="text-lg font-semibold">Discard unsent message?</h2>
+                              <p className="text-sm text-muted-foreground">You have a message that has not been sent yet.</p>
+                            </div>
+                            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                              <Button type="button" variant="outline" onClick={() => setIsUnsentMessageDialogOpen(false)}>Keep</Button>
+                              <Button type="button" onClick={() => { setIsUnsentMessageDialogOpen(false); closeSelectedFeedback(); }}>Discard</Button>
                             </div>
                           </div>
-                        </>
-                      )}
+                        </div>
+                      </>
+                    )}
+                    <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
+
                       <CardHeader className="space-y-0 pb-0">
                         <div className="flex items-center justify-between gap-3">
                           <CardTitle>Feedback Details</CardTitle>
@@ -2194,7 +2199,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       </CardContent>
 
                       <div className="pointer-events-none absolute bottom-0 right-6 z-20">
-                        {isUnsentMessageDialogOpen && <div className="absolute inset-0 z-40 rounded-t-xl bg-black/40 backdrop-blur-[1px]" />}
+
                         <div className="relative h-[360px] w-[320px]">
                           <div
                             className={`pointer-events-auto absolute bottom-0 right-0 z-10 h-[360px] w-[320px] overflow-hidden rounded-t-xl border-2 border-slate-300 bg-white shadow-2xl transition-transform duration-500 ease-in-out ${
@@ -2207,9 +2212,12 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               className="flex cursor-pointer items-center justify-between border-b border-border bg-muted/40 px-3 py-2 transition-colors hover:bg-muted/70"
                               onClick={() => setIsMiniChatOpen((prev) => !prev)}
                             >
-                              <p className="text-sm font-semibold text-foreground">
-                                Message window
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                                <p className="text-sm font-semibold text-foreground">
+                                  Message window
+                                </p>
+                              </div>
                               {isMiniChatOpen ? (
                                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
                               ) : (
@@ -2299,10 +2307,12 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                             className="space-y-2"
                                           >
                                             {showDayLabel ? (
-                                              <div className="flex justify-center">
-                                                <span className="rounded-full border border-border bg-white/80 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                                              <div className="flex items-center gap-2 py-1">
+                                                <div className="h-px flex-1 bg-border/60" />
+                                                <span className="text-[10px] font-medium text-muted-foreground">
                                                   {dayLabel}
                                                 </span>
+                                                <div className="h-px flex-1 bg-border/60" />
                                               </div>
                                             ) : null}
                                             <div

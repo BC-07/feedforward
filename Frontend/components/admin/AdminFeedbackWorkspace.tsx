@@ -253,6 +253,10 @@ export function AdminFeedbackWorkspace({
   const [activeEditTab, setActiveEditTab] = useState<"details" | "manage" | "messages">(
     "details",
   );
+  const [tabAnimDirection, setTabAnimDirection] = useState<"left" | "right">("left");
+  const previousTabRef = useRef<"details" | "manage" | "messages">("details");
+  const [dialogHeight, setDialogHeight] = useState<number | null>(null);
+  const dialogInnerRef = useRef<HTMLDivElement>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const openedFeedbackRequestRef = useRef("");
   const messageScrollRef = useRef<HTMLDivElement>(null);
@@ -514,6 +518,9 @@ export function AdminFeedbackWorkspace({
     setSelectedFeedback(null);
     setMessages([]);
     setMessageDraft("");
+    setDialogHeight(null);
+    setActiveEditTab("details");
+    previousTabRef.current = "details";
   }, []);
 
   const handleAttemptCloseEditDialog = useCallback(() => {
@@ -536,6 +543,22 @@ export function AdminFeedbackWorkspace({
     selectedFeedback,
     scrollMessagesToBottom,
   ]);
+
+  // Animate dialog height: compact for Manage tab, full for others
+  useEffect(() => {
+    if (!isEditDialogOpen) return;
+
+    if (activeEditTab !== "manage") {
+      setDialogHeight(null);
+      return;
+    }
+
+    // Fixed compact height for the Manage tab (header + tabs + status + priority + save button)
+    const raf = window.requestAnimationFrame(() => {
+      setDialogHeight(340);
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [activeEditTab, isEditDialogOpen, selectedFeedback]);
 
   const handleUpdateFeedback = async () => {
     if (!selectedFeedback) return;
@@ -1352,30 +1375,6 @@ export function AdminFeedbackWorkspace({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      <AlertDialog
-        open={isUnsentMessageDialogOpen}
-        onOpenChange={setIsUnsentMessageDialogOpen}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard unsent message?</AlertDialogTitle>
-            <AlertDialogDescription>
-              You have a message that has not been sent yet.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setIsUnsentMessageDialogOpen(false);
-                closeEditDialog();
-              }}
-            >
-              Discard
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       <div className="px-4 pb-6 pt-4 sm:px-7 sm:pt-6">
         <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-4 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
           <div
@@ -1620,365 +1619,18 @@ export function AdminFeedbackWorkspace({
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
                               ) : (
-                                <Dialog
-                                  open={
-                                    isEditDialogOpen &&
-                                    selectedFeedback?.id === feedback.id
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 rounded-md"
+                                  aria-label={`Edit ${feedback.id}`}
+                                  title="Edit feedback"
+                                  onClick={() =>
+                                    void openFeedbackDialog(feedback)
                                   }
-                                  onOpenChange={(open) => {
-                                    if (!open) {
-                                      handleAttemptCloseEditDialog();
-                                    }
-                                  }}
                                 >
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-7 w-7 rounded-md"
-                                      aria-label={`Edit ${feedback.id}`}
-                                      title="Edit feedback"
-                                      onClick={() =>
-                                        void openFeedbackDialog(feedback)
-                                      }
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent
-                                    className="flex max-w-xl flex-col overflow-hidden transition-[height,max-height] duration-300 ease-in-out"
-                                    style={{
-                                      height: activeEditTab === "manage" ? "auto" : "85vh",
-                                      maxHeight: activeEditTab === "manage" ? "340px" : "85vh",
-                                    }}
-                                    onInteractOutside={(event) =>
-                                      event.preventDefault()
-                                    }
-                                    onEscapeKeyDown={(event) =>
-                                      event.preventDefault()
-                                    }
-                                  >
-                                    <DialogHeader>
-                                      <DialogTitle>
-                                        Feedback Details
-                                      </DialogTitle>
-                                      <DialogDescription>
-                                        Tracking ID: {selectedFeedback?.id}
-                                      </DialogDescription>
-                                    </DialogHeader>
-                                    {selectedFeedback ? (
-                                      <Tabs
-                                        value={activeEditTab}
-                                        onValueChange={(value) =>
-                                          setActiveEditTab(
-                                            value as "details" | "manage" | "messages",
-                                          )
-                                        }
-                                        className="flex min-h-0 w-full flex-1 flex-col"
-                                      >
-                                        <TabsList className="grid w-full shrink-0 grid-cols-3 rounded-full">
-                                          <TabsTrigger value="details">
-                                            Details
-                                          </TabsTrigger>
-                                          <TabsTrigger value="messages">
-                                            Messages
-                                          </TabsTrigger>
-                                          <TabsTrigger value="manage">
-                                            Manage
-                                          </TabsTrigger>
-                                        </TabsList>
-
-                                        <TabsContent
-                                          value="details"
-                                          className="ff-hide-scrollbar flex min-h-0 flex-1 flex-col space-y-4 overflow-x-hidden overflow-y-auto pr-1"
-                                        >
-                                          <FeedbackDetailsCard
-                                            feedback={selectedFeedback}
-                                            title=""
-                                            className="rounded-none border-0 bg-transparent shadow-none"
-                                            formatDate={formatDetailsUpdatedAt}
-                                            preSubjectContent={
-                                              <div className="grid grid-cols-1 gap-y-8">
-                                                <div className="space-y-1">
-                                                  <Label className="text-muted-foreground">
-                                                    Submitted By
-                                                  </Label>
-                                                  <p className="pt-0.5 text-[0.98rem] font-medium">
-                                                    {selectedFeedback.isAnonymous
-                                                      ? "*****"
-                                                      : selectedFeedback.userName ||
-                                                        "*****"}
-                                                  </p>
-                                                </div>
-                                              </div>
-                                            }
-                                          />
-
-                                          {selectedFeedback.response ? (
-                                            <div>
-                                              <Label className="text-muted-foreground">
-                                                Current Response
-                                              </Label>
-                                              <div className="mt-2 max-h-[260px] overflow-y-auto rounded-lg border border-accent/20 bg-accent/5 p-4">
-                                                <div className="space-y-3">
-                                                  {parseAdminResponses(
-                                                    selectedFeedback.response,
-                                                  ).map((entry, index) => (
-                                                    <div
-                                                      key={`${entry.time ?? "note"}-${index}`}
-                                                    >
-                                                      <p className="text-[10px] font-semibold text-muted-foreground">
-                                                        {entry.author ||
-                                                          "Admin"}{" "}
-                                                        {entry.time
-                                                          ? formatLocalTime(
-                                                              entry.time,
-                                                            )
-                                                          : ""}
-                                                      </p>
-                                                      <p className="text-sm leading-relaxed text-foreground/90">
-                                                        {entry.message}
-                                                      </p>
-                                                    </div>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            </div>
-                                          ) : null}
-                                        </TabsContent>
-
-                                        <TabsContent
-                                          value="manage"
-                                          className="flex min-h-0 flex-1 flex-col"
-                                        >
-                                          {/* ── Controls ── */}
-                                          <div className="flex flex-1 flex-col justify-start gap-3">
-                                            {/* Status row */}
-                                            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
-                                              <span className="w-16 shrink-0 text-sm font-medium text-muted-foreground">
-                                                Status
-                                              </span>
-                                              <div className="flex flex-1 gap-1.5">
-                                                {(["Pending", "In Progress", "Resolved"] as const).map((s) => {
-                                                  const isActive = newStatus === s;
-                                                  const activeClass: Record<string, string> = {
-                                                    Pending: "bg-amber-500 border-amber-500 text-white",
-                                                    "In Progress": "bg-blue-500 border-blue-500 text-white",
-                                                    Resolved: "bg-emerald-500 border-emerald-500 text-white",
-                                                  };
-                                                  return (
-                                                    <button
-                                                      key={s}
-                                                      type="button"
-                                                      onClick={() => setNewStatus(s)}
-                                                      className={`flex-1 rounded-md border py-1.5 text-xs font-semibold transition-all ${
-                                                        isActive
-                                                          ? activeClass[s]
-                                                          : "border-border bg-background text-muted-foreground hover:border-border/80 hover:bg-muted/60"
-                                                      }`}
-                                                    >
-                                                      {s}
-                                                    </button>
-                                                  );
-                                                })}
-                                              </div>
-                                            </div>
-
-                                            {/* Priority row */}
-                                            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
-                                              <span className="w-16 shrink-0 text-sm font-medium text-muted-foreground">
-                                                Priority
-                                              </span>
-                                              <div className="flex flex-1 gap-1.5">
-                                                {(["Low", "Medium", "High"] as const).map((p) => {
-                                                  const isActive = newPriority === p;
-                                                  const activeClass: Record<string, string> = {
-                                                    Low: "bg-slate-500 border-slate-500 text-white",
-                                                    Medium: "bg-orange-500 border-orange-500 text-white",
-                                                    High: "bg-red-500 border-red-500 text-white",
-                                                  };
-                                                  return (
-                                                    <button
-                                                      key={p}
-                                                      type="button"
-                                                      onClick={() => setNewPriority(p)}
-                                                      className={`flex-1 rounded-md border py-1.5 text-xs font-semibold transition-all ${
-                                                        isActive
-                                                          ? activeClass[p]
-                                                          : "border-border bg-background text-muted-foreground hover:border-border/80 hover:bg-muted/60"
-                                                      }`}
-                                                    >
-                                                      {p}
-                                                    </button>
-                                                  );
-                                                })}
-                                              </div>
-                                            </div>
-                                          </div>
-
-                                          {/* ── Save button pinned to bottom ── */}
-                                          <div className="shrink-0 space-y-2 pt-4">
-                                            <Button
-                                              onClick={handleUpdateFeedback}
-                                              disabled={!hasFeedbackChanges}
-                                              className="w-full bg-accent hover:bg-accent/90 disabled:opacity-40"
-                                            >
-                                              Save Changes
-                                            </Button>
-                                            <p className="text-center text-[11px] text-muted-foreground/70">
-                                              Marking as Resolved will email the user if they registered an account.
-                                            </p>
-                                          </div>
-                                        </TabsContent>
-
-                                        {/* ── Messages tab ── */}
-                                        <TabsContent
-                                          value="messages"
-                                          className="flex min-h-0 flex-1 flex-col"
-                                        >
-                                          <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-muted/20">
-                                            <div
-                                              ref={messageScrollRef}
-                                              className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto p-3"
-                                            >
-                                              {isMessagesLoading ? (
-                                                <div className="flex h-full items-center justify-center">
-                                                  <p className="text-sm text-muted-foreground">
-                                                    Loading conversation...
-                                                  </p>
-                                                </div>
-                                              ) : null}
-                                              {!isMessagesLoading && messages.length === 0 ? (
-                                                <div className="flex h-full items-center justify-center">
-                                                  <div className="text-center">
-                                                    <MessageSquare className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
-                                                    <p className="text-sm text-muted-foreground">
-                                                      No messages yet
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground/60">
-                                                      Send a message to start the conversation
-                                                    </p>
-                                                  </div>
-                                                </div>
-                                              ) : null}
-                                              <div className="space-y-3">
-                                                {(() => {
-                                                  let lastDayLabel = "";
-                                                  return messages.map(
-                                                    (entry, index, allMessages) => {
-                                                      const createdAt = entry.createdAt
-                                                        ? new Date(entry.createdAt)
-                                                        : null;
-                                                      const today = new Date();
-                                                      const yesterday = new Date();
-                                                      yesterday.setDate(today.getDate() - 1);
-
-                                                      const dayLabel = createdAt
-                                                        ? createdAt.toDateString() === today.toDateString()
-                                                          ? "Today"
-                                                          : createdAt.toDateString() === yesterday.toDateString()
-                                                            ? "Yesterday"
-                                                            : createdAt.toLocaleDateString(undefined, {
-                                                                month: "short",
-                                                                day: "numeric",
-                                                                year: "numeric",
-                                                              })
-                                                        : "";
-                                                      const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
-                                                      if (showDayLabel) lastDayLabel = dayLabel;
-
-                                                      const isUserMessage = entry.senderRole === "user";
-                                                      const name = isUserMessage
-                                                        ? selectedFeedback?.isAnonymous
-                                                          ? "Anonymous"
-                                                          : entry.senderName || "User"
-                                                        : "You";
-                                                      const prev = index > 0 ? allMessages[index - 1] : null;
-                                                      const prevIsUser = prev ? prev.senderRole === "user" : false;
-                                                      const prevName = prev
-                                                        ? prevIsUser
-                                                          ? selectedFeedback?.isAnonymous
-                                                            ? "Anonymous"
-                                                            : prev.senderName || "User"
-                                                          : "You"
-                                                        : "";
-                                                      const showName =
-                                                        !prev ||
-                                                        showDayLabel ||
-                                                        prev.senderRole !== entry.senderRole ||
-                                                        prevName !== name;
-                                                      const hasVeryLongToken = /\S{24,}/.test(entry.message || "");
-                                                      const isLikelyMultiLine =
-                                                        (entry.message || "").includes("\n") ||
-                                                        (entry.message || "").length > 60;
-
-                                                      return (
-                                                        <div key={entry.id} className="space-y-1.5">
-                                                          {showDayLabel ? (
-                                                            <div className="flex justify-center py-1">
-                                                              <span className="rounded-full border border-border bg-background px-2.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                                                {dayLabel}
-                                                              </span>
-                                                            </div>
-                                                          ) : null}
-                                                          <div className={`flex ${isUserMessage ? "justify-start" : "justify-end"}`}>
-                                                            <div className={`group relative min-w-0 max-w-[80%] ${isUserMessage ? "text-left" : "text-right"}`}>
-                                                              {showName ? (
-                                                                <p className="mb-1 px-1 text-[11px] font-semibold text-muted-foreground">
-                                                                  {name}
-                                                                </p>
-                                                              ) : null}
-                                                              <div
-                                                                className={`inline-block rounded-2xl px-3 py-2 text-sm ${
-                                                                  isUserMessage
-                                                                    ? "border border-border bg-white text-foreground shadow-sm"
-                                                                    : "bg-accent text-white shadow-sm"
-                                                                }`}
-                                                              >
-                                                                <p
-                                                                  className={`whitespace-pre-line leading-relaxed ${
-                                                                    hasVeryLongToken ? "break-all" : "break-words"
-                                                                  }`}
-                                                                >
-                                                                  {isUserMessage
-                                                                    ? formatFeedbackText(entry.message || "")
-                                                                    : entry.message}
-                                                                </p>
-                                                              </div>
-                                                              {entry.createdAt ? (
-                                                                <span
-                                                                  className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-black/50 px-2 py-1 text-[10px] text-white shadow-sm group-hover:inline-flex ${
-                                                                    isUserMessage ? "-right-1 translate-x-full" : "-left-1 -translate-x-full"
-                                                                  } ${isLikelyMultiLine ? "top-1/2" : "top-[68%]"}`}
-                                                                >
-                                                                  {formatLocalTime(entry.createdAt)}
-                                                                </span>
-                                                              ) : null}
-                                                            </div>
-                                                          </div>
-                                                        </div>
-                                                      );
-                                                    },
-                                                  );
-                                                })()}
-                                              </div>
-                                            </div>
-
-                                            <div className="shrink-0 border-t border-border/60">
-                                              <ReplyComposer
-                                                key={selectedFeedback.id}
-                                                draft={messageDraft}
-                                                onDraftChange={setMessageDraft}
-                                                isSendingMessage={isSendingMessage}
-                                                onSend={handleSendMessage}
-                                              />
-                                            </div>
-                                          </div>
-                                        </TabsContent>
-                                      </Tabs>
-                                    ) : null}
-                                  </DialogContent>
-                                </Dialog>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
                               )}
                             </div>
                           </TableCell>
@@ -2396,6 +2048,419 @@ export function AdminFeedbackWorkspace({
           )}
         </div>
       </div>
+
+      {/* Lifted Dialog — rendered outside table to avoid transform stacking context issues */}
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleAttemptCloseEditDialog();
+          }
+        }}
+      >
+        <DialogContent
+        className="flex max-w-xl flex-col overflow-hidden p-0"
+        style={{
+          height: dialogHeight ? `${dialogHeight}px` : "min(680px, 85dvh)",
+          maxHeight: "min(680px, 85dvh)",
+          transition: "height 280ms cubic-bezier(0.4, 0, 0.2, 1)",
+        }}
+        onInteractOutside={(event) => {
+          event.preventDefault();
+          if (isEditDialogOpen && !isUnsentMessageDialogOpen) {
+            handleAttemptCloseEditDialog();
+          }
+        }}
+        onEscapeKeyDown={(event) => {
+          event.preventDefault();
+          if (isEditDialogOpen && !isUnsentMessageDialogOpen) {
+            handleAttemptCloseEditDialog();
+          }
+        }}
+      >
+        <div ref={dialogInnerRef} className="flex min-h-0 flex-1 flex-col p-6 pt-5">
+
+        <DialogHeader>
+          <DialogTitle>
+            Feedback Details
+          </DialogTitle>
+          <DialogDescription>
+            Tracking ID: {selectedFeedback?.id}
+          </DialogDescription>
+        </DialogHeader>
+        {selectedFeedback ? (
+          <Tabs
+            value={activeEditTab}
+            onValueChange={(value) => {
+              const next = value as "details" | "manage" | "messages";
+              const tabOrder = ["details", "messages", "manage"];
+              const prevIdx = tabOrder.indexOf(previousTabRef.current);
+              const nextIdx = tabOrder.indexOf(next);
+              setTabAnimDirection(nextIdx > prevIdx ? "left" : "right");
+              previousTabRef.current = next;
+              setActiveEditTab(next);
+            }}
+            className="flex min-h-0 w-full flex-1 flex-col"
+          >
+            <TabsList className="grid w-full shrink-0 grid-cols-3 rounded-full">
+              <TabsTrigger value="details">
+                Details
+              </TabsTrigger>
+              <TabsTrigger value="messages">
+                Messages
+              </TabsTrigger>
+              <TabsTrigger value="manage">
+                Manage
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent
+              value="details"
+              className="ff-hide-scrollbar flex min-h-0 flex-1 flex-col space-y-4 overflow-x-hidden overflow-y-auto pr-1"
+            >
+              <div
+                key={`tab-details-${activeEditTab}`}
+                className={tabAnimDirection === "left" ? "ff-step-slide-in-left" : "ff-step-slide-in-right"}
+              >
+              <FeedbackDetailsCard
+                feedback={selectedFeedback}
+                title=""
+                className="rounded-none border-0 bg-transparent shadow-none"
+                formatDate={formatDetailsUpdatedAt}
+                preSubjectContent={
+                  <div className="grid grid-cols-1 gap-y-8">
+                    <div className="space-y-1">
+                      <Label className="text-muted-foreground">
+                        Submitted By
+                      </Label>
+                      <p className="pt-0.5 text-[0.98rem] font-medium">
+                        {selectedFeedback.isAnonymous
+                          ? "*****"
+                          : selectedFeedback.userName ||
+                            "*****"}
+                      </p>
+                    </div>
+                  </div>
+                }
+              />
+
+              {selectedFeedback.response ? (
+                <div>
+                  <Label className="text-muted-foreground">
+                    Current Response
+                  </Label>
+                  <div className="mt-2 max-h-[260px] overflow-y-auto rounded-lg border border-accent/20 bg-accent/5 p-4">
+                    <div className="space-y-3">
+                      {parseAdminResponses(
+                        selectedFeedback.response,
+                      ).map((entry, index) => (
+                        <div
+                          key={`${entry.time ?? "note"}-${index}`}
+                        >
+                          <p className="text-[10px] font-semibold text-muted-foreground">
+                            {entry.author ||
+                              "Admin"}{" "}
+                            {entry.time
+                              ? formatLocalTime(
+      entry.time,
+      )
+                              : ""}
+                          </p>
+                          <p className="text-sm leading-relaxed text-foreground/90">
+                            {entry.message}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              </div>
+            </TabsContent>
+
+            <TabsContent
+              value="manage"
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div
+                key={`tab-manage-${activeEditTab}`}
+                className={`flex flex-1 flex-col ${tabAnimDirection === "left" ? "ff-step-slide-in-left" : "ff-step-slide-in-right"}`}
+              >
+              {/* ── Controls ── */}
+              <div className="flex flex-1 flex-col justify-start gap-3">
+                {/* Status row */}
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
+                  <span className="w-16 shrink-0 text-sm font-medium text-muted-foreground">
+                    Status
+                  </span>
+                  <div className="flex flex-1 gap-1.5">
+                    {(["Pending", "In Progress", "Resolved"] as const).map((s) => {
+                      const isActive = newStatus === s;
+                      const activeClass: Record<string, string> = {
+                        Pending: "bg-amber-500 border-amber-500 text-white",
+                        "In Progress": "bg-blue-500 border-blue-500 text-white",
+                        Resolved: "bg-emerald-500 border-emerald-500 text-white",
+                      };
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setNewStatus(s)}
+                          className={`flex-1 rounded-md border py-1.5 text-xs font-semibold transition-all ${
+                            isActive
+                              ? activeClass[s]
+                              : "border-border bg-background text-muted-foreground hover:border-border/80 hover:bg-muted/60"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Priority row */}
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/40 px-4 py-3">
+                  <span className="w-16 shrink-0 text-sm font-medium text-muted-foreground">
+                    Priority
+                  </span>
+                  <div className="flex flex-1 gap-1.5">
+                    {(["Low", "Medium", "High"] as const).map((p) => {
+                      const isActive = newPriority === p;
+                      const activeClass: Record<string, string> = {
+                        Low: "bg-slate-500 border-slate-500 text-white",
+                        Medium: "bg-orange-500 border-orange-500 text-white",
+                        High: "bg-red-500 border-red-500 text-white",
+                      };
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setNewPriority(p)}
+                          className={`flex-1 rounded-md border py-1.5 text-xs font-semibold transition-all ${
+                            isActive
+                              ? activeClass[p]
+                              : "border-border bg-background text-muted-foreground hover:border-border/80 hover:bg-muted/60"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Save button pinned to bottom ── */}
+              <div className="shrink-0 space-y-2 pt-4">
+                <Button
+                  onClick={handleUpdateFeedback}
+                  disabled={!hasFeedbackChanges}
+                  className="w-full bg-accent hover:bg-accent/90 disabled:opacity-40"
+                >
+                  Save Changes
+                </Button>
+                <p className="text-center text-[11px] text-muted-foreground/70">
+                  Marking as Resolved will email the user if they registered an account.
+                </p>
+              </div>
+              </div>
+            </TabsContent>
+
+            {/* ── Messages tab ── */}
+            <TabsContent
+              value="messages"
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div
+                key={`tab-messages-${activeEditTab}`}
+                className={`flex min-h-0 flex-1 flex-col ${tabAnimDirection === "left" ? "ff-step-slide-in-left" : "ff-step-slide-in-right"}`}
+              >
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-muted/20">
+                <div
+                  ref={messageScrollRef}
+                  className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto p-3"
+                >
+                  {isMessagesLoading ? (
+                    <div className="flex h-full items-center justify-center">
+                      <p className="text-sm text-muted-foreground">
+                        Loading conversation...
+                      </p>
+                    </div>
+                  ) : null}
+                  {!isMessagesLoading && messages.length === 0 ? (
+                    <div className="flex h-full items-center justify-center">
+                      <div className="text-center">
+                        <MessageSquare className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                        <p className="text-sm text-muted-foreground">
+                          No messages yet
+                        </p>
+                        <p className="text-xs text-muted-foreground/60">
+                          Send a message to start the conversation
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="space-y-3">
+                    {(() => {
+                      let lastDayLabel = "";
+                      return messages.map(
+                        (entry, index, allMessages) => {
+                          const createdAt = entry.createdAt
+                            ? new Date(entry.createdAt)
+                            : null;
+                          const today = new Date();
+                          const yesterday = new Date();
+                          yesterday.setDate(today.getDate() - 1);
+
+                          const dayLabel = createdAt
+                            ? createdAt.toDateString() === today.toDateString()
+                              ? "Today"
+                              : createdAt.toDateString() === yesterday.toDateString()
+      ? "Yesterday"
+      : createdAt.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+                            : "";
+                          const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
+                          if (showDayLabel) lastDayLabel = dayLabel;
+
+                          const isUserMessage = entry.senderRole === "user";
+                          const name = isUserMessage
+                            ? selectedFeedback?.isAnonymous
+                              ? "Anonymous"
+                              : entry.senderName || "User"
+                            : "";
+                          const prev = index > 0 ? allMessages[index - 1] : null;
+                          const prevIsUser = prev ? prev.senderRole === "user" : false;
+                          const prevName = prev
+                            ? prevIsUser
+                              ? selectedFeedback?.isAnonymous
+      ? "Anonymous"
+      : prev.senderName || "User"
+                              : "You"
+                            : "";
+                          const showName =
+                            !prev ||
+                            showDayLabel ||
+                            prev.senderRole !== entry.senderRole ||
+                            prevName !== name;
+                          const hasVeryLongToken = /\S{24,}/.test(entry.message || "");
+                          const isLikelyMultiLine =
+                            (entry.message || "").includes("\n") ||
+                            (entry.message || "").length > 60;
+
+                          return (
+                            <div key={entry.id} className="space-y-1.5">
+                              {showDayLabel ? (
+      <div className="flex items-center gap-2 py-1">
+      <div className="h-px flex-1 bg-border/60" />
+      <span className="text-[10px] font-medium text-muted-foreground">
+        {dayLabel}
+      </span>
+      <div className="h-px flex-1 bg-border/60" />
+      </div>
+                              ) : null}
+                              <div className={`flex ${isUserMessage ? "justify-start" : "justify-end"}`}>
+      <div className={`group relative min-w-0 max-w-[80%] ${isUserMessage ? "text-left" : "text-right"}`}>
+      {showName && name ? (
+        <p className="mb-1 px-1 text-[11px] font-semibold text-muted-foreground">
+          {name}
+        </p>
+      ) : null}
+      <div
+        className={`inline-block rounded-2xl px-3 py-2 text-sm ${
+          isUserMessage
+            ? "border border-border bg-white text-foreground shadow-sm"
+            : "bg-accent text-white shadow-sm"
+        }`}
+      >
+        <p
+          className={`whitespace-pre-line leading-relaxed ${
+            hasVeryLongToken ? "break-all" : "break-words"
+          }`}
+        >
+          {isUserMessage
+            ? formatFeedbackText(entry.message || "")
+            : entry.message}
+        </p>
+      </div>
+      {entry.createdAt ? (
+        <span
+          className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-black/50 px-2 py-1 text-[10px] text-white shadow-sm group-hover:inline-flex ${
+            isUserMessage ? "-right-1 translate-x-full" : "-left-1 -translate-x-full"
+          } ${isLikelyMultiLine ? "top-1/2" : "top-[68%]"}`}
+        >
+          {formatLocalTime(entry.createdAt)}
+        </span>
+      ) : null}
+      </div>
+                              </div>
+                            </div>
+                          );
+                        },
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                <div className="shrink-0 border-t border-border/60">
+                  <ReplyComposer
+                    key={selectedFeedback.id}
+                    draft={messageDraft}
+                    onDraftChange={setMessageDraft}
+                    isSendingMessage={isSendingMessage}
+                    onSend={handleSendMessage}
+                  />
+                </div>
+              </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        ) : null}
+        </div>
+      </DialogContent>
+      {/* Unsent message confirmation — outside DialogContent so it covers the whole page */}
+      {isUnsentMessageDialogOpen && (
+        <Dialog>
+          <div
+            className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-[1px]"
+            onClick={() => {
+              setIsUnsentMessageDialogOpen(false);
+              closeEditDialog();
+            }}
+          />
+          <div className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none">
+            <div className="pointer-events-auto w-full max-w-sm rounded-xl border bg-background p-6 shadow-lg">
+              <div className="space-y-1.5 mb-5">
+                <h2 className="text-base font-semibold">Discard unsent message?</h2>
+                <p className="text-sm text-muted-foreground">You have a message that has not been sent yet.</p>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  className="h-9 rounded-lg px-4"
+                  onClick={() => setIsUnsentMessageDialogOpen(false)}
+                >
+                  Keep
+                </Button>
+                <Button
+                  className="h-9 rounded-lg px-4 bg-destructive text-white hover:bg-destructive/90"
+                  onClick={() => {
+                    setIsUnsentMessageDialogOpen(false);
+                    closeEditDialog();
+                  }}
+                >
+                  Discard
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Dialog>
+      )}
+      </Dialog>
     </div>
   );
 }
