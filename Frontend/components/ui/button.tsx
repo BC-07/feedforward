@@ -34,6 +34,11 @@ const buttonVariants = cva(
   },
 );
 
+const closeButtonClassName = cn(
+  buttonVariants({ variant: "ghost", size: "icon" }),
+  "text-muted-foreground hover:bg-muted hover:text-foreground focus:border-ring focus:ring-ring/50 focus:ring-[3px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+);
+
 function Button({
   className,
   variant,
@@ -55,4 +60,4 @@ function Button({
   );
 }
 
-export { Button, buttonVariants };
+export { Button, buttonVariants, closeButtonClassName };

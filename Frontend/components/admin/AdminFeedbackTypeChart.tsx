@@ -88,10 +88,10 @@ export function AdminFeedbackTypeChart({
           </div>
         </div>
 
-        <ChartContainer config={chartConfig} className="h-[235] w-full">
+        <ChartContainer config={chartConfig} className="h-[235px] w-full">
           <BarChart
             data={chartData}
-            margin={{ top: 12, right: 16, left: 1, bottom: 1 }}
+            margin={{ top: 28, right: 16, left: 1, bottom: 1 }}
           >
             <CartesianGrid vertical={false} />
             <XAxis
@@ -100,7 +100,12 @@ export function AdminFeedbackTypeChart({
               axisLine={false}
               tickMargin={10}
             />
-            <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+            <YAxis
+              allowDecimals={false}
+              tickLine={false}
+              axisLine={false}
+              domain={[0, (dataMax: number) => Math.max(dataMax + 2, 4)]}
+            />
             <Bar
               dataKey="total"
               fill="var(--color-total)"
@@ -112,6 +117,7 @@ export function AdminFeedbackTypeChart({
               <LabelList
                 dataKey="total"
                 position="top"
+                offset={8}
                 className="fill-foreground"
                 fontSize={12}
               />

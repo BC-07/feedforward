@@ -42,7 +42,7 @@ export function TrackingIdSuccess({
         >
           <button
             type="button"
-            className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-all outline-none hover:bg-muted hover:text-foreground focus:border-ring focus:ring-ring/50 focus:ring-[3px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
             aria-label="Close"
             onClick={onClose}
           >

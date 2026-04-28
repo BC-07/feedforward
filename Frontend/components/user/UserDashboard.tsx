@@ -2160,7 +2160,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9"
+                            className="h-9 w-9 text-muted-foreground hover:bg-muted hover:text-foreground focus:border-ring focus:ring-ring/50 focus:ring-[3px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                             aria-label="Close feedback details"
                             onClick={handleAttemptCloseSelectedFeedback}
                           >

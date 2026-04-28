@@ -1528,10 +1528,10 @@ export function AdminFeedbackWorkspace({
                         <TableHead>Name</TableHead>
                         <TableHead>Tracking ID</TableHead>
                         <TableHead>Type</TableHead>
-                        <TableHead className="w-[260px] px-2">
+                        <TableHead className="w-[208px] px-2">
                           Category
                         </TableHead>
-                        <TableHead className="w-[100px] px-2">
+                        <TableHead className="w-[150px] px-1.5">
                           Priority
                         </TableHead>
                         <TableHead className="w-[120px] px-2">Status</TableHead>
@@ -1579,12 +1579,12 @@ export function AdminFeedbackWorkspace({
                             </Badge>
                           </TableCell>
                           <TableCell
-                            className="w-[260px] max-w-[260px] truncate px-2"
+                            className="w-[208px] max-w-[208px] truncate px-2"
                             title={feedback.category}
                           >
                             {feedback.category}
                           </TableCell>
-                          <TableCell className="w-[100px] truncate px-2">
+                          <TableCell className="w-[96px] truncate px-1.5">
                             <Badge
                               className={getPriorityColor(feedback.priority)}
                               variant="outline"
@@ -2082,7 +2082,7 @@ export function AdminFeedbackWorkspace({
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 rounded-md"
+                              className="h-9 w-9 text-muted-foreground hover:bg-muted hover:text-foreground focus:border-ring focus:ring-ring/50 focus:ring-[3px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                               onClick={handleAttemptCloseEditDialog}
                               aria-label="Close details panel"
                               title="Close details panel"
