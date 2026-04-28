@@ -18,6 +18,20 @@ interface AdminFeedbackTypeChartProps {
   feedbacks: Feedback[];
 }
 
+interface FeedbackTypeChartDatum {
+  type: string;
+  total: number;
+}
+
+interface FeedbackTypeBarShapeProps {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  value?: number;
+  payload?: FeedbackTypeChartDatum;
+}
+
 const chartConfig = {
   total: {
     label: "Submissions",
@@ -127,10 +141,10 @@ export function AdminFeedbackTypeChart({
             <span className="font-medium">{tooltip?.label}</span>
             {tooltip && <>: {tooltip.value} submission{tooltip.value !== 1 ? "s" : ""}</>}
           </div>
-          <ChartContainer config={chartConfig} className="h-[235] w-full">
+          <ChartContainer config={chartConfig} className="h-[235px] w-full">
             <BarChart
               data={chartData}
-              margin={{ top: 12, right: 16, left: 1, bottom: 1 }}
+              margin={{ top: 28, right: 16, left: 1, bottom: 1 }}
               onMouseLeave={() => { setHoveredBar(null); setTooltipVisible(false); hideTimer.current = setTimeout(() => setTooltip(null), 150); }}
             >
               <CartesianGrid vertical={false} />
@@ -140,7 +154,12 @@ export function AdminFeedbackTypeChart({
                 axisLine={false}
                 tickMargin={10}
               />
-              <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+              <YAxis
+                allowDecimals={false}
+                tickLine={false}
+                axisLine={false}
+                domain={[0, (dataMax: number) => Math.max(dataMax + 3, Math.ceil(dataMax * 1.15), 4)]}
+              />
               <Bar
                 dataKey="total"
                 radius={[10, 10, 0, 0]}
@@ -150,14 +169,17 @@ export function AdminFeedbackTypeChart({
                 animationDuration={700}
                 animationEasing="ease-out"
                 animationBegin={200}
-                onMouseEnter={(data: any, _index, event) => {
+                onMouseEnter={(
+                  data: FeedbackTypeChartDatum,
+                  _index,
+                  event: { currentTarget: SVGElement } | undefined,
+                ) => {
                   if (hideTimer.current) clearTimeout(hideTimer.current);
                   setHoveredBar(data.type ?? null);
                   const chartEl = chartRef.current;
                   if (!chartEl || !event) return;
                   const rect = chartEl.getBoundingClientRect();
-                  const target = event.target as SVGElement;
-                  const barRect = target.getBoundingClientRect();
+                  const barRect = event.currentTarget.getBoundingClientRect();
                   setTooltip({
                     x: barRect.left + barRect.width / 2 - rect.left,
                     y: barRect.top - rect.top - 8,
@@ -171,14 +193,22 @@ export function AdminFeedbackTypeChart({
                   setTooltipVisible(false);
                   hideTimer.current = setTimeout(() => setTooltip(null), 150);
                 }}
-                shape={(props: any) => {
-                  const { x, y, width, height, value, type } = props;
+                shape={(props: FeedbackTypeBarShapeProps) => {
+                  const {
+                    x = 0,
+                    y = 0,
+                    width = 0,
+                    height = 0,
+                    value = 0,
+                    payload,
+                  } = props;
+                  const type = payload?.type ?? "";
                   const isHovered = hoveredBar === type;
                   const fill = isHovered ? "#e08800" : "var(--color-total)";
                   const scaleY = isHovered ? 1.04 : 1;
                   const adjustedY = y + height - height * scaleY;
                   const adjustedHeight = height * scaleY;
-                  const labelY = adjustedY - 6;
+                  const labelY = Math.max(adjustedY - 8, 18);
                   return (
                     <g>
                       {adjustedHeight > 0 && (
