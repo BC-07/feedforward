@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo } from "react";
-import { Cell, Label, Pie, PieChart } from "recharts";
+import { useMemo, useEffect, useRef, useState } from "react";
+import { Cell, Label, Pie, PieChart, Sector } from "recharts";
 import type { Feedback } from "@/lib/api";
 import {
   Card,
@@ -13,8 +13,6 @@ import {
   ChartContainer,
   ChartLegend,
   ChartLegendContent,
-  ChartTooltip,
-  ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
 
@@ -40,6 +38,24 @@ const chartConfig = {
 export function AdminFeedbackStatusChart({
   feedbacks,
 }: AdminFeedbackStatusChartProps) {
+  const [isVisible, setIsVisible] = useState(false);
+  const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const tooltipPos = useRef({ x: 0, y: 0 });
+  const tooltipTarget = useRef({ x: 0, y: 0 });
+  const rafId = useRef<number | null>(null);
+  const isTooltipVisible = useRef(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setIsVisible(true); observer.disconnect(); } },
+      { threshold: 0.15 }
+    );
+    if (cardRef.current) observer.observe(cardRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   const chartData = useMemo(() => {
     const totals: Record<VisibilityKey, number> = {
       anonymous: 0,
@@ -60,11 +76,65 @@ export function AdminFeedbackStatusChart({
     })).filter((item) => item.total > 0);
   }, [feedbacks]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const animateTooltip = () => {
+    tooltipPos.current.x += (tooltipTarget.current.x - tooltipPos.current.x) * 0.18;
+    tooltipPos.current.y += (tooltipTarget.current.y - tooltipPos.current.y) * 0.18;
+    if (tooltipRef.current) {
+      tooltipRef.current.style.left = tooltipPos.current.x + "px";
+      tooltipRef.current.style.top = tooltipPos.current.y + "px";
+    }
+    if (isTooltipVisible.current) {
+      rafId.current = requestAnimationFrame(animateTooltip);
+    }
+  };
+
+  const showTooltip = (e: React.MouseEvent, label: string, value: number, total: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = e.clientX - rect.left + 12;
+    const y = e.clientY - rect.top - 36;
+    isTooltipVisible.current = true;
+    tooltipTarget.current = { x, y };
+    tooltipPos.current = { x, y };
+    if (tooltipRef.current) {
+      tooltipRef.current.innerHTML = `<span style="font-weight:500">${label}</span>: ${value} (${Math.round((value / total) * 100)}%)`;
+      tooltipRef.current.style.opacity = "1";
+      tooltipRef.current.style.transform = "scale(1) translateY(0)";
+    }
+    if (rafId.current) cancelAnimationFrame(rafId.current);
+    rafId.current = requestAnimationFrame(animateTooltip);
+  };
+
+  const moveTooltip = (e: React.MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    tooltipTarget.current = { x: e.clientX - rect.left + 12, y: e.clientY - rect.top - 36 };
+  };
+
+  const hideTooltip = () => {
+    isTooltipVisible.current = false;
+    if (rafId.current) cancelAnimationFrame(rafId.current);
+    if (tooltipRef.current) {
+      tooltipRef.current.style.opacity = "0";
+      tooltipRef.current.style.transform = "scale(0.95) translateY(2px)";
+    }
+  };
+
   const totalFeedbacks = feedbacks.length;
   const activeVisibilityTypes = chartData.length;
 
   return (
-    <Card className="h-full shadow-lg">
+    <Card
+      ref={cardRef}
+      className="h-full shadow-lg transition-all duration-700 ease-out delay-150"
+      style={{
+        opacity: isVisible ? 1 : 0,
+        transform: isVisible ? "translateY(0)" : "translateY(24px)",
+        transitionDelay: isVisible ? "150ms" : "0ms",
+      }}
+    >
       <CardHeader>
         <CardTitle>Feedback Anonymity Donut Graph</CardTitle>
       </CardHeader>
@@ -81,16 +151,18 @@ export function AdminFeedbackStatusChart({
           </div>
         </div>
 
-        <div className="relative">
+        <div ref={containerRef} className="relative">
+          <div
+            ref={tooltipRef}
+            className="pointer-events-none absolute z-50 rounded-md border bg-background px-2.5 py-1.5 text-xs shadow-md opacity-0"
+            style={{ transition: "opacity 0.15s ease, transform 0.15s ease", transform: "scale(0.95) translateY(2px)", whiteSpace: "nowrap" }}
+          />
           <ChartContainer config={chartConfig} className="h-[300px] w-full">
             <PieChart margin={{ top: 8, right: 8, bottom: 24, left: 8 }}>
               {chartData.length ? (
                 <>
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent nameKey="visibilityKey" />}
-                  />
                   <Pie
+                    {...({} as any)}
                     data={chartData}
                     dataKey="total"
                     nameKey="visibilityKey"
@@ -98,7 +170,39 @@ export function AdminFeedbackStatusChart({
                     outerRadius={96}
                     paddingAngle={4}
                     cornerRadius={8}
-                    isAnimationActive={false}
+                    isAnimationActive={isVisible}
+                    animationDuration={900}
+                    animationEasing="ease-out"
+                    animationBegin={300}
+                    onMouseEnter={(data: any, index: number, e: any) => {
+                      setActiveIndex(index);
+                      showTooltip(
+                        e as unknown as React.MouseEvent,
+                        chartConfig[data.visibilityKey as keyof typeof chartConfig]?.label ?? data.visibilityKey,
+                        data.total,
+                        totalFeedbacks,
+                      );
+                    }}
+                    onMouseMove={(_: any, _index: number, e: any) => moveTooltip(e as unknown as React.MouseEvent)}
+                    onMouseLeave={() => { setActiveIndex(undefined); hideTooltip(); }}
+                    activeIndex={activeIndex}
+                    activeShape={(props: any) => {
+                      const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+                      return (
+                        <g>
+                          <Sector
+                            cx={cx}
+                            cy={cy}
+                            innerRadius={innerRadius - 4}
+                            outerRadius={outerRadius + 6}
+                            startAngle={startAngle}
+                            endAngle={endAngle}
+                            fill={fill}
+                            opacity={0.85}
+                          />
+                        </g>
+                      );
+                    }}
                   >
                     <Label
                       content={({ viewBox }) => {

@@ -35,6 +35,7 @@ export default function Login() {
   const [otp, setOtp] = useState("");
   const [otpEmail, setOtpEmail] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isRequestingOTP, setIsRequestingOTP] = useState(false);
   const [isVerifyingOTP, setIsVerifyingOTP] = useState(false);
   const [otpStep, setOtpStep] = useState<"none" | "verify">("none");
@@ -56,6 +57,7 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isLoggingIn || isRequestingOTP) return;
     const normalizedEmail = email.trim();
     const normalizedPassword = password.trim();
     if (!normalizedEmail) {
@@ -64,6 +66,7 @@ export default function Login() {
     }
 
     if (normalizedPassword) {
+      setIsLoggingIn(true);
       try {
         const admin = await loginAdmin({
           email: normalizedEmail,
@@ -126,6 +129,8 @@ export default function Login() {
         } catch (error) {
           toastApiError(error, "Invalid email or password");
           return;
+        } finally {
+          setIsLoggingIn(false);
         }
       }
     }
@@ -146,6 +151,7 @@ export default function Login() {
 
   const handleVerifyOTP = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isVerifyingOTP) return;
     const normalizedEmail = otpEmail.trim();
     const normalizedOtp = otp.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 
@@ -229,7 +235,7 @@ export default function Login() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password (admin login)"
+                    placeholder="Enter your password"
                     className="pl-10 pr-10"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -254,9 +260,9 @@ export default function Login() {
                 type="submit"
                 className="w-full bg-accent hover:bg-accent/90"
                 size="lg"
-                disabled={isRequestingOTP}
+                disabled={isLoggingIn || isRequestingOTP}
               >
-                {isRequestingOTP ? "Sending OTP..." : "Log In"}
+                {isLoggingIn ? "Logging in..." : isRequestingOTP ? "Sending OTP..." : "Log In"}
               </Button>
               <div className="text-center">
                 <Link
