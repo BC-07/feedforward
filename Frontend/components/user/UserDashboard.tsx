@@ -60,6 +60,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Table,
   TableBody,
   TableCell,
@@ -144,10 +150,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     string | null
   >(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState("all");
+  const [filterType, setFilterType] = useState<string[]>([]);
   const [filterCategory, setFilterCategory] = useState("all");
-  const [filterPriority, setFilterPriority] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterPriority, setFilterPriority] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const [filterDate, setFilterDate] = useState("recent");
   const [filterTracking, setFilterTracking] = useState("asc");
   const [mySubmissionsPage, setMySubmissionsPage] = useState(1);
@@ -1020,18 +1026,20 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         feedback.category.toLowerCase().includes(trimmedSearchQuery);
 
       const matchesType =
-        filterType === "all" || feedback.type.toLowerCase() === filterType;
+        filterType.length === 0 ||
+        filterType.some((t) => feedback.type.toLowerCase() === t);
       const matchesCategory =
         filterCategory === "all" ||
         feedback.category.toLowerCase() === filterCategory.toLowerCase();
       const matchesPriority =
-        filterPriority === "all" ||
-        feedback.priority.toLowerCase() === filterPriority;
+        filterPriority.length === 0 ||
+        filterPriority.some((p) => feedback.priority.toLowerCase() === p);
       const normalized = normalizeStatus(feedback.status);
       const matchesStatus =
-        filterStatus === "all" ||
-        normalized ===
-          (filterStatus === "inprogress" ? "in progress" : filterStatus);
+        filterStatus.length === 0 ||
+        filterStatus.some((s) =>
+          normalized === (s === "inprogress" ? "in progress" : s),
+        );
 
       return (
         matchesSearch &&
@@ -1116,39 +1124,24 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const activeFilterCount = [
     filterTracking !== "asc",
     filterDate !== "recent",
-    filterType !== "all",
+    filterType.length > 0,
     filterCategory !== "all",
-    filterPriority !== "all",
-    filterStatus !== "all",
+    filterPriority.length > 0,
+    filterStatus.length > 0,
   ].filter(Boolean).length;
   const activeFilterChips = [
     trimmedSearchQuery ? { key: "search", label: searchQuery.trim() } : null,
     filterTracking !== "asc" ? { key: "tracking", label: "Z - A" } : null,
     filterDate !== "recent" ? { key: "date", label: "Oldest" } : null,
-    filterType !== "all"
-      ? { key: "type", label: formatFilterChipLabel(filterType) }
-      : null,
+    ...filterType.map((t) => ({ key: `type:${t}`, label: formatFilterChipLabel(t) })),
     filterCategory !== "all"
-      ? {
-          key: "category",
-          label: formatFilterChipLabel(filterCategory),
-        }
+      ? { key: "category", label: formatFilterChipLabel(filterCategory) }
       : null,
-    filterPriority !== "all"
-      ? {
-          key: "priority",
-          label: formatFilterChipLabel(filterPriority),
-        }
-      : null,
-    filterStatus !== "all"
-      ? {
-          key: "status",
-          label:
-            filterStatus === "inprogress"
-              ? "In Progress"
-              : formatFilterChipLabel(filterStatus),
-        }
-      : null,
+    ...filterPriority.map((p) => ({ key: `priority:${p}`, label: formatFilterChipLabel(p) })),
+    ...filterStatus.map((s) => ({
+      key: `status:${s}`,
+      label: s === "inprogress" ? "In Progress" : formatFilterChipLabel(s),
+    })),
   ].filter((chip): chip is { key: string; label: string } => Boolean(chip));
 
   const clearSingleFilter = useCallback((key: string) => {
@@ -1162,19 +1155,20 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       case "date":
         setFilterDate("recent");
         break;
-      case "type":
-        setFilterType("all");
-        break;
       case "category":
         setFilterCategory("all");
         break;
-      case "priority":
-        setFilterPriority("all");
-        break;
-      case "status":
-        setFilterStatus("all");
-        break;
       default:
+        if (key.startsWith("type:")) {
+          const val = key.slice(5);
+          setFilterType((prev) => prev.filter((t) => t !== val));
+        } else if (key.startsWith("priority:")) {
+          const val = key.slice(9);
+          setFilterPriority((prev) => prev.filter((p) => p !== val));
+        } else if (key.startsWith("status:")) {
+          const val = key.slice(7);
+          setFilterStatus((prev) => prev.filter((s) => s !== val));
+        }
         break;
     }
   }, []);
@@ -1183,10 +1177,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     setSearchQuery("");
     setFilterTracking("asc");
     setFilterDate("recent");
-    setFilterType("all");
+    setFilterType([]);
     setFilterCategory("all");
-    setFilterPriority("all");
-    setFilterStatus("all");
+    setFilterPriority([]);
+    setFilterStatus([]);
   }, []);
   const hoverFilterItems = useMemo(
     () =>
@@ -1214,19 +1208,23 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         {
           key: "type" as const,
           label:
-            filterType === "all"
+            filterType.length === 0
               ? "All Types"
-              : formatFilterChipLabel(filterType),
+              : formatFilterChipLabel(filterType[filterType.length - 1]!),
           options: [
-            { value: "all", label: "All Types" },
             { value: "suggestion", label: "Suggestion" },
             { value: "complaint", label: "Complaint" },
             { value: "inquiry", label: "Inquiry" },
             { value: "request", label: "Request" },
             { value: "compliment", label: "Compliment" },
           ],
-          isSelected: (value: string) => filterType === value,
-          onSelect: setFilterType,
+          isSelected: (value: string) => filterType.includes(value),
+          onSelect: (value: string) =>
+            setFilterType((prev) =>
+              prev.includes(value)
+                ? prev.filter((t) => t !== value)
+                : [...prev, value],
+            ),
         },
         {
           key: "category" as const,
@@ -1247,32 +1245,42 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         {
           key: "priority" as const,
           label:
-            filterPriority === "all"
+            filterPriority.length === 0
               ? "All Priorities"
-              : formatFilterChipLabel(filterPriority),
+              : formatFilterChipLabel(filterPriority[filterPriority.length - 1]!),
           options: [
-            { value: "all", label: "All Priorities" },
             { value: "low", label: "Low" },
             { value: "medium", label: "Medium" },
             { value: "high", label: "High" },
           ],
-          isSelected: (value: string) => filterPriority === value,
-          onSelect: setFilterPriority,
+          isSelected: (value: string) => filterPriority.includes(value),
+          onSelect: (value: string) =>
+            setFilterPriority((prev) =>
+              prev.includes(value)
+                ? prev.filter((p) => p !== value)
+                : [...prev, value],
+            ),
         },
         {
           key: "status" as const,
           label:
-            filterStatus === "all"
+            filterStatus.length === 0
               ? "All Status"
-              : formatFilterChipLabel(filterStatus),
+              : filterStatus[filterStatus.length - 1] === "inprogress"
+                ? "In Progress"
+                : formatFilterChipLabel(filterStatus[filterStatus.length - 1]!),
           options: [
-            { value: "all", label: "All Status" },
             { value: "pending", label: "Pending" },
             { value: "inprogress", label: "In Progress" },
             { value: "resolved", label: "Resolved" },
           ],
-          isSelected: (value: string) => filterStatus === value,
-          onSelect: setFilterStatus,
+          isSelected: (value: string) => filterStatus.includes(value),
+          onSelect: (value: string) =>
+            setFilterStatus((prev) =>
+              prev.includes(value)
+                ? prev.filter((s) => s !== value)
+                : [...prev, value],
+            ),
         },
       ] satisfies HoverFilterItem<HoverFilterKey>[],
     [
@@ -1288,7 +1296,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const desktopInlineFilterItems = useMemo(
     () =>
       hoverFilterItems.filter((item) =>
-        ["tracking", "date", "type", "priority", "status"].includes(item.key),
+        ["tracking", "date"].includes(item.key),
       ),
     [hoverFilterItems],
   );
@@ -1841,44 +1849,141 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                 }}
                               />
                             </div>
-                            {desktopInlineFilterItems.map((filter) => {
-                              const value =
-                                filter.key === "tracking"
-                                  ? filterTracking
-                                  : filter.key === "date"
-                                    ? filterDate
-                                    : filter.key === "type"
-                                      ? filterType
-                                      : filter.key === "priority"
-                                        ? filterPriority
-                                        : filterStatus;
-                              return (
-                                <Select
-                                  key={filter.key}
-                                  value={value}
-                                  onValueChange={filter.onSelect}
+                            {desktopInlineFilterItems.map((filter) => (
+                              <Select
+                                key={filter.key}
+                                value={filter.key === "tracking" ? filterTracking : filterDate}
+                                onValueChange={filter.onSelect}
+                              >
+                                <SelectTrigger
+                                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`}
+                                  style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
                                 >
-                                  <SelectTrigger
-                                    className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`}
-                                    style={{
-                                      color: SUBMISSION_FILTER_TEXT_COLOR,
-                                    }}
-                                  >
-                                    <SelectValue placeholder={filter.label} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {filter.options.map((option) => (
-                                      <SelectItem
-                                        key={`${filter.key}-${option.value}`}
-                                        value={option.value}
-                                      >
-                                        {option.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              );
-                            })}
+                                  <SelectValue placeholder={filter.label} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {filter.options.map((option) => (
+                                    <SelectItem
+                                      key={`${filter.key}-${option.value}`}
+                                      value={option.value}
+                                    >
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ))}
+
+                            {/* Multi-select Type */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                                  style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
+                                >
+                                  <span className="truncate" style={{ color: filterType.length === 0 ? SUBMISSION_FILTER_TEXT_COLOR : SUBMISSION_FILTER_TEXT_COLOR }}>
+                                    {filterType.length === 0 ? "All Types" : formatFilterChipLabel(filterType[filterType.length - 1]!)}
+                                  </span>
+                                  <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="w-48 p-1">
+                                {[
+                                  { value: "suggestion", label: "Suggestion" },
+                                  { value: "complaint", label: "Complaint" },
+                                  { value: "inquiry", label: "Inquiry" },
+                                  { value: "request", label: "Request" },
+                                  { value: "compliment", label: "Compliment" },
+                                ].map((option) => {
+                                  const isSelected = filterType.includes(option.value);
+                                  return (
+                                    <DropdownMenuItem
+                                      key={option.value}
+                                      onSelect={() => setFilterType((prev) => isSelected ? prev.filter((t) => t !== option.value) : [...prev, option.value])}
+                                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
+                                    >
+                                      <span>{option.label}</span>
+                                      {isSelected && <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+                                    </DropdownMenuItem>
+                                  );
+                                })}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* Multi-select Priority */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                                  style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
+                                >
+                                  <span className="truncate" style={{ color: filterPriority.length === 0 ? SUBMISSION_FILTER_TEXT_COLOR : SUBMISSION_FILTER_TEXT_COLOR }}>
+                                    {filterPriority.length === 0 ? "All Priorities" : formatFilterChipLabel(filterPriority[filterPriority.length - 1]!)}
+                                  </span>
+                                  <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="w-48 p-1">
+                                {[
+                                  { value: "low", label: "Low" },
+                                  { value: "medium", label: "Medium" },
+                                  { value: "high", label: "High" },
+                                ].map((option) => {
+                                  const isSelected = filterPriority.includes(option.value);
+                                  return (
+                                    <DropdownMenuItem
+                                      key={option.value}
+                                      onSelect={() => setFilterPriority((prev) => isSelected ? prev.filter((p) => p !== option.value) : [...prev, option.value])}
+                                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
+                                    >
+                                      <span>{option.label}</span>
+                                      {isSelected && <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+                                    </DropdownMenuItem>
+                                  );
+                                })}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            {/* Multi-select Status */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                                  style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
+                                >
+                                  <span className="truncate" style={{ color: filterStatus.length === 0 ? SUBMISSION_FILTER_TEXT_COLOR : SUBMISSION_FILTER_TEXT_COLOR }}>
+                                    {filterStatus.length === 0
+                                      ? "All Status"
+                                      : filterStatus[filterStatus.length - 1] === "inprogress"
+                                        ? "In Progress"
+                                        : formatFilterChipLabel(filterStatus[filterStatus.length - 1]!)}
+                                  </span>
+                                  <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="w-48 p-1">
+                                {[
+                                  { value: "pending", label: "Pending" },
+                                  { value: "inprogress", label: "In Progress" },
+                                  { value: "resolved", label: "Resolved" },
+                                ].map((option) => {
+                                  const isSelected = filterStatus.includes(option.value);
+                                  return (
+                                    <DropdownMenuItem
+                                      key={option.value}
+                                      onSelect={() => setFilterStatus((prev) => isSelected ? prev.filter((s) => s !== option.value) : [...prev, option.value])}
+                                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
+                                    >
+                                      <span>{option.label}</span>
+                                      {isSelected && <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+                                    </DropdownMenuItem>
+                                  );
+                                })}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                           <div className="flex w-full gap-2 md:hidden">
                             <div className="relative flex-1">
@@ -2157,7 +2262,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                         </div>
                       </>
                     )}
-                    <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
+                    <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[83vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
 
                       <CardHeader className="space-y-0 pb-0">
                         <div className="flex items-center justify-between gap-3">

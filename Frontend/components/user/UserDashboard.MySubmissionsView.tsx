@@ -24,6 +24,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   BarChart3,
   Plus,
   Search,
@@ -37,6 +43,7 @@ import {
 } from "@/components/filters/HoverFilterPopover";
 import { TablePaginationFooter } from "@/components/ui/table-pagination-footer";
 import type { Feedback } from "@/lib/api";
+import { formatFilterChipLabel } from "@/lib/filterUtils";
 import {
   SUBMISSION_FILTER_CONTROL_CLASS,
   SUBMISSION_FILTER_TEXT_COLOR,
@@ -55,6 +62,11 @@ interface UserDashboardMySubmissionsViewProps {
   filteredFeedbacks: Feedback[];
   paginatedFilteredFeedbacks: Feedback[];
   searchQuery: string;
+  filterType: string[];
+  filterPriority: string[];
+  filterStatus: string[];
+  filterTracking: string;
+  filterDate: string;
   mySubmissionsPage: number;
   mySubmissionsPageSize: (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number];
   mySubmissionsTotalPages: number;
@@ -67,6 +79,11 @@ interface UserDashboardMySubmissionsViewProps {
   hoverFilterItems: HoverFilterItem<HoverFilterKey>[];
   desktopInlineFilterItems: HoverFilterItem<HoverFilterKey>[];
   onSearchChange: (value: string) => void;
+  onFilterTypeChange: (updater: (prev: string[]) => string[]) => void;
+  onFilterPriorityChange: (updater: (prev: string[]) => string[]) => void;
+  onFilterStatusChange: (updater: (prev: string[]) => string[]) => void;
+  onFilterTrackingChange: (value: string) => void;
+  onFilterDateChange: (value: string) => void;
   onViewFeedback: (feedback: Feedback) => void;
   onCreateSubmissionClick: () => void;
   onDeleteClick: (feedback: Feedback) => void;
@@ -86,6 +103,11 @@ export function UserDashboardMySubmissionsView({
   filteredFeedbacks,
   paginatedFilteredFeedbacks,
   searchQuery,
+  filterType,
+  filterPriority,
+  filterStatus,
+  filterTracking,
+  filterDate,
   mySubmissionsPage,
   mySubmissionsPageSize,
   mySubmissionsTotalPages,
@@ -98,6 +120,11 @@ export function UserDashboardMySubmissionsView({
   hoverFilterItems,
   desktopInlineFilterItems,
   onSearchChange,
+  onFilterTypeChange,
+  onFilterPriorityChange,
+  onFilterStatusChange,
+  onFilterTrackingChange,
+  onFilterDateChange,
   onViewFeedback,
   onCreateSubmissionClick,
   onDeleteClick,
@@ -168,45 +195,142 @@ export function UserDashboardMySubmissionsView({
                 value={searchQuery}
                 onChange={(event) => onSearchChange(event.target.value)}
                 className={`${SUBMISSION_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}
-                style={{
-                  color: SUBMISSION_FILTER_TEXT_COLOR,
-                  paddingLeft: "2.75rem",
-                }}
+                style={{ color: SUBMISSION_FILTER_TEXT_COLOR, paddingLeft: "2.75rem" }}
               />
             </div>
-            {desktopInlineFilterItems.map((filter) => (
-              <Select
-                key={filter.key}
-                value={(() => {
-                  switch (filter.key) {
-                    case "tracking":
-                      return hoverFilterItems.find(f => f.key === "tracking")?.options.find(o => o.value === searchQuery)?.value || "asc";
-                    default:
-                      return filter.options[0]?.value || "";
-                  }
-                })()}
-                onValueChange={filter.onSelect}
-              >
-                <SelectTrigger
-                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`}
-                  style={{
-                    color: SUBMISSION_FILTER_TEXT_COLOR,
-                  }}
+
+            {/* A-Z tracking select */}
+            <Select value={filterTracking} onValueChange={onFilterTrackingChange}>
+              <SelectTrigger className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`} style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}>
+                <SelectValue placeholder="A - Z" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">A - Z</SelectItem>
+                <SelectItem value="desc">Z - A</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Most Recent date select */}
+            <Select value={filterDate} onValueChange={onFilterDateChange}>
+              <SelectTrigger className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`} style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}>
+                <SelectValue placeholder="Most Recent" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recent">Most Recent</SelectItem>
+                <SelectItem value="oldest">Oldest</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Multi-select Type */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                  style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
                 >
-                  <SelectValue placeholder={filter.label} />
-                </SelectTrigger>
-                <SelectContent>
-                  {filter.options.map((option) => (
-                    <SelectItem
-                      key={`${filter.key}-${option.value}`}
-                      value={option.value}
+                  <span className="truncate" style={{ color: filterType.length === 0 ? "#8f877d" : SUBMISSION_FILTER_TEXT_COLOR }}>
+                    {filterType.length === 0 ? "All Types" : formatFilterChipLabel(filterType[filterType.length - 1]!)}
+                  </span>
+                  <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48 p-1">
+                {[
+                  { value: "suggestion", label: "Suggestion" },
+                  { value: "complaint", label: "Complaint" },
+                  { value: "inquiry", label: "Inquiry" },
+                  { value: "request", label: "Request" },
+                  { value: "compliment", label: "Compliment" },
+                ].map((option) => {
+                  const isSelected = filterType.includes(option.value);
+                  return (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onSelect={() => onFilterTypeChange((prev) => isSelected ? prev.filter((t) => t !== option.value) : [...prev, option.value])}
+                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
                     >
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ))}
+                      <span>{option.label}</span>
+                      {isSelected && <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Multi-select Priority */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                  style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
+                >
+                  <span className="truncate" style={{ color: filterPriority.length === 0 ? "#8f877d" : SUBMISSION_FILTER_TEXT_COLOR }}>
+                    {filterPriority.length === 0 ? "All Priorities" : formatFilterChipLabel(filterPriority[filterPriority.length - 1]!)}
+                  </span>
+                  <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48 p-1">
+                {[
+                  { value: "low", label: "Low" },
+                  { value: "medium", label: "Medium" },
+                  { value: "high", label: "High" },
+                ].map((option) => {
+                  const isSelected = filterPriority.includes(option.value);
+                  return (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onSelect={() => onFilterPriorityChange((prev) => isSelected ? prev.filter((p) => p !== option.value) : [...prev, option.value])}
+                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
+                    >
+                      <span>{option.label}</span>
+                      {isSelected && <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Multi-select Status */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                  style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
+                >
+                  <span className="truncate" style={{ color: filterStatus.length === 0 ? "#8f877d" : SUBMISSION_FILTER_TEXT_COLOR }}>
+                    {filterStatus.length === 0
+                      ? "All Status"
+                      : filterStatus[filterStatus.length - 1] === "inprogress"
+                        ? "In Progress"
+                        : formatFilterChipLabel(filterStatus[filterStatus.length - 1]!)}
+                  </span>
+                  <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48 p-1">
+                {[
+                  { value: "pending", label: "Pending" },
+                  { value: "inprogress", label: "In Progress" },
+                  { value: "resolved", label: "Resolved" },
+                ].map((option) => {
+                  const isSelected = filterStatus.includes(option.value);
+                  return (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onSelect={() => onFilterStatusChange((prev) => isSelected ? prev.filter((s) => s !== option.value) : [...prev, option.value])}
+                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
+                    >
+                      <span>{option.label}</span>
+                      {isSelected && <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Mobile filters */}
