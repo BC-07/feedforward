@@ -402,26 +402,26 @@ export function UserDashboardMySubmissionsView({
         }}
       >
         <div className="w-full overflow-x-auto">
-          <Table className="w-full min-w-full md:min-w-[980px] md:table-fixed text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
+          <Table className="w-full min-w-[1180px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
             <TableHeader className="bg-muted/50 sticky top-0 z-10">
               <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead className="w-[150px]">
-                  Tracking ID
+                <TableHead>
+                  <div className="w-[180px]">Tracking ID</div>
                 </TableHead>
-                <TableHead className="w-[300px]">
-                  Subject
+                <TableHead>
+                  <div className="w-[420px]">Subject</div>
                 </TableHead>
-                <TableHead className="w-[220px]">
-                  Category
+                <TableHead className="px-2">
+                  <div className="w-[208px]">Category</div>
                 </TableHead>
-                <TableHead className="w-[110px]">
-                  Priority
+                <TableHead className="px-1.5">
+                  <div className="w-[150px]">Priority</div>
                 </TableHead>
-                <TableHead className="w-[150px]">
-                  Status
+                <TableHead className="px-2">
+                  <div className="w-[120px]">Status</div>
                 </TableHead>
-                <TableHead className="w-[130px] whitespace-nowrap">
-                  Date
+                <TableHead className="whitespace-nowrap px-2">
+                  <div className="w-[118px]">Date</div>
                 </TableHead>
                 <TableHead className="w-[88px] text-center">
                   Actions
@@ -445,31 +445,36 @@ export function UserDashboardMySubmissionsView({
                     className="h-14 cursor-pointer"
                     onClick={() => onViewFeedback(feedback)}
                   >
-                    <TableCell className="font-mono text-xs text-muted-foreground truncate">
-                      {feedback.id}
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      <div className="w-[180px] truncate">{feedback.id}</div>
                     </TableCell>
                     <TableCell
-                      className="font-medium truncate"
+                      className="font-medium"
                       title={feedback.subject}
                     >
-                      {feedback.subject}
+                      <div className="w-[420px] truncate">{feedback.subject}</div>
                     </TableCell>
                     <TableCell
-                      className="truncate"
+                      className="px-2"
                       title={feedback.category}
                     >
-                      {feedback.category}
+                      <div className="w-[208px] max-w-[208px] truncate">
+                        {feedback.category}
+                      </div>
                     </TableCell>
-                    <TableCell className="truncate">
-                      <Badge
-                        className={getPriorityColor(feedback.priority)}
-                        variant="outline"
-                      >
-                        {feedback.priority}
-                      </Badge>
+                    <TableCell className="px-1.5">
+                      <div className="w-[96px]">
+                        <Badge
+                          className={getPriorityColor(feedback.priority)}
+                          variant="outline"
+                        >
+                          {feedback.priority}
+                        </Badge>
+                      </div>
                     </TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-2">
+                    <TableCell className="px-2">
+                      <div className="w-[120px] truncate">
+                        <span className="inline-flex items-center gap-2">
                         {(() => {
                           const StatusIcon = getStatusIcon(feedback.status);
                           return (
@@ -486,10 +491,13 @@ export function UserDashboardMySubmissionsView({
                             </Badge>
                           );
                         })()}
-                      </span>
+                        </span>
+                      </div>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {formatSubmittedAt(feedback.createdAt)}
+                    <TableCell className="whitespace-nowrap px-2 text-muted-foreground">
+                      <div className="w-[118px] whitespace-nowrap">
+                        {formatSubmittedAt(feedback.createdAt)}
+                      </div>
                     </TableCell>
                     <TableCell className="w-[88px] text-center">
                       {feedback.status.toLowerCase() === "pending" ? (

@@ -1398,18 +1398,18 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               <Card className="h-full border shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
                 <CardContent className="flex h-full flex-col gap-3 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="min-h-[1.25rem] break-all font-mono text-xs text-muted-foreground">
+                    <p className="min-h-[1.25rem] break-all font-mono text-xs text-[#6b7280]">
                       {feedback.id}
                     </p>
-                    <span className="whitespace-nowrap text-[11px] text-muted-foreground">
+                    <span className="whitespace-nowrap text-[11px] text-[#6b7280]">
                       {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                     </span>
                   </div>
-                  <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug">
+                  <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug text-[#374151]">
                     {feedback.subject}
                   </p>
                   <p
-                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground ${
+                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-[#6b7280] ${
                       feedback.message.trim().length > 70 &&
                       /\s/.test(feedback.message.trim())
                         ? "indent-5"
@@ -1419,7 +1419,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     {feedback.message}
                   </p>
                   <div className="mt-auto flex items-center justify-between">
-                    <span className="rounded-md border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
+                    <span className="rounded-md border border-[#d7dbe2] bg-[#f8fafc] px-2 py-0.5 text-xs text-[#6b7280]">
                       {feedback.category}
                     </span>
                     <span className="inline-flex items-center">

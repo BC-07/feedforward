@@ -152,8 +152,12 @@ export function UserDashboardHomeView({
             }}
           >
             <CardHeader className="pb-0 pt-4">
-              <CardTitle className="text-base">Notifications</CardTitle>
-              <CardDescription>Unresolved updates</CardDescription>
+              <CardTitle className="text-base text-[#374151]">
+                Notifications
+              </CardTitle>
+              <CardDescription className="text-[#6b7280]">
+                Unresolved updates
+              </CardDescription>
             </CardHeader>
             <CardContent className="-mt-4 flex-1 min-h-0 space-y-1.5 bg-slate-50/35 pt-0 pb-3 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {homeNotifications.length === 0 ? (
@@ -168,10 +172,10 @@ export function UserDashboardHomeView({
                     onClick={() => onViewFeedback(feedback)}
                     className="w-full rounded-md border border-border/70 bg-white/80 p-2 text-left shadow-[0_0_0_1px_rgba(15,23,42,0.05)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-muted/30 hover:shadow-md"
                   >
-                    <p className="line-clamp-1 text-sm font-medium">
+                    <p className="line-clamp-1 text-sm font-medium text-[#374151]">
                       {feedback.subject}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-[#6b7280]">
                       {new Date(feedback.updatedAt).toLocaleDateString("en-US")}
                     </p>
                   </button>
