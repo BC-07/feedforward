@@ -1390,7 +1390,7 @@ export function AdminFeedbackWorkspace({
                   placeholder="Search by ID, subject, or name."
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  className={`${ADMIN_FILTER_CONTROL_CLASS} placeholder:text-[#9ca3af]`}
+                  className={`${ADMIN_FILTER_CONTROL_CLASS} placeholder:text-[#9ca3af] font-normal `}
                   style={{
                     color: ADMIN_FILTER_TEXT_COLOR,
                     paddingLeft: "2.75rem",
@@ -1404,7 +1404,7 @@ export function AdminFeedbackWorkspace({
               <div key={filter.key} className="space-y-1.5">
                 <Select value={filter.value} onValueChange={filter.onChange}>
                   <SelectTrigger
-                    className={`${ADMIN_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`}
+                    className={`${ADMIN_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255] font-medium`}
                     style={{ color: ADMIN_FILTER_TEXT_COLOR }}
                   >
                     <SelectValue placeholder={filter.chipLabel} />
@@ -1429,11 +1429,11 @@ export function AdminFeedbackWorkspace({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className={`${ADMIN_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                    className={`${ADMIN_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2 font-medium`}
                     style={{ color: ADMIN_FILTER_TEXT_COLOR }}
                   >
                     <span
-                      className="truncate"
+                      className="truncate font-medium"
                       style={{ color: filterType.length === 0 ? ADMIN_FILTER_MUTED_COLOR : ADMIN_FILTER_TEXT_COLOR }}
                     >
                       {filterType.length === 0
@@ -1443,7 +1443,7 @@ export function AdminFeedbackWorkspace({
                     <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48 p-1">
+                <DropdownMenuContent align="start" className="w-48 p-1 font-medium">
                   {[
                     { value: "suggestion", label: "Suggestion" },
                     { value: "complaint", label: "Complaint" },
@@ -1481,11 +1481,11 @@ export function AdminFeedbackWorkspace({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className={`${ADMIN_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                    className={`${ADMIN_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2 font-medium`}
                     style={{ color: ADMIN_FILTER_TEXT_COLOR }}
                   >
                     <span
-                      className="truncate"
+                      className="truncate font-medium"
                       style={{ color: filterPriority.length === 0 ? ADMIN_FILTER_MUTED_COLOR : ADMIN_FILTER_TEXT_COLOR }}
                     >
                       {filterPriority.length === 0
@@ -1495,7 +1495,7 @@ export function AdminFeedbackWorkspace({
                     <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48 p-1">
+                <DropdownMenuContent align="start" className="w-48 p-1 font-medium">
                   {[
                     { value: "low", label: "Low" },
                     { value: "medium", label: "Medium" },
@@ -1531,11 +1531,11 @@ export function AdminFeedbackWorkspace({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className={`${ADMIN_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                    className={`${ADMIN_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2 font-medium`}
                     style={{ color: ADMIN_FILTER_TEXT_COLOR }}
                   >
                     <span
-                      className="truncate"
+                      className="truncate font-medium"
                       style={{ color: filterStatus.length === 0 ? ADMIN_FILTER_MUTED_COLOR : ADMIN_FILTER_TEXT_COLOR }}
                     >
                       {filterStatus.length === 0
@@ -1547,7 +1547,7 @@ export function AdminFeedbackWorkspace({
                     <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48 p-1">
+                <DropdownMenuContent align="start" className="w-48 p-1 font-medium">
                   {[
                     { value: "pending", label: "Pending" },
                     { value: "inprogress", label: "In Progress" },
@@ -1637,7 +1637,7 @@ export function AdminFeedbackWorkspace({
                 ref={splitPaneListColumnRef}
                 className="flex min-h-0 flex-1 flex-col space-y-2"
               >
-                <div className="relative min-h-0 flex-1 overflow-auto w-full">
+                <div className="ff-hide-scrollbar relative min-h-0 flex-1 overflow-auto w-full">
                   <Table className="w-full min-w-[980px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
                     <TableHeader className="sticky top-0 z-10 bg-muted/50">
                       <TableRow className="bg-muted/50 hover:bg-muted/50">
