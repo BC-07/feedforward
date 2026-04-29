@@ -555,6 +555,21 @@ export function UserDashboardMySubmissionsView({
                 value as typeof mySubmissionsPageSize,
               )
             }
+            statusText={
+              <>
+                <span className="text-sm">
+                Viewing{" "}
+                <span className="font-normal">
+                  {paginatedFilteredFeedbacks.length}
+                </span>{" "}
+                out of{" "}
+                <span className="font-normal">
+                  {filteredFeedbacks.length}
+                </span>{" "}
+                submission{filteredFeedbacks.length !== 1 ? "s" : ""}
+                </span>
+              </>
+            }
           />
         </div>
       ) : null}
