@@ -144,10 +144,10 @@ export function UserDashboardMySubmissionsView({
         <CardContent className="pt-6 flex-1 flex items-center">
           <div className="text-center py-8 w-full">
             <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">
+            <h3 className="mb-2 text-lg font-normal">
               No Submissions Yet
             </h3>
-            <p className="text-muted-foreground">
+            <p className="text-black">
               No submissions yet. Use Submit Feedback to create your first one.
             </p>
           </div>
@@ -157,7 +157,7 @@ export function UserDashboardMySubmissionsView({
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-7rem)] min-h-0 w-full flex-col gap-2 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
+    <div className="ff-user-dashboard-theme mx-auto flex h-full min-h-0 w-full flex-col gap-2 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
       {/* Header with title and create button */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex h-9 items-center gap-3">
@@ -165,8 +165,8 @@ export function UserDashboardMySubmissionsView({
             <BarChart3 className="h-5 w-5" />
           </div>
           <div className="flex h-9 items-center">
-            <h2 className="text-[21px] font-semibold leading-none tracking-[-0.02em] text-[#171717]">
-              Submission list
+            <h2 className="text-[21px] font-normal leading-none tracking-[-0.02em] text-[#171717]">
+              Submission List  
             </h2>
           </div>
         </div>
@@ -194,7 +194,7 @@ export function UserDashboardMySubmissionsView({
                 placeholder="Search by ID, subject, or message."
                 value={searchQuery}
                 onChange={(event) => onSearchChange(event.target.value)}
-                className={`${SUBMISSION_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}
+                className={`${SUBMISSION_FILTER_CONTROL_CLASS} ff-submission-search-input`}
                 style={{ color: SUBMISSION_FILTER_TEXT_COLOR, paddingLeft: "2.75rem" }}
               />
             </div>
@@ -229,7 +229,7 @@ export function UserDashboardMySubmissionsView({
                   className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
                   style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
                 >
-                  <span className="truncate" style={{ color: filterType.length === 0 ? "#8f877d" : SUBMISSION_FILTER_TEXT_COLOR }}>
+                  <span className="truncate" style={{ color: "#171717" }}>
                     {filterType.length === 0 ? "All Types" : formatFilterChipLabel(filterType[filterType.length - 1]!)}
                   </span>
                   <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
@@ -266,7 +266,7 @@ export function UserDashboardMySubmissionsView({
                   className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
                   style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
                 >
-                  <span className="truncate" style={{ color: filterPriority.length === 0 ? "#8f877d" : SUBMISSION_FILTER_TEXT_COLOR }}>
+                  <span className="truncate" style={{ color: "#171717" }}>
                     {filterPriority.length === 0 ? "All Priorities" : formatFilterChipLabel(filterPriority[filterPriority.length - 1]!)}
                   </span>
                   <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
@@ -301,7 +301,7 @@ export function UserDashboardMySubmissionsView({
                   className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
                   style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
                 >
-                  <span className="truncate" style={{ color: filterStatus.length === 0 ? "#8f877d" : SUBMISSION_FILTER_TEXT_COLOR }}>
+                  <span className="truncate" style={{ color: "#171717" }}>
                     {filterStatus.length === 0
                       ? "All Status"
                       : filterStatus[filterStatus.length - 1] === "inprogress"
@@ -357,7 +357,7 @@ export function UserDashboardMySubmissionsView({
               {activeFilterChips.map((chip) => (
                 <span
                   key={chip.key}
-                  className="inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-medium leading-none text-[#6f6255]"
+                  className="inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-normal leading-none text-black"
                   style={{ columnGap: "12px" }}
                 >
                   <span>{chip.label}</span>
@@ -375,7 +375,7 @@ export function UserDashboardMySubmissionsView({
               <button
                 type="button"
                 onClick={onClearAllFilters}
-                className="inline-flex min-h-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium leading-none transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
+                className="inline-flex min-h-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-normal leading-none transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
                 style={{ color: "#171717" }}
               >
                 <X className="h-3.5 w-3.5" />
@@ -405,25 +405,25 @@ export function UserDashboardMySubmissionsView({
           <Table className="w-full min-w-[820px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
             <TableHeader className="bg-muted/50 sticky top-0 z-10">
               <TableRow className="bg-muted/50 hover:bg-muted/50">
-                <TableHead>
-                  <div className="w-32">Tracking ID</div>
+                <TableHead className="text-black">
+                  <div className="w-[180px]">Tracking ID</div>
                 </TableHead>
-                <TableHead>
-                  <div className="w-56">Subject</div>
+                <TableHead className="text-black">
+                  <div className="w-[420px]">Subject</div>
                 </TableHead>
-                <TableHead className="px-2">
-                  <div className="w-40">Category</div>
+                <TableHead className="px-2 text-black">
+                  <div className="w-[140px]">Category</div>
                 </TableHead>
-                <TableHead className="px-1.5">
-                  <div className="w-24">Priority</div>
+                <TableHead className="px-1.5 text-black">
+                  <div className="w-[150px]">Priority</div>
                 </TableHead>
-                <TableHead className="px-2">
-                  <div className="w-28">Status</div>
+                <TableHead className="px-2 text-black">
+                  <div className="w-[120px]">Status</div>
                 </TableHead>
-                <TableHead className="whitespace-nowrap px-2">
-                  <div className="w-24">Date</div>
+                <TableHead className="whitespace-nowrap px-2 text-black">
+                  <div className="w-[118px]">Date</div>
                 </TableHead>
-                <TableHead className="w-16 text-center">
+                <TableHead className="w-[88px] text-center text-black">
                   Actions
                 </TableHead>
               </TableRow>
@@ -433,7 +433,7 @@ export function UserDashboardMySubmissionsView({
                 <TableRow>
                   <TableCell
                     colSpan={7}
-                    className="py-8 text-center text-sm text-muted-foreground"
+                    className="py-8 text-center text-sm text-black"
                   >
                     No submissions match the current filters.
                   </TableCell>
@@ -445,14 +445,20 @@ export function UserDashboardMySubmissionsView({
                     className="h-14 cursor-pointer"
                     onClick={() => onViewFeedback(feedback)}
                   >
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      <div className="w-32 truncate">{feedback.id}</div>
+                    <TableCell className="text-xs" style={{ color: "#666666" }}>
+                      <div className="w-[180px] truncate">{feedback.id}</div>
                     </TableCell>
-                    <TableCell className="font-normal" title={feedback.subject}>
-                      <div className="w-56 truncate">{feedback.subject}</div>
+                    <TableCell
+                      className="font-normal text-[#6b7280]"
+                      title={feedback.subject}
+                    >
+                      <div className="w-[420px] truncate">{feedback.subject}</div>
                     </TableCell>
-                    <TableCell className="px-2" title={feedback.category}>
-                      <div className="w-40 truncate">
+                    <TableCell
+                      className="px-2"
+                      title={feedback.category}
+                    >
+                      <div className="w-[140px] max-w-[140px] truncate">
                         {feedback.category}
                       </div>
                     </TableCell>
@@ -474,7 +480,7 @@ export function UserDashboardMySubmissionsView({
                           return (
                             <Badge
                               variant="outline"
-                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-normal ${getStatusBadgeClass(
                                 feedback.status,
                               )}`}
                             >
@@ -488,8 +494,11 @@ export function UserDashboardMySubmissionsView({
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap px-2 text-muted-foreground">
-                      <div className="w-24 whitespace-nowrap">
+                    <TableCell
+                      className="whitespace-nowrap px-2"
+                      style={{ color: "#666666" }}
+                    >
+                      <div className="w-[118px] whitespace-nowrap">
                         {formatSubmittedAt(feedback.createdAt)}
                       </div>
                     </TableCell>

@@ -21,14 +21,14 @@ export function UserDashboardSubmitView({
   return (
     <div
       ref={leftColumnRef}
-      className="mx-auto w-full max-w-3xl flex flex-col gap-6"
+      className="ff-user-dashboard-theme mx-auto flex w-full max-w-3xl flex-col gap-6"
     >
       {/* Submit Feedback */}
       <div>
         <Card className="border shadow-sm">
           <CardHeader className="pb-4">
-            <CardTitle>Feedback Form</CardTitle>
-            <CardDescription>
+            <CardTitle className="font-normal">Feedback Form</CardTitle>
+            <CardDescription className="text-black">
               Check anonymous if you want your name hidden from admin views.
             </CardDescription>
           </CardHeader>

@@ -1390,7 +1390,7 @@ export function AdminFeedbackWorkspace({
                   placeholder="Search by ID, subject, or name."
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
-                  className={`${ADMIN_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}
+                  className={`${ADMIN_FILTER_CONTROL_CLASS} placeholder:text-[#9ca3af]`}
                   style={{
                     color: ADMIN_FILTER_TEXT_COLOR,
                     paddingLeft: "2.75rem",
@@ -1684,7 +1684,7 @@ export function AdminFeedbackWorkspace({
                                 : "*****"}
                           </TableCell>
                           <TableCell
-                            className="truncate font-mono text-xs text-muted-foreground"
+                            className="truncate text-xs text-muted-foreground"
                             title={feedback.id}
                           >
                             {feedback.id}
@@ -1858,7 +1858,7 @@ export function AdminFeedbackWorkspace({
                               <h3 className="text-base font-semibold text-[#171717]">
                                 Feedback Details
                               </h3>
-                              <p className="font-mono text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground">
                                 Tracking ID: {selectedFeedback.id}
                               </p>
                             </div>

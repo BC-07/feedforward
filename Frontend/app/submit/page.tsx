@@ -183,7 +183,7 @@ export default function Submit() {
     <div className="min-h-[calc(100vh-200px)] bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
       <div className="container mx-auto max-w-2xl">
         <div className="text-center mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3">Submit Your Feedback</h1>
+          <h1 className="mb-2 text-2xl font-normal sm:mb-3 sm:text-4xl">Submit Your Feedback</h1>
           <p className="text-muted-foreground">
             Help us improve by sharing your suggestions, complaints, and
             inquiries.

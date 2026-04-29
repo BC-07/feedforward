@@ -49,7 +49,7 @@ export function UserDashboardHomeView({
   getStatusIcon,
 }: UserDashboardHomeViewProps) {
   return (
-    <div className="flex flex-col bg-background">
+    <div className="ff-user-dashboard-theme flex flex-col bg-background">
       {/* Create submission dialog */}
       {renderCreateSubmissionDialog()}
 
@@ -57,40 +57,40 @@ export function UserDashboardHomeView({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="border shadow-sm">
           <CardContent className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs uppercase tracking-wide text-black">
               Total
             </p>
-            <p className="mt-1 text-2xl font-semibold">
+            <p className="mt-1 text-2xl font-semibold text-black">
               {dashboardStats.total}
             </p>
           </CardContent>
         </Card>
         <Card className="border shadow-sm">
           <CardContent className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs uppercase tracking-wide text-black">
               Pending
             </p>
-            <p className="mt-1 text-2xl font-semibold">
+            <p className="mt-1 text-2xl font-semibold text-black">
               {dashboardStats.pending}
             </p>
           </CardContent>
         </Card>
         <Card className="border shadow-sm">
           <CardContent className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs uppercase tracking-wide text-black">
               In Progress
             </p>
-            <p className="mt-1 text-2xl font-semibold">
+            <p className="mt-1 text-2xl font-semibold text-black">
               {dashboardStats.inProgress}
             </p>
           </CardContent>
         </Card>
         <Card className="border shadow-sm">
           <CardContent className="p-4">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs uppercase tracking-wide text-black">
               Resolved
             </p>
-            <p className="mt-1 text-2xl font-semibold">
+            <p className="mt-1 text-2xl font-semibold text-black">
               {dashboardStats.resolved}
             </p>
           </CardContent>
@@ -106,19 +106,19 @@ export function UserDashboardHomeView({
               <TabsList className="grid h-11 w-full grid-cols-3 gap-1 rounded-xl border border-border/60 bg-muted/50 p-1">
                 <TabsTrigger
                   value="latest"
-                  className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                  className="h-full rounded-lg border-0 text-xs font-medium text-black data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
                 >
                   Latest
                 </TabsTrigger>
                 <TabsTrigger
                   value="attention"
-                  className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                  className="h-full rounded-lg border-0 text-xs font-medium text-black data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
                 >
                   Needs Attention
                 </TabsTrigger>
                 <TabsTrigger
                   value="updated"
-                  className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                  className="h-full rounded-lg border-0 text-xs font-medium text-black data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
                 >
                   Recently Updated
                 </TabsTrigger>
@@ -152,16 +152,16 @@ export function UserDashboardHomeView({
             }}
           >
             <CardHeader className="pb-0 pt-4">
-              <CardTitle className="text-base text-[#374151]">
+              <CardTitle className="text-base text-black">
                 Notifications
               </CardTitle>
-              <CardDescription className="text-[#6b7280]">
+              <CardDescription className="text-black">
                 Unresolved updates
               </CardDescription>
             </CardHeader>
             <CardContent className="-mt-4 flex-1 min-h-0 space-y-1.5 bg-slate-50/35 pt-0 pb-3 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {homeNotifications.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-black">
                   No unread updates.
                 </p>
               ) : (
@@ -172,10 +172,13 @@ export function UserDashboardHomeView({
                     onClick={() => onViewFeedback(feedback)}
                     className="w-full rounded-md border border-border/70 bg-white/80 p-2 text-left shadow-[0_0_0_1px_rgba(15,23,42,0.05)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-muted/30 hover:shadow-md"
                   >
-                    <p className="line-clamp-1 text-sm font-medium text-[#374151]">
+                    <p className="line-clamp-1 text-sm font-semibold text-[#708090]">
                       {feedback.subject}
                     </p>
-                    <p className="text-xs text-[#6b7280]">
+                    <p
+                      className="text-xs"
+                      style={{ color: "#666666" }}
+                    >
                       {new Date(feedback.updatedAt).toLocaleDateString("en-US")}
                     </p>
                   </button>
