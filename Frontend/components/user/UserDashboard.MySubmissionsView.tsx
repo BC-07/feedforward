@@ -70,7 +70,7 @@ interface UserDashboardMySubmissionsViewProps {
   mySubmissionsPage: number;
   mySubmissionsPageSize: (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number];
   mySubmissionsTotalPages: number;
-  submissionsScrollRef: React.RefObject<HTMLDivElement>;
+  submissionsScrollRef: React.RefObject<HTMLDivElement | null>;
   submissionsScrollKey: string;
   submissionsScrollTop: React.MutableRefObject<number>;
   mySubmissionsPlaceholderRowCount: number;
@@ -157,7 +157,7 @@ export function UserDashboardMySubmissionsView({
   }
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full flex-col gap-2 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
+    <div className="mx-auto flex h-[calc(100vh-7rem)] min-h-0 w-full flex-col gap-2 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
       {/* Header with title and create button */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex h-9 items-center gap-3">
@@ -402,28 +402,28 @@ export function UserDashboardMySubmissionsView({
         }}
       >
         <div className="w-full overflow-x-auto">
-          <Table className="w-full min-w-[1180px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
+          <Table className="w-full min-w-[820px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
             <TableHeader className="bg-muted/50 sticky top-0 z-10">
               <TableRow className="bg-muted/50 hover:bg-muted/50">
                 <TableHead>
-                  <div className="w-[180px]">Tracking ID</div>
+                  <div className="w-32">Tracking ID</div>
                 </TableHead>
                 <TableHead>
-                  <div className="w-[420px]">Subject</div>
+                  <div className="w-56">Subject</div>
                 </TableHead>
                 <TableHead className="px-2">
-                  <div className="w-[208px]">Category</div>
+                  <div className="w-40">Category</div>
                 </TableHead>
                 <TableHead className="px-1.5">
-                  <div className="w-[150px]">Priority</div>
+                  <div className="w-24">Priority</div>
                 </TableHead>
                 <TableHead className="px-2">
-                  <div className="w-[120px]">Status</div>
+                  <div className="w-28">Status</div>
                 </TableHead>
                 <TableHead className="whitespace-nowrap px-2">
-                  <div className="w-[118px]">Date</div>
+                  <div className="w-24">Date</div>
                 </TableHead>
-                <TableHead className="w-[88px] text-center">
+                <TableHead className="w-16 text-center">
                   Actions
                 </TableHead>
               </TableRow>
@@ -446,24 +446,18 @@ export function UserDashboardMySubmissionsView({
                     onClick={() => onViewFeedback(feedback)}
                   >
                     <TableCell className="font-mono text-xs text-muted-foreground">
-                      <div className="w-[180px] truncate">{feedback.id}</div>
+                      <div className="w-32 truncate">{feedback.id}</div>
                     </TableCell>
-                    <TableCell
-                      className="font-medium"
-                      title={feedback.subject}
-                    >
-                      <div className="w-[420px] truncate">{feedback.subject}</div>
+                    <TableCell className="font-normal" title={feedback.subject}>
+                      <div className="w-56 truncate">{feedback.subject}</div>
                     </TableCell>
-                    <TableCell
-                      className="px-2"
-                      title={feedback.category}
-                    >
-                      <div className="w-[208px] max-w-[208px] truncate">
+                    <TableCell className="px-2" title={feedback.category}>
+                      <div className="w-40 truncate">
                         {feedback.category}
                       </div>
                     </TableCell>
                     <TableCell className="px-1.5">
-                      <div className="w-[96px]">
+                      <div className="w-24">
                         <Badge
                           className={getPriorityColor(feedback.priority)}
                           variant="outline"
@@ -473,7 +467,7 @@ export function UserDashboardMySubmissionsView({
                       </div>
                     </TableCell>
                     <TableCell className="px-2">
-                      <div className="w-[120px] truncate">
+                      <div className="w-28 truncate">
                         <span className="inline-flex items-center gap-2">
                         {(() => {
                           const StatusIcon = getStatusIcon(feedback.status);
@@ -495,11 +489,11 @@ export function UserDashboardMySubmissionsView({
                       </div>
                     </TableCell>
                     <TableCell className="whitespace-nowrap px-2 text-muted-foreground">
-                      <div className="w-[118px] whitespace-nowrap">
+                      <div className="w-24 whitespace-nowrap">
                         {formatSubmittedAt(feedback.createdAt)}
                       </div>
                     </TableCell>
-                    <TableCell className="w-[88px] text-center">
+                    <TableCell className="w-16 text-center">
                       {feedback.status.toLowerCase() === "pending" ? (
                         <Button
                           type="button"
