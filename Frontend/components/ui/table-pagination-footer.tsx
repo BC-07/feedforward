@@ -33,7 +33,7 @@ export function SimplePaginationFooter({
   onNext,
 }: SimplePaginationFooterProps) {
   return (
-    <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+    <div className="flex items-center justify-end gap-2 text-xs text-black">
       <Button
         type="button"
         variant="outline"
@@ -45,7 +45,7 @@ export function SimplePaginationFooter({
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
-      <span className="text-sm text-muted-foreground">
+      <span className="text-sm text-black">
         Page {page} of {totalPages}
       </span>
       <Button
@@ -73,10 +73,10 @@ export function TablePaginationFooter({
   onPageSizeChange,
 }: TablePaginationFooterProps) {
   return (
-    <div className="flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 text-xs text-black sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-2">
         <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
-          <SelectTrigger className="h-8 w-[82px]">
+          <SelectTrigger className="h-8 w-[82px] text-black">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="min-w-0 w-[105px]">
@@ -100,7 +100,7 @@ export function TablePaginationFooter({
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="text-sm text-muted-foreground">
+        <span className="text-sm text-black">
           Page {page} of {totalPages}
         </span>
         <Button

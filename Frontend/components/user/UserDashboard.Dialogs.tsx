@@ -37,7 +37,7 @@ export function TrackingIdSuccess({
     >
       <div className="w-full max-w-lg -translate-y-[10%]">
         <Card
-          className="relative shadow-lg animate-in zoom-in-95 fade-in-0"
+          className="ff-user-dashboard-theme relative animate-in zoom-in-95 fade-in-0 shadow-lg"
           onClick={(event) => event.stopPropagation()}
         >
           <button
@@ -53,13 +53,13 @@ export function TrackingIdSuccess({
               <ArrowRight className="h-8 w-8 text-accent" />
             </div>
             <CardTitle>Feedback Submitted!</CardTitle>
-            <CardDescription>
+            <CardDescription className="text-black">
               Your feedback has been received successfully
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="w-full bg-muted rounded-lg p-4 text-center relative">
-              <p className="text-sm text-muted-foreground mb-2">
+              <p className="mb-2 text-sm text-black">
                 Your Tracking ID
               </p>
               <p className="text-2xl font-bold text-primary">
@@ -75,12 +75,12 @@ export function TrackingIdSuccess({
                 <Copy className="h-4 w-4" />
               </button>
             </div>
-            <p className="text-sm text-muted-foreground text-center">
+            <p className="text-center text-sm text-black">
               Please save this tracking ID to check the status of your
               submission.
             </p>
             {currentUserEmail && (
-              <p className="text-xs text-muted-foreground text-center">
+              <p className="text-center text-xs text-black">
                 A copy of this tracking ID was sent to {currentUserEmail}.
               </p>
             )}
@@ -148,7 +148,7 @@ export function CreateSubmissionDialog({
     >
       <DialogContent
         ref={contentRef}
-        className="w-[calc(100%-1rem)] max-w-2xl max-h-[93vh] overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl transition-[height] duration-200 sm:w-full sm:p-6 ff-hide-scrollbar"
+        className="ff-user-dashboard-theme ff-hide-scrollbar max-h-[93vh] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl transition-[height] duration-200 sm:w-full sm:p-6"
         style={
           currentStep === "confirm" && modalHeight
             ? { height: `${modalHeight}px` }
@@ -162,7 +162,7 @@ export function CreateSubmissionDialog({
           >
             <DialogHeader>
               <DialogTitle>Feedback Form</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-black">
                 Fill out the details below to create a new submission.
               </DialogDescription>
             </DialogHeader>
@@ -180,7 +180,7 @@ export function CreateSubmissionDialog({
           >
             <DialogHeader>
               <DialogTitle>Confirm Your Feedback</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-black">
                 Review your details before we send this feedback.
               </DialogDescription>
             </DialogHeader>
@@ -247,10 +247,10 @@ export function ConfirmationDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100%-1.5rem)] max-w-lg max-h-[90vh] flex flex-col overflow-hidden p-5 sm:w-full sm:p-6">
+      <DialogContent className="ff-user-dashboard-theme flex max-h-[90vh] w-[calc(100%-1.5rem)] max-w-lg flex-col overflow-hidden p-5 sm:w-full sm:p-6">
         <DialogHeader>
           <DialogTitle>Confirm Your Feedback</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-black">
             Review your details before we send this feedback.
           </DialogDescription>
         </DialogHeader>
@@ -304,7 +304,7 @@ export function DeleteConfirmationDialog({
         onOpenChange(open);
       }}
     >
-      <DialogContent className="w-[calc(100%-1rem)] max-w-[320px] rounded-2xl p-5 sm:w-full">
+      <DialogContent className="ff-user-dashboard-theme w-[calc(100%-1rem)] max-w-[320px] rounded-2xl p-5 sm:w-full">
         <div className="flex items-start gap-3 mb-4">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted mt-0.5">
             <svg
@@ -328,7 +328,7 @@ export function DeleteConfirmationDialog({
           </div>
           <div>
             <DialogTitle className="text-sm font-semibold leading-snug">Delete submission?</DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            <DialogDescription className="mt-1 text-xs leading-relaxed text-black">
               This will permanently remove your pending feedback.
             </DialogDescription>
           </div>
@@ -338,7 +338,7 @@ export function DeleteConfirmationDialog({
             <p className="text-xs font-semibold break-words break-all text-foreground">
               {deleteTarget.subject}
             </p>
-            <p className="mt-0.5 text-xs font-mono break-all text-muted-foreground">
+            <p className="mt-0.5 text-xs break-all text-black">
               {deleteTarget.id}
             </p>
           </div>
@@ -384,7 +384,7 @@ export function UnsentMessageWarning({
         <div className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
           <div className="space-y-2 text-left">
             <h2 className="text-lg font-semibold">Discard unsent message?</h2>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-black">
               You have a message that has not been sent yet.
             </p>
           </div>

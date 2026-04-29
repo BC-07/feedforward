@@ -847,8 +847,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           preSubjectContent={
             <div className="grid grid-cols-1 gap-y-4">
               <div className="space-y-1">
-                <Label className="text-muted-foreground">Submitted By</Label>
-                <p className="pt-0.5 text-[0.98rem] font-medium break-words">
+                <Label className="text-black">Submitted By</Label>
+                <p className="pt-0.5 text-[0.98rem] font-normal break-words">
                   {isAnonymous
                     ? "*****"
                     : currentUser?.fullName || currentUser?.name || "*****"}
@@ -970,7 +970,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             }
             required
           />
-          <p className="text-right text-xs text-muted-foreground">
+          <p className="text-right text-xs text-black">
             {formData.message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
           </p>
         </div>
@@ -986,11 +986,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         <div className="space-y-1">
           <Label
             htmlFor={`${idPrefix}-anonymous`}
-            className="cursor-pointer text-sm font-medium"
+            className="cursor-pointer text-sm font-normal"
           >
             Submit anonymously
           </Label>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-black">
             When checked, your name will be hidden to the admins.
           </p>
         </div>
@@ -1006,7 +1006,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       </Button>
       {isSubmittingFeedback ? (
         <p
-          className="text-center text-xs text-muted-foreground"
+          className="text-center text-xs text-black"
           aria-live="polite"
         >
           Feedback is being sent. Please wait...
@@ -1378,7 +1378,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     if (items.length === 0) {
       return (
         <Card className="border shadow-sm">
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          <CardContent className="py-10 text-center text-sm text-black">
             {emptyMessage}
           </CardContent>
         </Card>
@@ -1398,28 +1398,35 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               <Card className="h-full border shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
                 <CardContent className="flex h-full flex-col gap-3 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="min-h-[1.25rem] break-all font-mono text-xs text-[#6b7280]">
+                    <p
+                      className="min-h-[1.25rem] break-all text-xs"
+                      style={{ color: "#666666" }}
+                    >
                       {feedback.id}
                     </p>
-                    <span className="whitespace-nowrap text-[11px] text-[#6b7280]">
+                    <span
+                      className="whitespace-nowrap text-[11px]"
+                      style={{ color: "#666666" }}
+                    >
                       {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                     </span>
                   </div>
-                  <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug text-[#374151]">
+                  <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug text-[#b72860]">
                     {feedback.subject}
                   </p>
                   <p
-                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-[#6b7280] ${
+                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-red-600 ${
                       feedback.message.trim().length > 70 &&
                       /\s/.test(feedback.message.trim())
                         ? "indent-5"
                         : ""
                     }`}
+                    style={{ color: "#6e6e6e" }}
                   >
                     {feedback.message}
                   </p>
                   <div className="mt-auto flex items-center justify-between">
-                    <span className="rounded-md border border-[#d7dbe2] bg-[#f8fafc] px-2 py-0.5 text-xs text-[#6b7280]">
+                    <span className="rounded-md border border-[#d7dbe2] bg-[#f8fafc] px-2 py-0.5 text-xs text-black">
                       {feedback.category}
                     </span>
                     <span className="inline-flex items-center">
@@ -1428,7 +1435,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                         return (
                           <Badge
                             variant="outline"
-                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-normal ${getStatusBadgeClass(
                               feedback.status,
                             )}`}
                           >
@@ -1444,7 +1451,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             </button>
           ))}
         </div>
-        <div className="mt-2 flex items-center justify-between px-1 text-xs text-muted-foreground">
+        <div className="mt-2 flex items-center justify-between px-1 text-xs text-black">
           <p>
             {items.length > visibleItems.length
               ? `Showing ${visibleItems.length} of ${items.length} items`
@@ -1453,7 +1460,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           {items.length > visibleItems.length ? (
             <button
               type="button"
-              className="font-medium text-accent hover:underline"
+              className="font-normal text-accent hover:underline"
               onClick={() => router.push("/user/my-submissions")}
             >
               View all
@@ -1484,7 +1491,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     >
       <DialogContent
         ref={createSubmissionDialogContentRef}
-        className="w-[calc(100%-1rem)] max-w-2xl max-h-[93vh] overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl transition-[height] duration-200 sm:w-full sm:p-6 ff-hide-scrollbar"
+        className="ff-user-dashboard-theme ff-hide-scrollbar max-h-[93vh] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl transition-[height] duration-200 sm:w-full sm:p-6"
         style={
           createSubmissionStep === "confirm" && createSubmissionFormModalHeight
             ? { height: `${createSubmissionFormModalHeight}px` }
@@ -1498,7 +1505,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           >
             <DialogHeader>
               <DialogTitle>Feedback Form</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-black">
                 Fill out the details below to create a new submission.
               </DialogDescription>
             </DialogHeader>
@@ -1512,7 +1519,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           >
             <DialogHeader>
               <DialogTitle>Confirm Your Feedback</DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-black">
                 Review your details before we send this feedback.
               </DialogDescription>
             </DialogHeader>
@@ -1586,7 +1593,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
   return (
     <>
-      <div className="min-h-[calc(100vh-200px)] bg-muted/20">
+      <div className="ff-user-dashboard-theme min-h-[calc(100vh-200px)] bg-muted/20">
         {/* Tracking ID Success Modal */}
         <TrackingIdSuccess
           trackingId={trackingId}
@@ -1640,7 +1647,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   <Card className="border shadow-sm">
                     <CardHeader className="pb-4">
                       <CardTitle>Feedback Form</CardTitle>
-                      <CardDescription>
+                      <CardDescription className="text-black">
                         Check anonymous if you want your name hidden from admin
                         views.
                       </CardDescription>
@@ -1675,40 +1682,40 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         <Card className="border shadow-sm">
                           <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <p className="text-xs uppercase tracking-wide text-black">
                               Total
                             </p>
-                            <p className="mt-1 text-2xl font-semibold">
+                            <p className="mt-1 text-2xl font-normal text-black">
                               {dashboardStats.total}
                             </p>
                           </CardContent>
                         </Card>
                         <Card className="border shadow-sm">
                           <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <p className="text-xs uppercase tracking-wide text-black">
                               Pending
                             </p>
-                            <p className="mt-1 text-2xl font-semibold">
+                            <p className="mt-1 text-2xl font-normal text-black">
                               {dashboardStats.pending}
                             </p>
                           </CardContent>
                         </Card>
                         <Card className="border shadow-sm">
                           <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <p className="text-xs uppercase tracking-wide text-black">
                               In Progress
                             </p>
-                            <p className="mt-1 text-2xl font-semibold">
+                            <p className="mt-1 text-2xl font-normal text-black">
                               {dashboardStats.inProgress}
                             </p>
                           </CardContent>
                         </Card>
                         <Card className="border shadow-sm">
                           <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <p className="text-xs uppercase tracking-wide text-black">
                               Resolved
                             </p>
-                            <p className="mt-1 text-2xl font-semibold">
+                            <p className="mt-1 text-2xl font-normal text-black">
                               {dashboardStats.resolved}
                             </p>
                           </CardContent>
@@ -1721,19 +1728,19 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               <TabsList className="grid h-11 w-full grid-cols-3 gap-1 rounded-xl border border-border/60 bg-muted/50 p-1">
                                 <TabsTrigger
                                   value="latest"
-                                  className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                                  className="h-full rounded-lg border-0 text-xs font-normal text-black data-[state=active]:bg-white data-[state=active]:font-normal data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
                                 >
                                   Latest
                                 </TabsTrigger>
                                 <TabsTrigger
                                   value="attention"
-                                  className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                                  className="h-full rounded-lg border-0 text-xs font-normal text-black data-[state=active]:bg-white data-[state=active]:font-normal data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
                                 >
                                   Needs Attention
                                 </TabsTrigger>
                                 <TabsTrigger
                                   value="updated"
-                                  className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
+                                  className="h-full rounded-lg border-0 text-xs font-normal text-black data-[state=active]:bg-white data-[state=active]:font-normal data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
                                 >
                                   Recently Updated
                                 </TabsTrigger>
@@ -1765,16 +1772,16 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                             }}
                           >
                             <CardHeader className="pb-0 pt-4">
-                              <CardTitle className="text-base">
+                              <CardTitle className="text-base text-black">
                                 Notifications
                               </CardTitle>
-                              <CardDescription>
+                              <CardDescription className="text-black">
                                 Unresolved updates
                               </CardDescription>
                             </CardHeader>
                             <CardContent className="-mt-4 flex-1 min-h-0 space-y-1.5 bg-slate-50/35 pt-0 pb-3 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                               {homeNotifications.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-sm text-black">
                                   No unread updates.
                                 </p>
                               ) : (
@@ -1785,10 +1792,13 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                     onClick={() => handleViewFeedback(feedback)}
                                     className="w-full rounded-md border border-border/70 bg-white/80 p-2 text-left shadow-[0_0_0_1px_rgba(15,23,42,0.05)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-muted/30 hover:shadow-md"
                                   >
-                                    <p className="line-clamp-1 text-sm font-medium">
+                                    <p className="line-clamp-1 text-sm font-semibold text-[#6b7280]">
                                       {feedback.subject}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p
+                                      className="text-xs"
+                                      style={{ color: "#666666" }}
+                                    >
                                       {new Date(
                                         feedback.updatedAt,
                                       ).toLocaleDateString("en-US")}
@@ -1810,7 +1820,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           </div>
                           <div className="flex h-9 items-center">
                             <h2 className="text-[21px] font-semibold leading-none tracking-[-0.02em] text-[#171717]">
-                              Submission list
+                              Submission List
                             </h2>
                           </div>
                         </div>
@@ -1842,7 +1852,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                 onChange={(event) =>
                                   setSearchQuery(event.target.value)
                                 }
-                                className={`${SUBMISSION_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}
+                                className={`${SUBMISSION_FILTER_CONTROL_CLASS} ff-submission-search-input`}
                                 style={{
                                   color: SUBMISSION_FILTER_TEXT_COLOR,
                                   paddingLeft: "2.75rem",
@@ -2008,7 +2018,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               {activeFilterChips.map((chip) => (
                                 <span
                                   key={chip.key}
-                                  className="inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-medium leading-none text-[#6f6255]"
+                                  className="inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-normal leading-none text-black"
                                   style={{ columnGap: "12px" }}
                                 >
                                   <span>{chip.label}</span>
@@ -2026,7 +2036,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               <button
                                 type="button"
                                 onClick={clearAllFilters}
-                                className="inline-flex min-h-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium leading-none transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
+                                className="inline-flex min-h-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-normal leading-none transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
                                 style={{ color: "#171717" }}
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -2055,25 +2065,25 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                           <Table className="w-full min-w-full md:min-w-[980px] md:table-fixed text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
                             <TableHeader className="bg-muted/50 sticky top-0 z-10">
                               <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                <TableHead className="w-[150px]">
+                                <TableHead className="w-[150px] text-black">
                                   Tracking ID
                                 </TableHead>
-                                <TableHead className="w-[300px]">
+                                <TableHead className="w-[300px] text-black">
                                   Subject
                                 </TableHead>
-                                <TableHead className="w-[220px]">
+                                <TableHead className="w-[150px] text-black">
                                   Category
                                 </TableHead>
-                                <TableHead className="w-[110px]">
+                                <TableHead className="w-[110px] text-black">
                                   Priority
                                 </TableHead>
-                                <TableHead className="w-[150px]">
+                                <TableHead className="w-[150px] text-black">
                                   Status
                                 </TableHead>
-                                <TableHead className="w-[130px] whitespace-nowrap">
+                                <TableHead className="w-[130px] whitespace-nowrap text-black">
                                   Date
                                 </TableHead>
-                                <TableHead className="w-[88px] text-center">
+                                <TableHead className="w-[88px] text-center text-black">
                                   Actions
                                 </TableHead>
                               </TableRow>
@@ -2083,7 +2093,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                 <TableRow>
                                   <TableCell
                                     colSpan={7}
-                                    className="py-8 text-center text-sm text-muted-foreground"
+                                  className="py-8 text-center text-sm text-black"
                                   >
                                     No submissions match the current filters.
                                   </TableCell>
@@ -2095,17 +2105,20 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                     className="h-14 cursor-pointer"
                                     onClick={() => handleViewFeedback(feedback)}
                                   >
-                                    <TableCell className="font-mono text-xs text-muted-foreground truncate">
+                                    <TableCell
+                                      className="text-xs truncate"
+                                      style={{ color: "#666666" }}
+                                    >
                                       {feedback.id}
                                     </TableCell>
                                     <TableCell
-                                      className="font-medium truncate"
+                                      className="font-normal truncate text-[#6b7280]"
                                       title={feedback.subject}
                                     >
                                       {feedback.subject}
                                     </TableCell>
                                     <TableCell
-                                      className="truncate"
+                                      className="truncate text-[#6b7280]"
                                       title={feedback.category}
                                     >
                                       {feedback.category}
@@ -2129,7 +2142,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                           return (
                                             <Badge
                                               variant="outline"
-                                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-normal ${getStatusBadgeClass(
                                                 feedback.status,
                                               )}`}
                                             >
@@ -2142,7 +2155,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                         })()}
                                       </span>
                                     </TableCell>
-                                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                                    <TableCell
+                                      className="whitespace-nowrap"
+                                      style={{ color: "#666666" }}
+                                    >
                                       {formatSubmittedAt(feedback.createdAt)}
                                     </TableCell>
                                     <TableCell className="w-[88px] text-center">
@@ -2221,10 +2237,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       <CardContent className="pt-6 flex-1 flex items-center">
                         <div className="text-center py-8 w-full">
                           <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                          <h3 className="text-lg font-semibold mb-2">
+                          <h3 className="mb-2 text-lg font-normal">
                             No Submissions Yet
                           </h3>
-                          <p className="text-muted-foreground">
+                          <p className="text-black">
                             No submissions yet. Use Submit Feedback to create
                             your first one.
                           </p>
@@ -2251,8 +2267,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                         <div className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none">
                           <div className="pointer-events-auto w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
                             <div className="space-y-2 text-left">
-                              <h2 className="text-lg font-semibold">Discard unsent message?</h2>
-                              <p className="text-sm text-muted-foreground">You have a message that has not been sent yet.</p>
+                              <h2 className="text-lg font-normal">Discard unsent message?</h2>
+                              <p className="text-sm text-black">You have a message that has not been sent yet.</p>
                             </div>
                             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                               <Button type="button" variant="outline" onClick={() => setIsUnsentMessageDialogOpen(false)}>Keep</Button>
@@ -2277,7 +2293,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
-                        <CardDescription className="font-mono">
+                        <CardDescription
+                          className="text-black"
+                          style={{ color: "#666666" }}
+                        >
                           {selectedFeedback.id}
                         </CardDescription>
                       </CardHeader>
@@ -2319,7 +2338,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                             >
                               <div className="flex items-center gap-1.5">
                                 <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                                <p className="text-sm font-semibold text-foreground">
+                                <p className="text-sm font-normal text-foreground">
                                   Message window
                                 </p>
                               </div>
@@ -2335,12 +2354,12 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                 className="ff-hide-scrollbar min-h-0 overflow-y-auto p-3"
                               >
                                 {isMessagesLoading ? (
-                                  <p className="text-sm text-muted-foreground">
+                                  <p className="text-sm text-black">
                                     Loading conversation...
                                   </p>
                                 ) : null}
                                 {!isMessagesLoading && messages.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">
+                                  <p className="text-sm text-black">
                                     No messages yet.
                                   </p>
                                 ) : null}
@@ -2414,7 +2433,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                             {showDayLabel ? (
                                               <div className="flex items-center gap-2 py-1">
                                                 <div className="h-px flex-1 bg-border/60" />
-                                                <span className="text-[10px] font-medium text-muted-foreground">
+                                                <span className="text-[10px] font-normal text-black">
                                                   {dayLabel}
                                                 </span>
                                                 <div className="h-px flex-1 bg-border/60" />
@@ -2427,7 +2446,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                                 className={`group relative w-fit min-w-0 max-w-[85%] ${isUser ? "text-right" : "text-left"}`}
                                               >
                                                 {showName && !isUser ? (
-                                                  <p className="mb-1 px-1 text-[11px] font-semibold text-muted-foreground">
+                                                  <p className="mb-1 px-1 text-[11px] font-normal text-black">
                                                     {name}
                                                   </p>
                                                 ) : null}
@@ -2521,7 +2540,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               : "Open quick chat"
                           }
                           onClick={() => setIsMiniChatOpen((prev) => !prev)}
-                          className="pointer-events-auto absolute bottom-0 right-0 z-0 h-8 w-[320px] cursor-pointer rounded-t-md border border-b-0 border-border bg-muted/90 px-6 text-xs font-semibold text-foreground shadow-md transition-colors hover:bg-muted"
+                          className="pointer-events-auto absolute bottom-0 right-0 z-0 h-8 w-[320px] cursor-pointer rounded-t-md border border-b-0 border-border bg-muted/90 px-6 text-xs font-normal text-foreground shadow-md transition-colors hover:bg-muted"
                         >
                           {isMiniChatOpen ? "Updates" : "Updates"}
                         </button>

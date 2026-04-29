@@ -41,6 +41,8 @@ const getStatusMessage = (status: string) => {
   }
 };
 
+const MUTED_TEXT_COLOR = "#6e6e6e";
+
 const getStatusSteps = (currentStatus: string) => {
   const order = ["pending", "in progress", "resolved"];
   const normalized = currentStatus.trim().toLowerCase();
@@ -122,14 +124,22 @@ export function FeedbackStatusCard({
 
                   if (stepTimestamp) {
                     return (
-                      <p className="text-[0.9rem] text-muted-foreground">
+                      <p
+                        className="text-[0.9rem]"
+                        style={{ color: "#000000" }}
+                      >
                         {formatDate(stepTimestamp)}
                       </p>
                     );
                   }
 
                   return step.description ? (
-                    <p className="text-[0.9rem] text-muted-foreground">{step.description}</p>
+                    <p
+                      className="text-[0.9rem]"
+                      style={{ color: MUTED_TEXT_COLOR }}
+                    >
+                      {step.description}
+                    </p>
                   ) : null;
                 })()}
               </div>
@@ -143,7 +153,9 @@ export function FeedbackStatusCard({
               feedback.status,
               `mt-0.5 h-4 w-4 flex-shrink-0 ${getStatusIconTone(feedback.status)}`,
             )}
-            <p className="text-[0.9rem] text-muted-foreground">{statusMessage}</p>
+            <p className="text-[0.9rem]" style={{ color: MUTED_TEXT_COLOR }}>
+              {statusMessage}
+            </p>
           </div>
         </div>
       </CardContent>
