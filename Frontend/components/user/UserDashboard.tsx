@@ -34,14 +34,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
@@ -51,7 +43,6 @@ import { formatFilterChipLabel } from "@/lib/filterUtils";
 import { formatFeedbackText } from "@/lib/textFormat";
 import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
 import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
-import { FeedbackSuccessCard } from "@/components/feedback/FeedbackSuccessCard";
 import {
   Select,
   SelectContent,
@@ -59,25 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { TablePaginationFooter } from "@/components/ui/table-pagination-footer";
-import {
-  HoverFilterPopover,
-  type HoverFilterItem,
-} from "@/components/filters/HoverFilterPopover";
+
 import {
   Send,
   Clock,
@@ -85,15 +58,9 @@ import {
   Circle,
   Wrench,
   MessageCircle,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   ChevronDown,
   X,
-  BarChart3,
-  Plus,
-  Search,
-  Trash2,
 } from "lucide-react";
 
 // Import constants and types
@@ -104,8 +71,6 @@ import {
   CONVERSATION_MESSAGE_MAX_LENGTH,
   USER_MESSAGE_BUBBLE_CLASS,
   MY_SUBMISSIONS_PAGE_SIZE_OPTIONS,
-  SUBMISSION_FILTER_TEXT_COLOR,
-  SUBMISSION_FILTER_CONTROL_CLASS,
   USER_FEEDBACK_DRAFT_KEY,
   USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY,
   EMPTY_FORM,
@@ -125,6 +90,7 @@ import {
 import { UserDashboardSubmitView } from "./UserDashboard.SubmitView";
 import { UserDashboardMySubmissionsView } from "./UserDashboard.MySubmissionsView";
 import { UserDashboardHomeView } from "./UserDashboard.HomeView";
+import type { HoverFilterItem } from "@/components/filters/HoverFilterPopover";
 
 export function UserDashboard({ view }: { view: UserDashboardView }) {
   const router = useRouter();
@@ -184,11 +150,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     useState(false);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
-  const leftColumnRef = useRef<HTMLDivElement | null>(null);
-  const submissionsScrollRef = useRef<HTMLDivElement | null>(null);
-  const conversationScrollRef = useRef<HTMLDivElement | null>(null);
-  const miniConversationScrollRef = useRef<HTMLDivElement | null>(null);
-  const createSubmissionDialogContentRef = useRef<HTMLDivElement | null>(null);
+  const leftColumnRef = useRef<HTMLDivElement>(null);
+  const submissionsScrollRef = useRef<HTMLDivElement>(null);
+  const conversationScrollRef = useRef<HTMLDivElement>(null);
+  const miniConversationScrollRef = useRef<HTMLDivElement>(null);
+  const createSubmissionDialogContentRef = useRef<HTMLDivElement>(null);
   const submissionsScrollTop = useRef(0);
   const feedbackSubmitLockRef = useRef(false);
   const [createSubmissionFormModalHeight, setCreateSubmissionFormModalHeight] =
@@ -1471,14 +1437,16 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     );
   };
 
-  const createSubmissionStepAnimationClass =
-    createSubmissionStepDirection === "backward"
-      ? "ff-step-slide-in-right"
-      : "ff-step-slide-in-left";
-
   const renderCreateSubmissionDialog = () => (
-    <Dialog
-      open={isCreateSubmissionOpen}
+    <CreateSubmissionDialog
+      isOpen={isCreateSubmissionOpen}
+      currentStep={createSubmissionStep}
+      stepDirection={createSubmissionStepDirection}
+      isSubmitting={isSubmittingFeedback}
+      trackingIdForSuccess={createSubmissionTrackingId}
+      currentUserEmail={currentUser?.email}
+      modalHeight={createSubmissionFormModalHeight}
+      contentRef={createSubmissionDialogContentRef}
       onOpenChange={(open) => {
         setIsCreateSubmissionOpen(open);
         if (!open) {
@@ -1564,31 +1532,23 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   setCreateSubmissionStepDirection("forward");
                   setCreateSubmissionTrackingId(null);
 
-                  const existingFeedback = feedbacks.find(
-                    (feedback) => feedback.id === id,
-                  );
-                  if (existingFeedback) {
-                    await handleViewFeedback(existingFeedback);
-                    return;
-                  }
-
-                  try {
-                    const latest = await getFeedback(id);
-                    setSelectedFeedback(latest);
-                  } catch {
-                    toast.error("Unable to open submission details right now.");
-                  }
-                }}
-                onSubmitAnother={() => {
-                  goToCreateSubmissionStep("form");
-                  setCreateSubmissionTrackingId(null);
-                }}
-              />
-            </div>
-          ) : null
-        ) : null}
-      </DialogContent>
-    </Dialog>
+        const existingFeedback = feedbacks.find((fb) => fb.id === id);
+        if (existingFeedback) {
+          await handleViewFeedback(existingFeedback);
+          return;
+        }
+        try {
+          const latest = await getFeedback(id);
+          setSelectedFeedback(latest);
+        } catch {
+          toast.error("Unable to open submission details right now.");
+        }
+      }}
+      onSubmitAnother={() => {
+        goToCreateSubmissionStep("form");
+        setCreateSubmissionTrackingId(null);
+      }}
+    />
   );
 
   return (

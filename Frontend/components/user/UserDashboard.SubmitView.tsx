@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 
 interface UserDashboardSubmitViewProps {
-  leftColumnRef?: React.RefObject<HTMLDivElement>;
+  leftColumnRef?: React.RefObject<HTMLDivElement | null>;
   renderSubmissionForm: (idPrefix: string) => React.ReactNode;
 }
 

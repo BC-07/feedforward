@@ -28,7 +28,7 @@ interface FeedbackTypeBarShapeProps {
   y?: number;
   width?: number;
   height?: number;
-  value?: number;
+  value?: number | [number, number];
   payload?: FeedbackTypeChartDatum;
 }
 
@@ -169,22 +169,19 @@ export function AdminFeedbackTypeChart({
                 animationDuration={700}
                 animationEasing="ease-out"
                 animationBegin={200}
-                onMouseEnter={(
-                  data: FeedbackTypeChartDatum,
-                  _index,
-                  event: { currentTarget: SVGElement } | undefined,
-                ) => {
+                onMouseEnter={(data, _index, event) => {
                   if (hideTimer.current) clearTimeout(hideTimer.current);
-                  setHoveredBar(data.type ?? null);
+                  const payload = data.payload as FeedbackTypeChartDatum | undefined;
+                  setHoveredBar(payload?.type ?? null);
                   const chartEl = chartRef.current;
                   if (!chartEl || !event) return;
                   const rect = chartEl.getBoundingClientRect();
-                  const barRect = event.currentTarget.getBoundingClientRect();
+                  const barRect = (event.currentTarget as SVGElement).getBoundingClientRect();
                   setTooltip({
                     x: barRect.left + barRect.width / 2 - rect.left,
                     y: barRect.top - rect.top - 8,
-                    label: data.type,
-                    value: data.total,
+                    label: payload?.type ?? "",
+                    value: payload?.total ?? 0,
                   });
                   setTooltipVisible(true);
                 }}
@@ -199,9 +196,10 @@ export function AdminFeedbackTypeChart({
                     y = 0,
                     width = 0,
                     height = 0,
-                    value = 0,
+                    value: rawValue = 0,
                     payload,
                   } = props;
+                  const value = Array.isArray(rawValue) ? rawValue[1] - rawValue[0] : rawValue;
                   const type = payload?.type ?? "";
                   const isHovered = hoveredBar === type;
                   const fill = isHovered ? "#e08800" : "var(--color-total)";

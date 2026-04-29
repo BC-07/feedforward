@@ -70,7 +70,7 @@ interface UserDashboardMySubmissionsViewProps {
   mySubmissionsPage: number;
   mySubmissionsPageSize: (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number];
   mySubmissionsTotalPages: number;
-  submissionsScrollRef: React.RefObject<HTMLDivElement>;
+  submissionsScrollRef: React.RefObject<HTMLDivElement | null>;
   submissionsScrollKey: string;
   submissionsScrollTop: React.MutableRefObject<number>;
   mySubmissionsPlaceholderRowCount: number;
@@ -402,7 +402,7 @@ export function UserDashboardMySubmissionsView({
         }}
       >
         <div className="w-full overflow-x-auto">
-          <Table className="w-full min-w-[1180px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
+          <Table className="w-full min-w-[820px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
             <TableHeader className="bg-muted/50 sticky top-0 z-10">
               <TableRow className="bg-muted/50 hover:bg-muted/50">
                 <TableHead className="text-black">
@@ -463,7 +463,7 @@ export function UserDashboardMySubmissionsView({
                       </div>
                     </TableCell>
                     <TableCell className="px-1.5">
-                      <div className="w-[96px]">
+                      <div className="w-24">
                         <Badge
                           className={getPriorityColor(feedback.priority)}
                           variant="outline"
@@ -473,7 +473,7 @@ export function UserDashboardMySubmissionsView({
                       </div>
                     </TableCell>
                     <TableCell className="px-2">
-                      <div className="w-[120px] truncate">
+                      <div className="w-28 truncate">
                         <span className="inline-flex items-center gap-2">
                         {(() => {
                           const StatusIcon = getStatusIcon(feedback.status);
@@ -502,7 +502,7 @@ export function UserDashboardMySubmissionsView({
                         {formatSubmittedAt(feedback.createdAt)}
                       </div>
                     </TableCell>
-                    <TableCell className="w-[88px] text-center">
+                    <TableCell className="w-16 text-center">
                       {feedback.status.toLowerCase() === "pending" ? (
                         <Button
                           type="button"

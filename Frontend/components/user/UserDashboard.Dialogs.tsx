@@ -100,7 +100,7 @@ interface CreateSubmissionDialogProps {
   trackingIdForSuccess: string | null;
   currentUserEmail: string | undefined;
   modalHeight: number | null;
-  contentRef: React.RefObject<HTMLDivElement>;
+  contentRef: React.RefObject<HTMLDivElement | null>;
   onOpenChange: (open: boolean) => void;
   onStepChange: (step: "form" | "confirm" | "success") => void;
   renderSubmissionForm: (idPrefix: string, onSubmit?: (e: React.FormEvent) => void) => React.ReactNode;
