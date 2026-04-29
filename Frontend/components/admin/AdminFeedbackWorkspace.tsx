@@ -1336,9 +1336,9 @@ export function AdminFeedbackWorkspace({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
-      <div className="px-4 pb-6 pt-4 sm:px-7 sm:pt-6">
-        <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-4 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
+    <div className="flex h-[calc(100vh-5rem)] min-h-0 flex-col bg-background">
+      <div className="flex min-h-0 flex-1 flex-col px-4 pb-6 pt-4 sm:px-7 sm:pt-6">
+        <div className="mx-auto flex min-h-0 w-full max-w-[1560px] flex-1 flex-col gap-4 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
           <div
             className={`flex flex-col gap-4 transition-[padding] duration-300 ease-out lg:flex-row lg:items-center lg:justify-between ${
               isSplitPaneOpen ? "xl:pr-[calc(40%+1rem)]" : "xl:pr-0"
@@ -1629,15 +1629,15 @@ export function AdminFeedbackWorkspace({
             <div
               className={
                 isSplitPaneLayout
-                  ? "flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start"
-                  : "space-y-2"
+                  ? "flex min-h-0 min-w-0 flex-1 flex-col gap-4 xl:flex-row xl:items-start"
+                  : "flex min-h-0 flex-1 flex-col space-y-2"
               }
             >
               <div
                 ref={splitPaneListColumnRef}
-                className="min-w-0 flex-1 space-y-2"
+                className="flex min-h-0 flex-1 flex-col space-y-2"
               >
-                <div className="relative w-full overflow-x-auto">
+                <div className="relative min-h-0 flex-1 overflow-auto w-full">
                   <Table className="w-full min-w-[980px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
                     <TableHeader className="sticky top-0 z-10 bg-muted/50">
                       <TableRow className="bg-muted/50 hover:bg-muted/50">
@@ -1791,6 +1791,21 @@ export function AdminFeedbackWorkspace({
                       setFeedbacksPageSize(value);
                       setCurrentPage(1);
                     }}
+                    statusText={
+                      <>
+                        <span className="text-sm">
+                        Viewing{" "}
+                        <span className="font-normal">
+                          {paginatedFeedbacks.length}
+                        </span>{" "}
+                        out of{" "}
+                        <span className="font-normal">
+                          {visibleFeedbacks.length}
+                        </span>{" "}
+                        submission{visibleFeedbacks.length !== 1 ? "s" : ""}
+                        </span>
+                      </>
+                    }
                   />
                 </div>
               </div>

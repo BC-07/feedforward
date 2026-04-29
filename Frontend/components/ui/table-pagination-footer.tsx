@@ -1,3 +1,4 @@
+import React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "./button";
@@ -17,6 +18,7 @@ type TablePaginationFooterProps = {
   pageSize: number;
   pageSizeOptions: readonly number[];
   onPageSizeChange: (value: number) => void;
+  statusText?: React.ReactNode;
 };
 
 type SimplePaginationFooterProps = {
@@ -45,6 +47,7 @@ export function SimplePaginationFooter({
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
+      
       <span className="text-sm text-muted-foreground">
         Page {page} of {totalPages}
       </span>
@@ -71,10 +74,11 @@ export function TablePaginationFooter({
   pageSize,
   pageSizeOptions,
   onPageSizeChange,
+  statusText,
 }: TablePaginationFooterProps) {
   return (
     <div className="flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
           <SelectTrigger className="h-8 w-[82px]">
             <SelectValue />
@@ -87,6 +91,9 @@ export function TablePaginationFooter({
             ))}
           </SelectContent>
         </Select>
+        {statusText ? (
+          <span className="text-xs text-muted-foreground">{statusText}</span>
+        ) : null}
       </div>
       <div className="flex items-center justify-end gap-2">
         <Button
