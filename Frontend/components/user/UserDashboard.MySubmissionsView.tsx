@@ -157,7 +157,7 @@ export function UserDashboardMySubmissionsView({
   }
 
   return (
-    <div className="ff-user-dashboard-theme mx-auto flex h-full min-h-0 w-full flex-col gap-2 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
+    <div className="ff-user-dashboard-theme mx-auto flex h-[calc(100vh-7rem)] min-h-0 w-full flex-col gap-2 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
       {/* Header with title and create button */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex h-9 items-center gap-3">
@@ -194,14 +194,14 @@ export function UserDashboardMySubmissionsView({
                 placeholder="Search by ID, subject, or message."
                 value={searchQuery}
                 onChange={(event) => onSearchChange(event.target.value)}
-                className={`${SUBMISSION_FILTER_CONTROL_CLASS} ff-submission-search-input`}
+                className={`${SUBMISSION_FILTER_CONTROL_CLASS} font-normal ff-submission-search-input`}
                 style={{ color: SUBMISSION_FILTER_TEXT_COLOR, paddingLeft: "2.75rem" }}
               />
             </div>
 
             {/* A-Z tracking select */}
             <Select value={filterTracking} onValueChange={onFilterTrackingChange}>
-              <SelectTrigger className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`} style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}>
+              <SelectTrigger className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255] font-medium`} style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}>
                 <SelectValue placeholder="A - Z" />
               </SelectTrigger>
               <SelectContent>
@@ -212,7 +212,7 @@ export function UserDashboardMySubmissionsView({
 
             {/* Most Recent date select */}
             <Select value={filterDate} onValueChange={onFilterDateChange}>
-              <SelectTrigger className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`} style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}>
+              <SelectTrigger className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255] font-medium`} style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}>
                 <SelectValue placeholder="Most Recent" />
               </SelectTrigger>
               <SelectContent>
@@ -222,20 +222,20 @@ export function UserDashboardMySubmissionsView({
             </Select>
 
             {/* Multi-select Type */}
-            <DropdownMenu>
+            <DropdownMenu >
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
+                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2 `}
                   style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
                 >
-                  <span className="truncate" style={{ color: "#171717" }}>
+                  <span className="truncate font-medium" style={{ color: "#171717" }}>
                     {filterType.length === 0 ? "All Types" : formatFilterChipLabel(filterType[filterType.length - 1]!)}
                   </span>
                   <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48 p-1">
+              <DropdownMenuContent align="start" className="w-48 p-1 font-medium">
                 {[
                   { value: "suggestion", label: "Suggestion" },
                   { value: "complaint", label: "Complaint" },
@@ -266,13 +266,13 @@ export function UserDashboardMySubmissionsView({
                   className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
                   style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
                 >
-                  <span className="truncate" style={{ color: "#171717" }}>
+                  <span className="truncate font-medium" style={{ color: "#171717" }}>
                     {filterPriority.length === 0 ? "All Priorities" : formatFilterChipLabel(filterPriority[filterPriority.length - 1]!)}
                   </span>
                   <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48 p-1">
+              <DropdownMenuContent align="start" className="w-48 p-1 font-medium">
                 {[
                   { value: "low", label: "Low" },
                   { value: "medium", label: "Medium" },
@@ -301,7 +301,7 @@ export function UserDashboardMySubmissionsView({
                   className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
                   style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
                 >
-                  <span className="truncate" style={{ color: "#171717" }}>
+                  <span className="truncate font-medium" style={{ color: "#171717" }}>
                     {filterStatus.length === 0
                       ? "All Status"
                       : filterStatus[filterStatus.length - 1] === "inprogress"
@@ -311,7 +311,7 @@ export function UserDashboardMySubmissionsView({
                   <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48 p-1">
+              <DropdownMenuContent align="start" className="w-48 p-1 font-medium">
                 {[
                   { value: "pending", label: "Pending" },
                   { value: "inprogress", label: "In Progress" },
@@ -341,7 +341,7 @@ export function UserDashboardMySubmissionsView({
                 placeholder="Search by ID, subject, message."
                 value={searchQuery}
                 onChange={(event) => onSearchChange(event.target.value)}
-                className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
+                className="font-normal h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
               />
             </div>
             <HoverFilterPopover
@@ -397,33 +397,33 @@ export function UserDashboardMySubmissionsView({
           const top = event.currentTarget.scrollTop;
           submissionsScrollTop.current = top;
           if (typeof window !== "undefined") {
-            window.localStorage.setItem(submissionsScrollKey, top.toString());
+            window.sessionStorage.setItem(submissionsScrollKey, top.toString());
           }
         }}
       >
         <div className="w-full overflow-x-auto">
-          <Table className="w-full min-w-[820px] text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
+          <Table className="w-full min-w-[640px] text-xs sm:text-sm [&_td]:px-2 [&_th]:px-2">
             <TableHeader className="bg-muted/50 sticky top-0 z-10">
               <TableRow className="bg-muted/50 hover:bg-muted/50">
                 <TableHead className="text-black">
-                  <div className="w-[180px]">Tracking ID</div>
+                  <div className="w-[120px]">Tracking ID</div>
                 </TableHead>
                 <TableHead className="text-black">
-                  <div className="w-[420px]">Subject</div>
+                  <div className="w-[220px]">Subject</div>
                 </TableHead>
                 <TableHead className="px-2 text-black">
-                  <div className="w-[140px]">Category</div>
+                  <div className="w-[120px]">Category</div>
                 </TableHead>
                 <TableHead className="px-1.5 text-black">
-                  <div className="w-[150px]">Priority</div>
+                  <div className="w-[90px]">Priority</div>
                 </TableHead>
                 <TableHead className="px-2 text-black">
-                  <div className="w-[120px]">Status</div>
+                  <div className="w-[100px]">Status</div>
                 </TableHead>
                 <TableHead className="whitespace-nowrap px-2 text-black">
-                  <div className="w-[118px]">Date</div>
+                  <div className="w-[100px]">Date</div>
                 </TableHead>
-                <TableHead className="w-[88px] text-center text-black">
+                <TableHead className="w-[60px] text-center text-black">
                   Actions
                 </TableHead>
               </TableRow>
@@ -446,24 +446,24 @@ export function UserDashboardMySubmissionsView({
                     onClick={() => onViewFeedback(feedback)}
                   >
                     <TableCell className="text-xs" style={{ color: "#666666" }}>
-                      <div className="w-[180px] truncate">{feedback.id}</div>
+                      <div className="w-[120px] truncate">{feedback.id}</div>
                     </TableCell>
                     <TableCell
                       className="font-normal text-[#6b7280]"
                       title={feedback.subject}
                     >
-                      <div className="w-[420px] truncate">{feedback.subject}</div>
+                      <div className="w-[220px] truncate">{feedback.subject}</div>
                     </TableCell>
                     <TableCell
                       className="px-2"
                       title={feedback.category}
                     >
-                      <div className="w-[140px] max-w-[140px] truncate">
+                      <div className="w-[120px] max-w-[120px] truncate">
                         {feedback.category}
                       </div>
                     </TableCell>
                     <TableCell className="px-1.5">
-                      <div className="w-24">
+                      <div className="w-[90px]">
                         <Badge
                           className={getPriorityColor(feedback.priority)}
                           variant="outline"
@@ -473,7 +473,7 @@ export function UserDashboardMySubmissionsView({
                       </div>
                     </TableCell>
                     <TableCell className="px-2">
-                      <div className="w-28 truncate">
+                      <div className="w-[100px] truncate">
                         <span className="inline-flex items-center gap-2">
                         {(() => {
                           const StatusIcon = getStatusIcon(feedback.status);
@@ -498,11 +498,11 @@ export function UserDashboardMySubmissionsView({
                       className="whitespace-nowrap px-2"
                       style={{ color: "#666666" }}
                     >
-                      <div className="w-[118px] whitespace-nowrap">
+                      <div className="w-[100px] whitespace-nowrap">
                         {formatSubmittedAt(feedback.createdAt)}
                       </div>
                     </TableCell>
-                    <TableCell className="w-16 text-center">
+                    <TableCell className="w-[60px] text-center">
                       {feedback.status.toLowerCase() === "pending" ? (
                         <Button
                           type="button"
@@ -563,6 +563,21 @@ export function UserDashboardMySubmissionsView({
               onPageSizeChange(
                 value as typeof mySubmissionsPageSize,
               )
+            }
+            statusText={
+              <>
+                <span className="text-sm">
+                Viewing{" "}
+                <span className="font-normal">
+                  {paginatedFilteredFeedbacks.length}
+                </span>{" "}
+                out of{" "}
+                <span className="font-normal">
+                  {filteredFeedbacks.length}
+                </span>{" "}
+                submission{filteredFeedbacks.length !== 1 ? "s" : ""}
+                </span>
+              </>
             }
           />
         </div>

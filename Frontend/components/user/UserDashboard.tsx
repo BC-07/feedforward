@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   createFeedback,
   createFeedbackMessage,
@@ -96,6 +96,8 @@ import {
   USER_FEEDBACK_DRAFT_KEY,
   USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY,
   EMPTY_FORM,
+  SUBMISSION_FIELD_CLASS,
+  SUBMISSION_ACTION_BUTTON_HEIGHT_CLASS,
   type UserDashboardView,
   type CreateSubmissionStep,
   type HoverFilterKey,
@@ -119,6 +121,8 @@ import {
 
 export function UserDashboard({ view }: { view: UserDashboardView }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const draftKey = USER_FEEDBACK_DRAFT_KEY;
   const emptyForm = EMPTY_FORM;
   const submissionsScrollKey = USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY;
@@ -140,16 +144,66 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [createSubmissionTrackingId, setCreateSubmissionTrackingId] = useState<
     string | null
   >(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<string[]>([]);
-  const [filterCategory, setFilterCategory] = useState("all");
-  const [filterPriority, setFilterPriority] = useState<string[]>([]);
-  const [filterStatus, setFilterStatus] = useState<string[]>([]);
-  const [filterDate, setFilterDate] = useState("recent");
-  const [filterTracking, setFilterTracking] = useState("asc");
+  // Helper: read filters from URL, falling back to sessionStorage if URL has none
+  const getInitialFilters = () => {
+    const fromUrl = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : "",
+    );
+    const hasUrlFilters = fromUrl.toString().length > 0;
+    if (hasUrlFilters) return fromUrl;
+    try {
+      const saved = window.sessionStorage.getItem("mySubmissions_filters");
+      if (saved) return new URLSearchParams(saved);
+    } catch {}
+    return new URLSearchParams();
+  };
+  const [searchQuery, setSearchQuery] = useState(
+    () => getInitialFilters().get("q") ?? "",
+  );
+  const [filterType, setFilterType] = useState<string[]>(
+    () => getInitialFilters().getAll("ty"),
+  );
+  const [filterCategory, setFilterCategory] = useState(
+    () => getInitialFilters().get("cat") ?? "all",
+  );
+  const [filterPriority, setFilterPriority] = useState<string[]>(
+    () => getInitialFilters().getAll("pri"),
+  );
+  const [filterStatus, setFilterStatus] = useState<string[]>(
+    () => getInitialFilters().getAll("st"),
+  );
+  const [filterDate, setFilterDate] = useState(
+    () => getInitialFilters().get("dt") ?? "recent",
+  );
+  const [filterTracking, setFilterTracking] = useState(
+    () => getInitialFilters().get("tr") ?? "asc",
+  );
   const [mySubmissionsPage, setMySubmissionsPage] = useState(1);
-  const [mySubmissionsPageSize, setMySubmissionsPageSize] =
-    useState<(typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]>(10);
+  const [mySubmissionsPageSize, setMySubmissionsPageSizeRaw] = useState<
+    (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]
+  >(() => {
+    if (typeof window === "undefined") return 10;
+    try {
+      const stored = window.sessionStorage.getItem("mySubmissions_pageSize");
+      const parsed = Number(stored);
+      if (
+        stored !== null &&
+        (MY_SUBMISSIONS_PAGE_SIZE_OPTIONS as readonly number[]).includes(parsed)
+      ) {
+        return parsed as (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number];
+      }
+    } catch {}
+    return 10;
+  });
+  const setMySubmissionsPageSize = useCallback(
+    (size: (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]) => {
+      setMySubmissionsPageSizeRaw(size);
+      try {
+        window.sessionStorage.setItem("mySubmissions_pageSize", String(size));
+      } catch {}
+    },
+    [],
+  );
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
@@ -423,7 +477,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(submissionsScrollKey);
+    const stored = window.sessionStorage.getItem(submissionsScrollKey);
     if (stored) {
       const value = Number.parseInt(stored, 10);
       submissionsScrollTop.current = Number.isNaN(value) ? 0 : value;
@@ -433,7 +487,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
     if (selectedFeedback || trackingId) return;
-    const stored = window.localStorage.getItem(submissionsScrollKey);
+    const stored = window.sessionStorage.getItem(submissionsScrollKey);
     if (stored) {
       const value = Number.parseInt(stored, 10);
       submissionsScrollTop.current = Number.isNaN(value) ? 0 : value;
@@ -782,9 +836,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     return `${datePart} ${timePart}`;
   };
 
-  const submissionFieldClass =
-    "h-10 rounded-lg border-border/70 bg-background focus-visible:border-amber-400 focus-visible:ring-2 focus-visible:ring-amber-200/60";
-  const submissionActionButtonHeightClass = "h-9";
   const formatConfirmSubmittedOn = (value: string) => {
     const date = new Date(value);
     const datePart = date.toLocaleDateString("en-US", {
@@ -871,7 +922,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             >
               <SelectTrigger
                 id={`${idPrefix}-type`}
-                className={submissionFieldClass}
+                className={SUBMISSION_FIELD_CLASS}
               >
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
@@ -904,7 +955,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             >
               <SelectTrigger
                 id={`${idPrefix}-category`}
-                className={submissionFieldClass}
+                className={SUBMISSION_FIELD_CLASS}
               >
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
@@ -929,7 +980,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           <Input
             id={`${idPrefix}-subject`}
             placeholder="Brief summary of your feedback"
-            className={submissionFieldClass}
+            className={SUBMISSION_FIELD_CLASS}
             value={formData.subject}
             maxLength={FEEDBACK_SUBJECT_MAX_LENGTH}
             disabled={isSubmittingFeedback}
@@ -989,7 +1040,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
       <Button
         type="submit"
-        className={`${submissionActionButtonHeightClass} w-full rounded-lg bg-accent hover:bg-accent/90`}
+        className={`${SUBMISSION_ACTION_BUTTON_HEIGHT_CLASS} w-full rounded-lg bg-accent hover:bg-accent/90`}
         disabled={isSubmittingFeedback}
       >
         <Send className="mr-2 h-4 w-4" />
@@ -1173,6 +1224,37 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     setFilterPriority([]);
     setFilterStatus([]);
   }, []);
+
+  // Sync filter state → URL + sessionStorage so filters survive sidebar navigation
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    if (filterTracking !== "asc") params.set("tr", filterTracking);
+    if (filterDate !== "recent") params.set("dt", filterDate);
+    filterType.forEach((t) => params.append("ty", t));
+    if (filterCategory !== "all") params.set("cat", filterCategory);
+    filterPriority.forEach((p) => params.append("pri", p));
+    filterStatus.forEach((s) => params.append("st", s));
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    try {
+      if (qs) {
+        window.sessionStorage.setItem("mySubmissions_filters", qs);
+      } else {
+        window.sessionStorage.removeItem("mySubmissions_filters");
+      }
+    } catch {}
+  }, [
+    searchQuery,
+    filterTracking,
+    filterDate,
+    filterType,
+    filterCategory,
+    filterPriority,
+    filterStatus,
+    pathname,
+    router,
+  ]);
   const hoverFilterItems = useMemo(
     () =>
       [
@@ -1402,7 +1484,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                     </span>
                   </div>
-                  <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug text-[#b72860]">
+                  <p className="line-clamp-2 min-h-[3rem] break-words font-medium leading-snug text-[#b72860]">
                     {feedback.subject}
                   </p>
                   <p
@@ -1460,6 +1542,24 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         </div>
       </>
     );
+  };
+
+  const handleTrackSubmission = async (id: string) => {
+    setIsCreateSubmissionOpen(false);
+    setCreateSubmissionStep("form");
+    setCreateSubmissionStepDirection("forward");
+    setCreateSubmissionTrackingId(null);
+    const existingFeedback = feedbacks.find((fb) => fb.id === id);
+    if (existingFeedback) {
+      await handleViewFeedback(existingFeedback);
+      return;
+    }
+    try {
+      const latest = await getFeedback(id);
+      setSelectedFeedback(latest);
+    } catch {
+      toast.error("Unable to open submission details right now.");
+    }
   };
 
   const renderCreateSubmissionDialog = () => (
@@ -1558,24 +1658,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         >
           <div className="grid gap-6 sm:gap-8 items-stretch">
             {isSubmitView && (
-              <div
-                ref={leftColumnRef}
-                className="mx-auto w-full max-w-3xl flex flex-col gap-6"
-              >
-                {/* Submit Feedback */}
-                <div>
-                  <Card className="border shadow-sm">
-                    <CardHeader className="pb-4">
-                      <CardTitle>Feedback Form</CardTitle>
-                      <CardDescription className="text-black">
-                        Check anonymous if you want your name hidden from admin
-                        views.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>{renderSubmissionForm("submit")}</CardContent>
-                  </Card>
-                </div>
-              </div>
+              <UserDashboardSubmitView
+                leftColumnRef={leftColumnRef}
+                renderSubmissionForm={renderSubmissionForm}
+              />
             )}
 
             {(isMySubmissionsView || isHomeView) && (
@@ -1597,577 +1683,70 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   }
                 >
                   {isHomeView ? (
-                    <div className="flex flex-col bg-background">
-                      {renderCreateSubmissionDialog()}
-                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <Card className="border shadow-sm">
-                          <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-black">
-                              Total
-                            </p>
-                            <p className="mt-1 text-2xl font-normal text-black">
-                              {dashboardStats.total}
-                            </p>
-                          </CardContent>
-                        </Card>
-                        <Card className="border shadow-sm">
-                          <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-black">
-                              Pending
-                            </p>
-                            <p className="mt-1 text-2xl font-normal text-black">
-                              {dashboardStats.pending}
-                            </p>
-                          </CardContent>
-                        </Card>
-                        <Card className="border shadow-sm">
-                          <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-black">
-                              In Progress
-                            </p>
-                            <p className="mt-1 text-2xl font-normal text-black">
-                              {dashboardStats.inProgress}
-                            </p>
-                          </CardContent>
-                        </Card>
-                        <Card className="border shadow-sm">
-                          <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-black">
-                              Resolved
-                            </p>
-                            <p className="mt-1 text-2xl font-normal text-black">
-                              {dashboardStats.resolved}
-                            </p>
-                          </CardContent>
-                        </Card>
-                      </div>
-                      <div className="mt-4">
-                        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-                          <div className="min-w-0">
-                            <Tabs defaultValue="latest">
-                              <TabsList className="grid h-11 w-full grid-cols-3 gap-1 rounded-xl border border-border/60 bg-muted/50 p-1">
-                                <TabsTrigger
-                                  value="latest"
-                                  className="h-full rounded-lg border-0 text-xs font-normal text-black data-[state=active]:bg-white data-[state=active]:font-normal data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
-                                >
-                                  Latest
-                                </TabsTrigger>
-                                <TabsTrigger
-                                  value="attention"
-                                  className="h-full rounded-lg border-0 text-xs font-normal text-black data-[state=active]:bg-white data-[state=active]:font-normal data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
-                                >
-                                  Needs Attention
-                                </TabsTrigger>
-                                <TabsTrigger
-                                  value="updated"
-                                  className="h-full rounded-lg border-0 text-xs font-normal text-black data-[state=active]:bg-white data-[state=active]:font-normal data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
-                                >
-                                  Recently Updated
-                                </TabsTrigger>
-                              </TabsList>
-                              <TabsContent value="latest" className="mt-3">
-                                {renderHomeSubmissionGrid(
-                                  latestSubmissionCards,
-                                  "No submissions yet. Click New Submission to create your first one.",
-                                )}
-                              </TabsContent>
-                              <TabsContent value="attention" className="mt-3">
-                                {renderHomeSubmissionGrid(
-                                  needsAttentionCards,
-                                  "Nothing needs attention right now.",
-                                )}
-                              </TabsContent>
-                              <TabsContent value="updated" className="mt-3">
-                                {renderHomeSubmissionGrid(
-                                  recentlyUpdatedCards,
-                                  "No recent updates yet.",
-                                )}
-                              </TabsContent>
-                            </Tabs>
-                          </div>
-                          <Card
-                            className="h-full border border-border/80 bg-slate-50/45 shadow-sm flex flex-col overflow-hidden"
-                            style={{
-                              maxHeight: `${notificationPanelMaxHeight}px`,
-                            }}
-                          >
-                            <CardHeader className="pb-0 pt-4">
-                              <CardTitle className="text-base text-black">
-                                Notifications
-                              </CardTitle>
-                              <CardDescription className="text-black">
-                                Unresolved updates
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="-mt-4 flex-1 min-h-0 space-y-1.5 bg-slate-50/35 pt-0 pb-3 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                              {homeNotifications.length === 0 ? (
-                                <p className="text-sm text-black">
-                                  No unread updates.
-                                </p>
-                              ) : (
-                                homeNotifications.map((feedback) => (
-                                  <button
-                                    key={feedback.id}
-                                    type="button"
-                                    onClick={() => handleViewFeedback(feedback)}
-                                    className="w-full rounded-md border border-border/70 bg-white/80 p-2 text-left shadow-[0_0_0_1px_rgba(15,23,42,0.05)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-muted/30 hover:shadow-md"
-                                  >
-                                    <p className="line-clamp-1 text-sm font-semibold text-[#6b7280]">
-                                      {feedback.subject}
-                                    </p>
-                                    <p
-                                      className="text-xs"
-                                      style={{ color: "#666666" }}
-                                    >
-                                      {new Date(
-                                        feedback.updatedAt,
-                                      ).toLocaleDateString("en-US")}
-                                    </p>
-                                  </button>
-                                ))
-                              )}
-                            </CardContent>
-                          </Card>
-                        </div>
-                      </div>
-                    </div>
-                  ) : isMySubmissionsView && feedbacks.length > 0 ? (
-                    <div className="mx-auto flex h-full min-h-0 w-full flex-col gap-2 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="flex h-9 items-center gap-3">
-                          <div className="flex h-9 w-11 items-center justify-center rounded-2xl bg-muted/50 text-[#171717]">
-                            <BarChart3 className="h-5 w-5" />
-                          </div>
-                          <div className="flex h-9 items-center">
-                            <h2 className="text-[21px] font-semibold leading-none tracking-[-0.02em] text-[#171717]">
-                              Submission List
-                            </h2>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            setCreateSubmissionStep("form");
-                            setCreateSubmissionTrackingId(null);
-                            setIsAnonymous(false);
-                            setIsCreateSubmissionOpen(true);
-                          }}
-                          className="h-9 sm:w-auto bg-accent hover:bg-accent/90 transition-colors duration-150 hover:-translate-y-px"
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          New Submission
-                        </Button>
-                      </div>
-                      <div>
-                        <div className="mb-3">
-                          <div className="hidden gap-x-3 gap-y-2 md:grid xl:grid-cols-[minmax(0,1.9fr)_repeat(5,minmax(0,1fr))]">
-                            <div className="relative">
-                              <Search
-                                className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2"
-                                style={{ color: "#8f877d" }}
-                              />
-                              <Input
-                                placeholder="Search by ID, subject, or message."
-                                value={searchQuery}
-                                onChange={(event) =>
-                                  setSearchQuery(event.target.value)
-                                }
-                                className={`${SUBMISSION_FILTER_CONTROL_CLASS} ff-submission-search-input`}
-                                style={{
-                                  color: SUBMISSION_FILTER_TEXT_COLOR,
-                                  paddingLeft: "2.75rem",
-                                }}
-                              />
-                            </div>
-                            {desktopInlineFilterItems.map((filter) => (
-                              <Select
-                                key={filter.key}
-                                value={filter.key === "tracking" ? filterTracking : filterDate}
-                                onValueChange={filter.onSelect}
-                              >
-                                <SelectTrigger
-                                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`}
-                                  style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
-                                >
-                                  <SelectValue placeholder={filter.label} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {filter.options.map((option) => (
-                                    <SelectItem
-                                      key={`${filter.key}-${option.value}`}
-                                      value={option.value}
-                                    >
-                                      {option.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ))}
-
-                            {/* Multi-select Type */}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  type="button"
-                                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
-                                  style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
-                                >
-                                  <span className="truncate" style={{ color: filterType.length === 0 ? SUBMISSION_FILTER_TEXT_COLOR : SUBMISSION_FILTER_TEXT_COLOR }}>
-                                    {filterType.length === 0 ? "All Types" : formatFilterChipLabel(filterType[filterType.length - 1]!)}
-                                  </span>
-                                  <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="w-48 p-1">
-                                {[
-                                  { value: "suggestion", label: "Suggestion" },
-                                  { value: "complaint", label: "Complaint" },
-                                  { value: "inquiry", label: "Inquiry" },
-                                  { value: "request", label: "Request" },
-                                  { value: "compliment", label: "Compliment" },
-                                ].map((option) => {
-                                  const isSelected = filterType.includes(option.value);
-                                  return (
-                                    <DropdownMenuItem
-                                      key={option.value}
-                                      onSelect={() => setFilterType((prev) => isSelected ? prev.filter((t) => t !== option.value) : [...prev, option.value])}
-                                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
-                                    >
-                                      <span>{option.label}</span>
-                                      {isSelected && <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
-                                    </DropdownMenuItem>
-                                  );
-                                })}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-
-                            {/* Multi-select Priority */}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  type="button"
-                                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
-                                  style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
-                                >
-                                  <span className="truncate" style={{ color: filterPriority.length === 0 ? SUBMISSION_FILTER_TEXT_COLOR : SUBMISSION_FILTER_TEXT_COLOR }}>
-                                    {filterPriority.length === 0 ? "All Priorities" : formatFilterChipLabel(filterPriority[filterPriority.length - 1]!)}
-                                  </span>
-                                  <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="w-48 p-1">
-                                {[
-                                  { value: "low", label: "Low" },
-                                  { value: "medium", label: "Medium" },
-                                  { value: "high", label: "High" },
-                                ].map((option) => {
-                                  const isSelected = filterPriority.includes(option.value);
-                                  return (
-                                    <DropdownMenuItem
-                                      key={option.value}
-                                      onSelect={() => setFilterPriority((prev) => isSelected ? prev.filter((p) => p !== option.value) : [...prev, option.value])}
-                                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
-                                    >
-                                      <span>{option.label}</span>
-                                      {isSelected && <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
-                                    </DropdownMenuItem>
-                                  );
-                                })}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-
-                            {/* Multi-select Status */}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  type="button"
-                                  className={`${SUBMISSION_FILTER_CONTROL_CLASS} flex items-center justify-between gap-2`}
-                                  style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
-                                >
-                                  <span className="truncate" style={{ color: filterStatus.length === 0 ? SUBMISSION_FILTER_TEXT_COLOR : SUBMISSION_FILTER_TEXT_COLOR }}>
-                                    {filterStatus.length === 0
-                                      ? "All Status"
-                                      : filterStatus[filterStatus.length - 1] === "inprogress"
-                                        ? "In Progress"
-                                        : formatFilterChipLabel(filterStatus[filterStatus.length - 1]!)}
-                                  </span>
-                                  <svg className="h-4 w-4 shrink-0 text-[#6f6255]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="w-48 p-1">
-                                {[
-                                  { value: "pending", label: "Pending" },
-                                  { value: "inprogress", label: "In Progress" },
-                                  { value: "resolved", label: "Resolved" },
-                                ].map((option) => {
-                                  const isSelected = filterStatus.includes(option.value);
-                                  return (
-                                    <DropdownMenuItem
-                                      key={option.value}
-                                      onSelect={() => setFilterStatus((prev) => isSelected ? prev.filter((s) => s !== option.value) : [...prev, option.value])}
-                                      className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm cursor-pointer"
-                                    >
-                                      <span>{option.label}</span>
-                                      {isSelected && <svg className="h-4 w-4 text-accent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
-                                    </DropdownMenuItem>
-                                  );
-                                })}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                          <div className="flex w-full gap-2 md:hidden">
-                            <div className="relative flex-1">
-                              <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                              <Input
-                                placeholder="Search by ID, subject, message."
-                                value={searchQuery}
-                                onChange={(event) =>
-                                  setSearchQuery(event.target.value)
-                                }
-                                className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
-                              />
-                            </div>
-                            <HoverFilterPopover
-                              items={hoverFilterItems}
-                              activeCount={activeFilterCount}
-                              onReset={clearAllFilters}
-                            />
-                          </div>
-                          {activeFilterChips.length > 0 ? (
-                            <div className="mt-5 mb-3 flex flex-wrap items-center gap-2">
-                              {activeFilterChips.map((chip) => (
-                                <span
-                                  key={chip.key}
-                                  className="inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-normal leading-none text-black"
-                                  style={{ columnGap: "12px" }}
-                                >
-                                  <span>{chip.label}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => clearSingleFilter(chip.key)}
-                                    className="inline-flex items-center justify-center rounded-full p-0.5 text-[#6f6255] transition-colors hover:bg-[#efe5da] hover:text-[#4d463e]"
-                                    aria-label={`Remove ${chip.label} filter`}
-                                    title={`Remove ${chip.label} filter`}
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
-                                </span>
-                              ))}
-                              <button
-                                type="button"
-                                onClick={clearAllFilters}
-                                className="inline-flex min-h-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-normal leading-none transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
-                                style={{ color: "#171717" }}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                                Clear all
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                      {renderCreateSubmissionDialog()}
-                      <div
-                        ref={submissionsScrollRef}
-                        className="ff-hide-scrollbar flex-1 min-h-0 w-full max-w-full overflow-y-scroll overflow-x-hidden md:[scrollbar-gutter:stable] h-[calc(100vh-260px)]"
-                        onScroll={(event) => {
-                          const top = event.currentTarget.scrollTop;
-                          submissionsScrollTop.current = top;
-                          if (typeof window !== "undefined") {
-                            window.localStorage.setItem(
-                              submissionsScrollKey,
-                              top.toString(),
-                            );
-                          }
-                        }}
-                      >
-                        <div className="w-full overflow-x-auto">
-                          <Table className="w-full min-w-full md:min-w-[980px] md:table-fixed text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
-                            <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                              <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                <TableHead className="w-[150px] text-black">
-                                  Tracking ID
-                                </TableHead>
-                                <TableHead className="w-[300px] text-black">
-                                  Subject
-                                </TableHead>
-                                <TableHead className="w-[150px] text-black">
-                                  Category
-                                </TableHead>
-                                <TableHead className="w-[110px] text-black">
-                                  Priority
-                                </TableHead>
-                                <TableHead className="w-[150px] text-black">
-                                  Status
-                                </TableHead>
-                                <TableHead className="w-[130px] whitespace-nowrap text-black">
-                                  Date
-                                </TableHead>
-                                <TableHead className="w-[88px] text-center text-black">
-                                  Actions
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filteredFeedbacks.length === 0 ? (
-                                <TableRow>
-                                  <TableCell
-                                    colSpan={7}
-                                  className="py-8 text-center text-sm text-black"
-                                  >
-                                    No submissions match the current filters.
-                                  </TableCell>
-                                </TableRow>
-                              ) : (
-                                paginatedFilteredFeedbacks.map((feedback) => (
-                                  <TableRow
-                                    key={feedback.id}
-                                    className="h-14 cursor-pointer"
-                                    onClick={() => handleViewFeedback(feedback)}
-                                  >
-                                    <TableCell
-                                      className="text-xs truncate"
-                                      style={{ color: "#666666" }}
-                                    >
-                                      {feedback.id}
-                                    </TableCell>
-                                    <TableCell
-                                      className="font-normal truncate text-[#6b7280]"
-                                      title={feedback.subject}
-                                    >
-                                      {feedback.subject}
-                                    </TableCell>
-                                    <TableCell
-                                      className="truncate text-[#6b7280]"
-                                      title={feedback.category}
-                                    >
-                                      {feedback.category}
-                                    </TableCell>
-                                    <TableCell className="truncate">
-                                      <Badge
-                                        className={getPriorityColor(
-                                          feedback.priority,
-                                        )}
-                                        variant="outline"
-                                      >
-                                        {feedback.priority}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      <span className="inline-flex items-center gap-2">
-                                        {(() => {
-                                          const StatusIcon = getStatusIcon(
-                                            feedback.status,
-                                          );
-                                          return (
-                                            <Badge
-                                              variant="outline"
-                                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-normal ${getStatusBadgeClass(
-                                                feedback.status,
-                                              )}`}
-                                            >
-                                              <StatusIcon className="h-3.5 w-3.5" />
-                                              <span className="leading-none">
-                                                {feedback.status}
-                                              </span>
-                                            </Badge>
-                                          );
-                                        })()}
-                                      </span>
-                                    </TableCell>
-                                    <TableCell
-                                      className="whitespace-nowrap"
-                                      style={{ color: "#666666" }}
-                                    >
-                                      {formatSubmittedAt(feedback.createdAt)}
-                                    </TableCell>
-                                    <TableCell className="w-[88px] text-center">
-                                      {feedback.status.toLowerCase() ===
-                                      "pending" ? (
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-7 w-7 rounded-md text-rose-600 hover:bg-rose-600 hover:text-white"
-                                          aria-label="Delete submission"
-                                          title="Delete submission"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            setDeleteTarget(feedback);
-                                            setIsDeleteOpen(true);
-                                          }}
-                                        >
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </Button>
-                                      ) : (
-                                        <span className="inline-flex h-7 w-7 items-center justify-center text-xs text-muted-foreground">
-                                          -
-                                        </span>
-                                      )}
-                                    </TableCell>
-                                  </TableRow>
-                                ))
-                              )}
-                              {filteredFeedbacks.length > 0 &&
-                              mySubmissionsPlaceholderRowCount > 0
-                                ? Array.from({
-                                    length: mySubmissionsPlaceholderRowCount,
-                                  }).map((_, index) => (
-                                    <TableRow
-                                      key={`submission-placeholder-row-${index}`}
-                                      className="h-14"
-                                      aria-hidden="true"
-                                    >
-                                      <TableCell colSpan={7} />
-                                    </TableRow>
-                                  ))
-                                : null}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </div>
-                      {filteredFeedbacks.length > 0 ? (
-                        <div className="shrink-0 border-t border-border/60 bg-background pt-3">
-                          <TablePaginationFooter
-                            page={mySubmissionsPage}
-                            totalPages={mySubmissionsTotalPages}
-                            onPrevious={() =>
-                              setMySubmissionsPage((page) =>
-                                Math.max(1, page - 1),
-                              )
-                            }
-                            onNext={() =>
-                              setMySubmissionsPage((page) =>
-                                Math.min(mySubmissionsTotalPages, page + 1),
-                              )
-                            }
-                            pageSize={mySubmissionsPageSize}
-                            pageSizeOptions={MY_SUBMISSIONS_PAGE_SIZE_OPTIONS}
-                            onPageSizeChange={(value) =>
-                              setMySubmissionsPageSize(
-                                value as typeof mySubmissionsPageSize,
-                              )
-                            }
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <Card className="h-full border shadow-sm flex flex-col">
-                      <CardContent className="pt-6 flex-1 flex items-center">
-                        <div className="text-center py-8 w-full">
-                          <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                          <h3 className="mb-2 text-lg font-normal">
-                            No Submissions Yet
-                          </h3>
-                          <p className="text-black">
-                            No submissions yet. Use Submit Feedback to create
-                            your first one.
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                    <UserDashboardHomeView
+                      dashboardStats={dashboardStats}
+                      latestSubmissionCards={latestSubmissionCards}
+                      needsAttentionCards={needsAttentionCards}
+                      recentlyUpdatedCards={recentlyUpdatedCards}
+                      homeNotifications={homeNotifications}
+                      notificationPanelMaxHeight={notificationPanelMaxHeight}
+                      onViewFeedback={handleViewFeedback}
+                      onCreateSubmission={() => setIsCreateSubmissionOpen(true)}
+                      renderCreateSubmissionDialog={renderCreateSubmissionDialog}
+                      renderHomeSubmissionGrid={renderHomeSubmissionGrid}
+                      getStatusBadgeClass={getStatusBadgeClass}
+                      getStatusIcon={getStatusIcon}
+                    />
+                  ) : isMySubmissionsView ? (
+                    <UserDashboardMySubmissionsView
+                      feedbacks={feedbacks}
+                      filteredFeedbacks={filteredFeedbacks}
+                      paginatedFilteredFeedbacks={paginatedFilteredFeedbacks}
+                      searchQuery={searchQuery}
+                      filterType={filterType}
+                      filterPriority={filterPriority}
+                      filterStatus={filterStatus}
+                      filterTracking={filterTracking}
+                      filterDate={filterDate}
+                      mySubmissionsPage={mySubmissionsPage}
+                      mySubmissionsPageSize={mySubmissionsPageSize}
+                      mySubmissionsTotalPages={mySubmissionsTotalPages}
+                      submissionsScrollRef={submissionsScrollRef}
+                      submissionsScrollKey={submissionsScrollKey}
+                      submissionsScrollTop={submissionsScrollTop}
+                      mySubmissionsPlaceholderRowCount={mySubmissionsPlaceholderRowCount}
+                      activeFilterChips={activeFilterChips}
+                      activeFilterCount={activeFilterCount}
+                      hoverFilterItems={hoverFilterItems}
+                      desktopInlineFilterItems={desktopInlineFilterItems}
+                      onSearchChange={setSearchQuery}
+                      onFilterTypeChange={setFilterType}
+                      onFilterPriorityChange={setFilterPriority}
+                      onFilterStatusChange={setFilterStatus}
+                      onFilterTrackingChange={setFilterTracking}
+                      onFilterDateChange={setFilterDate}
+                      onViewFeedback={handleViewFeedback}
+                      onCreateSubmissionClick={() => {
+                        setCreateSubmissionStep("form");
+                        setCreateSubmissionTrackingId(null);
+                        setIsAnonymous(false);
+                        setIsCreateSubmissionOpen(true);
+                      }}
+                      onDeleteClick={(feedback) => {
+                        setDeleteTarget(feedback);
+                        setIsDeleteOpen(true);
+                      }}
+                      onClearSingleFilter={clearSingleFilter}
+                      onClearAllFilters={clearAllFilters}
+                      onPageChange={setMySubmissionsPage}
+                      onPageSizeChange={setMySubmissionsPageSize}
+                      renderCreateSubmissionDialog={renderCreateSubmissionDialog}
+                      getPriorityColor={getPriorityColor}
+                      getStatusBadgeClass={getStatusBadgeClass}
+                      getStatusIcon={getStatusIcon}
+                      formatSubmittedAt={formatSubmittedAt}
+                    />
+                  ) : null}
                 </div>
                 {selectedFeedback ? (
                   <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">

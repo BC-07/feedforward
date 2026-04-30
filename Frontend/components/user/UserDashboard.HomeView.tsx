@@ -172,7 +172,7 @@ export function UserDashboardHomeView({
                     onClick={() => onViewFeedback(feedback)}
                     className="w-full rounded-md border border-border/70 bg-white/80 p-2 text-left shadow-[0_0_0_1px_rgba(15,23,42,0.05)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-muted/30 hover:shadow-md"
                   >
-                    <p className="line-clamp-1 text-sm font-semibold text-[#708090]">
+                    <p className="line-clamp-1 text-sm font-medium text-[#708090]">
                       {feedback.subject}
                     </p>
                     <p

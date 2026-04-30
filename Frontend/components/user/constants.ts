@@ -28,6 +28,9 @@ export const USER_MESSAGE_BUBBLE_CLASS =
 export const SUBMISSION_FILTER_TEXT_COLOR = "#171717";
 export const SUBMISSION_FILTER_CONTROL_CLASS =
   "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
+export const SUBMISSION_FIELD_CLASS =
+  "h-10 rounded-lg border-border/70 bg-background focus-visible:border-amber-400 focus-visible:ring-2 focus-visible:ring-amber-200/60";
+export const SUBMISSION_ACTION_BUTTON_HEIGHT_CLASS = "h-9";
 
 // Pagination
 export const MY_SUBMISSIONS_PAGE_SIZE_OPTIONS = [10, 30, 50, 100] as const;

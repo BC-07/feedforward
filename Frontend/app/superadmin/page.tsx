@@ -1686,6 +1686,15 @@ export default function SuperAdminDashboard() {
                       onPageSizeChange={(value) =>
                         setAdminPageSize(value as typeof adminPageSize)
                       }
+                      statusText={
+                        <span className="text-sm">
+                          Viewing{" "}
+                          <span className="font-normal">{paginatedAdmins.length}</span>{" "}
+                          out of{" "}
+                          <span className="font-normal">{visibleAdmins.length}</span>{" "}
+                          admin{visibleAdmins.length !== 1 ? "s" : ""}
+                        </span>
+                      }
                     />
                   </div>
                 )}
@@ -1949,6 +1958,15 @@ export default function SuperAdminDashboard() {
                       setCategoryControlPageSize(
                         value as typeof categoryControlPageSize,
                       )
+                    }
+                    statusText={
+                      <span className="text-sm">
+                        Viewing{" "}
+                        <span className="font-normal">{paginatedCategoryControlRows.length}</span>{" "}
+                        out of{" "}
+                        <span className="font-normal">{filteredCategoryControlRows.length}</span>{" "}
+                        categor{filteredCategoryControlRows.length !== 1 ? "ies" : "y"}
+                      </span>
                     }
                   />
                 </div>
