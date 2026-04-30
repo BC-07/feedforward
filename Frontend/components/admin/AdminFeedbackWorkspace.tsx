@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   memo,
   startTransition,
@@ -230,6 +230,7 @@ export function AdminFeedbackWorkspace({
 }: AdminFeedbackWorkspaceProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [isFeedbacksLoading, setIsFeedbacksLoading] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
@@ -243,12 +244,39 @@ export function AdminFeedbackWorkspace({
     useState(false);
   const [newStatus, setNewStatus] = useState("");
   const [newPriority, setNewPriority] = useState("");
+  // Always start with defaults so server and client render identically (no hydration mismatch).
+  // After mount, apply saved filters from URL or sessionStorage.
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<string[]>([]);
   const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const [filterPriority, setFilterPriority] = useState<string[]>([]);
   const [filterName, setFilterName] = useState("asc");
   const [filterDate, setFilterDate] = useState("recent");
+  // Tracks how many times the sync effect has run since mount.
+  // Render 0 (defaults) and render 1 (setState from restore, but state values
+  // haven't propagated yet) must both be skipped to avoid wiping sessionStorage
+  // before the restored filter values are actually in React state.
+  // Only from render 2 onward are the restored values safe to sync.
+  const filterSyncRenderRef = useRef(0);
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search);
+    const filterKeys = ["q", "tr", "dt", "ty", "pri", "st"];
+    const hasUrlFilters = filterKeys.some((k) => fromUrl.has(k));
+    let params = fromUrl;
+    if (!hasUrlFilters) {
+      try {
+        const saved = window.sessionStorage.getItem("adminFeedback_filters");
+        if (saved) params = new URLSearchParams(saved);
+      } catch {}
+    }
+    setSearchQuery(params.get("q") ?? "");
+    setFilterType(params.getAll("ty"));
+    setFilterStatus(params.getAll("st"));
+    setFilterPriority(params.getAll("pri"));
+    setFilterName(params.get("tr") ?? "asc");
+    setFilterDate(params.get("dt") ?? "recent");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // runs once on mount only
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [activeEditTab, setActiveEditTab] = useState<"details" | "manage" | "messages">(
     "details",
@@ -268,8 +296,22 @@ export function AdminFeedbackWorkspace({
     number | null
   >(null);
   const PAGE_SIZE_OPTIONS = [10, 30, 50, 100] as const;
-  const [feedbacksPageSize, setFeedbacksPageSize] =
-    useState<number>(10);
+  const [feedbacksPageSize, setFeedbacksPageSizeRaw] = useState<number>(10);
+  const setFeedbacksPageSize = useCallback((size: number) => {
+    setFeedbacksPageSizeRaw(size);
+    try {
+      window.sessionStorage.setItem("adminFeedback_pageSize", String(size));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      const stored = window.sessionStorage.getItem("adminFeedback_pageSize");
+      const parsed = Number(stored);
+      if (stored !== null && [10, 30, 50, 100].includes(parsed)) {
+        setFeedbacksPageSizeRaw(parsed);
+      }
+    } catch {}
+  }, []); // runs once on mount only
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const trimmedSearchQuery = searchQuery.trim();
   const isSplitPaneLayout = false;
@@ -622,6 +664,64 @@ export function AdminFeedbackWorkspace({
     setFilterPriority([]);
     setFilterStatus([]);
   }, []);
+
+  // Keep refs of searchParams and pathname so the sync effect can read them
+  // without adding them to its dependency array — which would cause an infinite
+  // loop (replace → params change → replace…) or spuriously re-run the sync on
+  // sidebar navigation (pathname change), wiping sessionStorage with stale defaults.
+  const searchParamsRef = useRef(searchParams);
+  useEffect(() => {
+    searchParamsRef.current = searchParams;
+  }, [searchParams]);
+
+  const pathnameRef = useRef(pathname);
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+
+  // Sync filter state → URL + sessionStorage so filters survive sidebar navigation.
+  // Skip the first two executions after mount:
+  //   run 1 — fires with blank defaults before the restore effect has run
+  //   run 2 — restore effect's setState calls have been queued but the new values
+  //            aren't in state yet for this render; syncing now would wipe
+  //            sessionStorage before the restored filters are actually visible
+  // From run 3 onward the restored values are safely settled in React state.
+  useEffect(() => {
+    const runIndex = filterSyncRenderRef.current;
+    filterSyncRenderRef.current = runIndex + 1;
+    if (runIndex < 2) return;
+
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    if (filterName !== "asc") params.set("tr", filterName);
+    if (filterDate !== "recent") params.set("dt", filterDate);
+    filterType.forEach((t) => params.append("ty", t));
+    filterPriority.forEach((p) => params.append("pri", p));
+    filterStatus.forEach((s) => params.append("st", s));
+    const qs = params.toString();
+    // Preserve non-filter params (feedbackId, open) via refs — not deps
+    const next = new URLSearchParams(searchParamsRef.current.toString());
+    ["q", "tr", "dt", "ty", "pri", "st"].forEach((k) => next.delete(k));
+    params.forEach((v, k) => next.append(k, v));
+    const nextQs = next.toString();
+    const currentPathname = pathnameRef.current;
+    router.replace(nextQs ? `${currentPathname}?${nextQs}` : currentPathname, { scroll: false });
+    try {
+      if (qs) {
+        window.sessionStorage.setItem("adminFeedback_filters", qs);
+      } else {
+        window.sessionStorage.removeItem("adminFeedback_filters");
+      }
+    } catch {}
+  }, [
+    searchQuery,
+    filterName,
+    filterDate,
+    filterType,
+    filterPriority,
+    filterStatus,
+    router,
+  ]);
 
   const hasActiveFilters =
     trimmedSearchQuery.length > 0 ||

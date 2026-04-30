@@ -397,7 +397,7 @@ export function UserDashboardMySubmissionsView({
           const top = event.currentTarget.scrollTop;
           submissionsScrollTop.current = top;
           if (typeof window !== "undefined") {
-            window.localStorage.setItem(submissionsScrollKey, top.toString());
+            window.sessionStorage.setItem(submissionsScrollKey, top.toString());
           }
         }}
       >

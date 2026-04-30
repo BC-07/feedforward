@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   createFeedback,
   createFeedbackMessage,
@@ -96,6 +96,8 @@ import type { HoverFilterItem } from "@/components/filters/HoverFilterPopover";
 
 export function UserDashboard({ view }: { view: UserDashboardView }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const draftKey = USER_FEEDBACK_DRAFT_KEY;
   const emptyForm = EMPTY_FORM;
   const submissionsScrollKey = USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY;
@@ -117,16 +119,66 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [createSubmissionTrackingId, setCreateSubmissionTrackingId] = useState<
     string | null
   >(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<string[]>([]);
-  const [filterCategory, setFilterCategory] = useState("all");
-  const [filterPriority, setFilterPriority] = useState<string[]>([]);
-  const [filterStatus, setFilterStatus] = useState<string[]>([]);
-  const [filterDate, setFilterDate] = useState("recent");
-  const [filterTracking, setFilterTracking] = useState("asc");
+  // Helper: read filters from URL, falling back to sessionStorage if URL has none
+  const getInitialFilters = () => {
+    const fromUrl = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : "",
+    );
+    const hasUrlFilters = fromUrl.toString().length > 0;
+    if (hasUrlFilters) return fromUrl;
+    try {
+      const saved = window.sessionStorage.getItem("mySubmissions_filters");
+      if (saved) return new URLSearchParams(saved);
+    } catch {}
+    return new URLSearchParams();
+  };
+  const [searchQuery, setSearchQuery] = useState(
+    () => getInitialFilters().get("q") ?? "",
+  );
+  const [filterType, setFilterType] = useState<string[]>(
+    () => getInitialFilters().getAll("ty"),
+  );
+  const [filterCategory, setFilterCategory] = useState(
+    () => getInitialFilters().get("cat") ?? "all",
+  );
+  const [filterPriority, setFilterPriority] = useState<string[]>(
+    () => getInitialFilters().getAll("pri"),
+  );
+  const [filterStatus, setFilterStatus] = useState<string[]>(
+    () => getInitialFilters().getAll("st"),
+  );
+  const [filterDate, setFilterDate] = useState(
+    () => getInitialFilters().get("dt") ?? "recent",
+  );
+  const [filterTracking, setFilterTracking] = useState(
+    () => getInitialFilters().get("tr") ?? "asc",
+  );
   const [mySubmissionsPage, setMySubmissionsPage] = useState(1);
-  const [mySubmissionsPageSize, setMySubmissionsPageSize] =
-    useState<(typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]>(10);
+  const [mySubmissionsPageSize, setMySubmissionsPageSizeRaw] = useState<
+    (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]
+  >(() => {
+    if (typeof window === "undefined") return 10;
+    try {
+      const stored = window.sessionStorage.getItem("mySubmissions_pageSize");
+      const parsed = Number(stored);
+      if (
+        stored !== null &&
+        (MY_SUBMISSIONS_PAGE_SIZE_OPTIONS as readonly number[]).includes(parsed)
+      ) {
+        return parsed as (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number];
+      }
+    } catch {}
+    return 10;
+  });
+  const setMySubmissionsPageSize = useCallback(
+    (size: (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]) => {
+      setMySubmissionsPageSizeRaw(size);
+      try {
+        window.sessionStorage.setItem("mySubmissions_pageSize", String(size));
+      } catch {}
+    },
+    [],
+  );
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
@@ -400,7 +452,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(submissionsScrollKey);
+    const stored = window.sessionStorage.getItem(submissionsScrollKey);
     if (stored) {
       const value = Number.parseInt(stored, 10);
       submissionsScrollTop.current = Number.isNaN(value) ? 0 : value;
@@ -410,7 +462,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
     if (selectedFeedback || trackingId) return;
-    const stored = window.localStorage.getItem(submissionsScrollKey);
+    const stored = window.sessionStorage.getItem(submissionsScrollKey);
     if (stored) {
       const value = Number.parseInt(stored, 10);
       submissionsScrollTop.current = Number.isNaN(value) ? 0 : value;
@@ -1147,6 +1199,37 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     setFilterPriority([]);
     setFilterStatus([]);
   }, []);
+
+  // Sync filter state → URL + sessionStorage so filters survive sidebar navigation
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    if (filterTracking !== "asc") params.set("tr", filterTracking);
+    if (filterDate !== "recent") params.set("dt", filterDate);
+    filterType.forEach((t) => params.append("ty", t));
+    if (filterCategory !== "all") params.set("cat", filterCategory);
+    filterPriority.forEach((p) => params.append("pri", p));
+    filterStatus.forEach((s) => params.append("st", s));
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    try {
+      if (qs) {
+        window.sessionStorage.setItem("mySubmissions_filters", qs);
+      } else {
+        window.sessionStorage.removeItem("mySubmissions_filters");
+      }
+    } catch {}
+  }, [
+    searchQuery,
+    filterTracking,
+    filterDate,
+    filterType,
+    filterCategory,
+    filterPriority,
+    filterStatus,
+    pathname,
+    router,
+  ]);
   const hoverFilterItems = useMemo(
     () =>
       [
@@ -1376,7 +1459,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                     </span>
                   </div>
-                  <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug text-[#b72860]">
+                  <p className="line-clamp-2 min-h-[3rem] break-words font-medium leading-snug text-[#b72860]">
                     {feedback.subject}
                   </p>
                   <p
