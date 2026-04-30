@@ -165,7 +165,7 @@ export function UserDashboardMySubmissionsView({
             <BarChart3 className="h-5 w-5" />
           </div>
           <div className="flex h-9 items-center">
-            <h2 className="text-[21px] font-normal leading-none tracking-[-0.02em] text-[#171717]">
+            <h2 className="text-[21px] font-semibold leading-none tracking-[-0.02em] text-[#171717]">
               Submission List  
             </h2>
           </div>
