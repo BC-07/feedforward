@@ -114,7 +114,7 @@ const ADMIN_FILTER_MUTED_COLOR = "#171717";
 const ADMIN_FILTER_CONTROL_CLASS =
   "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
 const ADMIN_FILTER_CHIP_CLASS =
-  "inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-medium leading-none text-[#6f6255]";
+  "inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-normal leading-none text-black";
 
 function markAdminNotificationAsRead(
   adminId: string,
@@ -1504,7 +1504,7 @@ export function AdminFeedbackWorkspace({
               <div key={filter.key} className="space-y-1.5">
                 <Select value={filter.value} onValueChange={filter.onChange}>
                   <SelectTrigger
-                    className={`${ADMIN_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255] font-medium`}
+                    className={`${ADMIN_FILTER_CONTROL_CLASS} [&_svg]:text-[#9ca3af] font-medium`}
                     style={{ color: ADMIN_FILTER_TEXT_COLOR }}
                   >
                     <SelectValue placeholder={filter.chipLabel} />
@@ -1687,13 +1687,14 @@ export function AdminFeedbackWorkspace({
               {activeFilterPills.map((pill) => (
                 <span
                   key={pill.key}
-                  className={`${ADMIN_FILTER_CHIP_CLASS} gap-1.5`}
+                  className={ADMIN_FILTER_CHIP_CLASS}
+                  style={{ columnGap: "12px" }}
                 >
-                  {pill.label}
+                  <span>{pill.label}</span>
                   <button
                     type="button"
                     onClick={() => clearSingleFilter(pill.key)}
-                    className="inline-flex items-center justify-center rounded-full p-0.5 text-[#6f6255] transition-colors hover:bg-[#efe5da] hover:text-[#4d463e]"
+                    className="inline-flex items-center justify-center rounded-full p-0.5 text-black transition-colors hover:bg-[#efe5da] hover:text-black"
                     aria-label={`Remove ${pill.label} filter`}
                     title={`Remove ${pill.label} filter`}
                   >
@@ -1705,10 +1706,10 @@ export function AdminFeedbackWorkspace({
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
-                  style={{ color: ADMIN_FILTER_TEXT_COLOR }}
+                  className="inline-flex min-h-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-normal leading-none transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
+                  style={{ color: "#171717" }}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3.5 w-3.5 text-black" />
                   Clear all
                 </button>
               ) : null}
