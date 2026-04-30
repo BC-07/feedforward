@@ -34,6 +34,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
@@ -50,6 +51,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TablePaginationFooter } from "@/components/ui/table-pagination-footer";
 
 import {
   Send,
@@ -58,6 +74,10 @@ import {
   Circle,
   Wrench,
   MessageCircle,
+  BarChart3,
+  Plus,
+  Search,
+  Trash2,
   ChevronUp,
   ChevronDown,
   X,
@@ -71,6 +91,8 @@ import {
   CONVERSATION_MESSAGE_MAX_LENGTH,
   USER_MESSAGE_BUBBLE_CLASS,
   MY_SUBMISSIONS_PAGE_SIZE_OPTIONS,
+  SUBMISSION_FILTER_CONTROL_CLASS,
+  SUBMISSION_FILTER_TEXT_COLOR,
   USER_FEEDBACK_DRAFT_KEY,
   USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY,
   EMPTY_FORM,
@@ -90,7 +112,10 @@ import {
 import { UserDashboardSubmitView } from "./UserDashboard.SubmitView";
 import { UserDashboardMySubmissionsView } from "./UserDashboard.MySubmissionsView";
 import { UserDashboardHomeView } from "./UserDashboard.HomeView";
-import type { HoverFilterItem } from "@/components/filters/HoverFilterPopover";
+import {
+  HoverFilterPopover,
+  type HoverFilterItem,
+} from "@/components/filters/HoverFilterPopover";
 
 export function UserDashboard({ view }: { view: UserDashboardView }) {
   const router = useRouter();
@@ -1456,81 +1481,16 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           setCreateSubmissionFormModalHeight(null);
         }
       }}
-    >
-      <DialogContent
-        ref={createSubmissionDialogContentRef}
-        className="ff-user-dashboard-theme ff-hide-scrollbar max-h-[93vh] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl transition-[height] duration-200 sm:w-full sm:p-6"
-        style={
-          createSubmissionStep === "confirm" && createSubmissionFormModalHeight
-            ? { height: `${createSubmissionFormModalHeight}px` }
-            : undefined
-        }
-      >
-        {createSubmissionStep === "form" ? (
-          <div
-            key={`create-step-form-${createSubmissionStepDirection}`}
-            className={createSubmissionStepAnimationClass}
-          >
-            <DialogHeader>
-              <DialogTitle>Feedback Form</DialogTitle>
-              <DialogDescription className="text-black">
-                Fill out the details below to create a new submission.
-              </DialogDescription>
-            </DialogHeader>
-            {renderSubmissionForm("modal", handleCreateSubmissionFormSubmit)}
-          </div>
-        ) : null}
-        {createSubmissionStep === "confirm" ? (
-          <div
-            key={`create-step-confirm-${createSubmissionStepDirection}`}
-            className={`${createSubmissionStepAnimationClass} flex h-full min-h-0 flex-col`}
-          >
-            <DialogHeader>
-              <DialogTitle>Confirm Your Feedback</DialogTitle>
-              <DialogDescription className="text-black">
-                Review your details before we send this feedback.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {renderConfirmSummary()}
-            </div>
-            <div className="mx-auto mt-5 h-px w-[92%] bg-border/70" />
-            <div className="mt-[10px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                variant="outline"
-                className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 sm:min-w-[160px]`}
-                onClick={() => goToCreateSubmissionStep("form")}
-              >
-                Back
-              </Button>
-              <Button
-                className={`${submissionActionButtonHeightClass} rounded-lg bg-accent text-white hover:bg-accent/90 sm:min-w-[190px]`}
-                onClick={handleCreateSubmissionConfirmSubmit}
-                disabled={isSubmittingFeedback}
-              >
-                {isSubmittingFeedback
-                  ? "Submitting feedback..."
-                  : "Confirm & Submit"}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-        {createSubmissionStep === "success" ? (
-          createSubmissionTrackingId ? (
-            <div
-              key={`create-step-success-${createSubmissionStepDirection}`}
-              className={createSubmissionStepAnimationClass}
-            >
-              <FeedbackSuccessCard
-                trackingId={createSubmissionTrackingId}
-                email={currentUser?.email}
-                className="w-full max-w-none gap-4 border-0 bg-transparent shadow-none"
-                onCopyTrackingId={copyToClipboard}
-                onTrackSubmission={async (id) => {
-                  setIsCreateSubmissionOpen(false);
-                  setCreateSubmissionStep("form");
-                  setCreateSubmissionStepDirection("forward");
-                  setCreateSubmissionTrackingId(null);
+      onStepChange={goToCreateSubmissionStep}
+      renderSubmissionForm={renderSubmissionForm}
+      renderConfirmSummary={renderConfirmSummary}
+      onConfirmSubmit={handleCreateSubmissionConfirmSubmit}
+      onCopyTrackingId={copyToClipboard}
+      onTrackSubmission={async (id) => {
+        setIsCreateSubmissionOpen(false);
+        setCreateSubmissionStep("form");
+        setCreateSubmissionStepDirection("forward");
+        setCreateSubmissionTrackingId(null);
 
         const existingFeedback = feedbacks.find((fb) => fb.id === id);
         if (existingFeedback) {
