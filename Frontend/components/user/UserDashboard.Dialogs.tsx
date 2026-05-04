@@ -149,6 +149,8 @@ export function CreateSubmissionDialog({
       <DialogContent
         ref={contentRef}
         className="ff-user-dashboard-theme ff-hide-scrollbar max-h-[93vh] w-[calc(100%-1rem)] max-w-2xl overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl transition-[height] duration-200 sm:w-full sm:p-6"
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
         style={
           currentStep === "confirm" && modalHeight
             ? { height: `${modalHeight}px` }

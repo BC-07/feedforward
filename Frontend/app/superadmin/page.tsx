@@ -269,6 +269,7 @@ export default function SuperAdminDashboard() {
     useState<(typeof CATEGORY_CONTROL_PAGE_SIZE_OPTIONS)[number]>(10);
   const [statsRange, setStatsRange] = useState<StatsRange>("7d");
   const [adminSearch, setAdminSearch] = useState("");
+  const [adminSortBy, setAdminSortBy] = useState<"name" | "created">("created");
   const [adminNameSort, setAdminNameSort] = useState<"az" | "za">("az");
   const [adminUnitFilter, setAdminUnitFilter] = useState("all");
   const [adminCreatedFilter, setAdminCreatedFilter] = useState<"latest" | "oldest">("latest");
@@ -319,14 +320,20 @@ export default function SuperAdminDashboard() {
         const aInactive = a.unit.trim().toLowerCase() === "inactive";
         const bInactive = b.unit.trim().toLowerCase() === "inactive";
         if (aInactive !== bInactive) return aInactive ? 1 : -1;
+        const nameDiff = a.name.localeCompare(b.name);
         const createdDiff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (adminSortBy === "name") {
+          if (nameDiff !== 0) {
+            return adminNameSort === "az" ? nameDiff : -nameDiff;
+          }
+          return adminCreatedFilter === "latest" ? -createdDiff : createdDiff;
+        }
         if (createdDiff !== 0) {
           return adminCreatedFilter === "latest" ? -createdDiff : createdDiff;
         }
-        const nameDiff = a.name.localeCompare(b.name);
         return adminNameSort === "az" ? nameDiff : -nameDiff;
       });
-  }, [admins, adminFilter, adminSearch, adminUnitFilter, adminNameSort, adminCreatedFilter]);
+  }, [admins, adminFilter, adminSearch, adminUnitFilter, adminSortBy, adminNameSort, adminCreatedFilter]);
 
   const availableCategories = categories.filter((category) => {
     const name = category.name.trim().toLowerCase();
@@ -1531,7 +1538,13 @@ export default function SuperAdminDashboard() {
                       className="h-8.5 border-border/60 bg-background pl-9 text-sm transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
                     />
                   </div>
-                  <Select value={adminNameSort} onValueChange={(v) => setAdminNameSort(v as "az" | "za")}>
+                  <Select
+                    value={adminNameSort}
+                    onValueChange={(value) => {
+                      setAdminNameSort(value as "az" | "za");
+                      setAdminSortBy("name");
+                    }}
+                  >
                     <SelectTrigger className="h-8.5 border-border/60 bg-background text-sm [&_svg]:text-[#6f6255]">
                       <SelectValue placeholder="A - Z" />
                     </SelectTrigger>
@@ -1540,7 +1553,13 @@ export default function SuperAdminDashboard() {
                       <SelectItem value="za">Z - A</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={adminCreatedFilter} onValueChange={(v) => setAdminCreatedFilter(v as "latest" | "oldest")}>
+                  <Select
+                    value={adminCreatedFilter}
+                    onValueChange={(value) => {
+                      setAdminCreatedFilter(value as "latest" | "oldest");
+                      setAdminSortBy("created");
+                    }}
+                  >
                     <SelectTrigger className="h-8.5 border-border/60 bg-background text-sm [&_svg]:text-[#6f6255]">
                       <SelectValue placeholder="Latest" />
                     </SelectTrigger>
@@ -1610,6 +1629,11 @@ export default function SuperAdminDashboard() {
                             <TableCell>
                               {new Date(admin.createdAt).toLocaleDateString(
                                 "en-US",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                },
                               )}
                             </TableCell>
                             <TableCell className="text-right w-[120px]">
@@ -2010,7 +2034,11 @@ export default function SuperAdminDashboard() {
       </AlertDialog>
 
       <Dialog open={isCreateAdminOpen} onOpenChange={setIsCreateAdminOpen}>
-        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto border-border/70 bg-card p-0 shadow-2xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:max-w-xl data-[state=open]:duration-200 data-[state=closed]:duration-150">
+        <DialogContent
+          className="max-h-[calc(100vh-2rem)] overflow-y-auto border-border/70 bg-card p-0 shadow-2xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:max-w-xl data-[state=open]:duration-200 data-[state=closed]:duration-150"
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
+        >
           <DialogHeader className="border-b border-border/60 px-6 py-6 pr-14">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/12 text-primary">
@@ -2299,7 +2327,11 @@ export default function SuperAdminDashboard() {
         open={isCreateCategoryOpen}
         onOpenChange={setIsCreateCategoryOpen}
       >
-        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[22px] border-border/70 bg-card p-0 shadow-2xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:max-w-md data-[state=open]:duration-200 data-[state=closed]:duration-150">
+        <DialogContent
+          className="max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[22px] border-border/70 bg-card p-0 shadow-2xl [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden sm:max-w-md data-[state=open]:duration-200 data-[state=closed]:duration-150"
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
+        >
           <DialogHeader className="border-b border-border/60 bg-muted/40 px-6 py-6 pr-14">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-background text-foreground">
