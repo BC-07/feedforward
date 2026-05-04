@@ -104,6 +104,7 @@ interface CreateSubmissionDialogProps {
   onOpenChange: (open: boolean) => void;
   onStepChange: (step: "form" | "confirm" | "success") => void;
   renderSubmissionForm: (idPrefix: string, onSubmit?: (e: React.FormEvent) => void) => React.ReactNode;
+  onFormSubmit: (e: React.FormEvent) => void;
   renderConfirmSummary: () => React.ReactNode;
   onConfirmSubmit: () => Promise<void>;
   onCopyTrackingId: (text: string) => void;
@@ -123,6 +124,7 @@ export function CreateSubmissionDialog({
   onOpenChange,
   onStepChange,
   renderSubmissionForm,
+  onFormSubmit,
   renderConfirmSummary,
   onConfirmSubmit,
   onCopyTrackingId,
@@ -168,10 +170,7 @@ export function CreateSubmissionDialog({
                 Fill out the details below to create a new submission.
               </DialogDescription>
             </DialogHeader>
-            {renderSubmissionForm("modal", (e: React.FormEvent) => {
-              e.preventDefault();
-              onStepChange("confirm");
-            })}
+            {renderSubmissionForm("modal", onFormSubmit)}
           </div>
         ) : null}
 
@@ -193,7 +192,7 @@ export function CreateSubmissionDialog({
             <div className="mt-[10px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 variant="outline"
-                className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 sm:min-w-[160px]`}
+                className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 hover:bg-black hover:text-white sm:min-w-[160px]`}
                 onClick={() => onStepChange("form")}
               >
                 Back
@@ -260,7 +259,7 @@ export function ConfirmationDialog({
         <div className="mt-[10px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button
             variant="outline"
-            className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 sm:min-w-[160px]`}
+            className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 hover:bg-black hover:text-white sm:min-w-[160px]`}
             onClick={() => onOpenChange(false)}
           >
             Back

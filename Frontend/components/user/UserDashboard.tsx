@@ -1583,6 +1583,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       }}
       onStepChange={goToCreateSubmissionStep}
       renderSubmissionForm={renderSubmissionForm}
+      onFormSubmit={handleCreateSubmissionFormSubmit}
       renderConfirmSummary={renderConfirmSummary}
       onConfirmSubmit={handleCreateSubmissionConfirmSubmit}
       onCopyTrackingId={copyToClipboard}
