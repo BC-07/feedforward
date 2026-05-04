@@ -144,40 +144,13 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [createSubmissionTrackingId, setCreateSubmissionTrackingId] = useState<
     string | null
   >(null);
-  // Helper: read filters from URL, falling back to sessionStorage if URL has none
-  const getInitialFilters = () => {
-    const fromUrl = new URLSearchParams(
-      typeof window !== "undefined" ? window.location.search : "",
-    );
-    const hasUrlFilters = fromUrl.toString().length > 0;
-    if (hasUrlFilters) return fromUrl;
-    try {
-      const saved = window.sessionStorage.getItem("mySubmissions_filters");
-      if (saved) return new URLSearchParams(saved);
-    } catch {}
-    return new URLSearchParams();
-  };
-  const [searchQuery, setSearchQuery] = useState(
-    () => getInitialFilters().get("q") ?? "",
-  );
-  const [filterType, setFilterType] = useState<string[]>(
-    () => getInitialFilters().getAll("ty"),
-  );
-  const [filterCategory, setFilterCategory] = useState(
-    () => getInitialFilters().get("cat") ?? "all",
-  );
-  const [filterPriority, setFilterPriority] = useState<string[]>(
-    () => getInitialFilters().getAll("pri"),
-  );
-  const [filterStatus, setFilterStatus] = useState<string[]>(
-    () => getInitialFilters().getAll("st"),
-  );
-  const [filterDate, setFilterDate] = useState(
-    () => getInitialFilters().get("dt") ?? "recent",
-  );
-  const [filterTracking, setFilterTracking] = useState(
-    () => getInitialFilters().get("tr") ?? "asc",
-  );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState<string[]>([]);
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterPriority, setFilterPriority] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string[]>([]);
+  const [filterDate, setFilterDate] = useState("recent");
+  const [filterTracking, setFilterTracking] = useState("asc");
   const [mySubmissionsPage, setMySubmissionsPage] = useState(1);
   const [mySubmissionsPageSize, setMySubmissionsPageSizeRaw] = useState<
     (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]
@@ -1225,36 +1198,34 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     setFilterStatus([]);
   }, []);
 
-  // Sync filter state → URL + sessionStorage so filters survive sidebar navigation
   useEffect(() => {
-    const params = new URLSearchParams();
-    if (searchQuery.trim()) params.set("q", searchQuery.trim());
-    if (filterTracking !== "asc") params.set("tr", filterTracking);
-    if (filterDate !== "recent") params.set("dt", filterDate);
-    filterType.forEach((t) => params.append("ty", t));
-    if (filterCategory !== "all") params.set("cat", filterCategory);
-    filterPriority.forEach((p) => params.append("pri", p));
-    filterStatus.forEach((s) => params.append("st", s));
-    const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    if (isMySubmissionsView) return;
+    clearAllFilters();
+    setMySubmissionsPage(1);
+  }, [clearAllFilters, isMySubmissionsView]);
+
+  useEffect(() => {
     try {
-      if (qs) {
-        window.sessionStorage.setItem("mySubmissions_filters", qs);
-      } else {
-        window.sessionStorage.removeItem("mySubmissions_filters");
-      }
+      window.sessionStorage.removeItem("mySubmissions_filters");
     } catch {}
-  }, [
-    searchQuery,
-    filterTracking,
-    filterDate,
-    filterType,
-    filterCategory,
-    filterPriority,
-    filterStatus,
-    pathname,
-    router,
-  ]);
+
+    const filterKeys = ["q", "tr", "dt", "ty", "cat", "pri", "st"];
+    const params = new URLSearchParams(window.location.search);
+    const hadFilterParams = filterKeys.some((key) => params.has(key));
+    if (hadFilterParams) {
+      filterKeys.forEach((key) => params.delete(key));
+      const nextQuery = params.toString();
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+        scroll: false,
+      });
+    }
+
+    return () => {
+      try {
+        window.sessionStorage.removeItem("mySubmissions_filters");
+      } catch {}
+    };
+  }, [pathname, router]);
   const hoverFilterItems = useMemo(
     () =>
       [
