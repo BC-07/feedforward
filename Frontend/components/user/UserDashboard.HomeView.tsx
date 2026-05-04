@@ -70,7 +70,10 @@ export function UserDashboardHomeView({
             <p className="text-xs uppercase tracking-wide text-black">
               Pending
             </p>
-            <p className="mt-1 text-2xl font-semibold text-black">
+            <p
+              className="mt-1 text-2xl font-semibold"
+              style={{ color: "#d28a00" }}
+            >
               {dashboardStats.pending}
             </p>
           </CardContent>
@@ -80,7 +83,10 @@ export function UserDashboardHomeView({
             <p className="text-xs uppercase tracking-wide text-black">
               In Progress
             </p>
-            <p className="mt-1 text-2xl font-semibold text-black">
+            <p
+              className="mt-1 text-2xl font-semibold"
+              style={{ color: "#2563eb" }}
+            >
               {dashboardStats.inProgress}
             </p>
           </CardContent>
@@ -90,7 +96,10 @@ export function UserDashboardHomeView({
             <p className="text-xs uppercase tracking-wide text-black">
               Resolved
             </p>
-            <p className="mt-1 text-2xl font-semibold text-black">
+            <p
+              className="mt-1 text-2xl font-semibold"
+              style={{ color: "#00a63e" }}
+            >
               {dashboardStats.resolved}
             </p>
           </CardContent>
