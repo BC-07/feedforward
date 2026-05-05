@@ -74,9 +74,7 @@ import { toastApiError } from "@/lib/errorHandling";
 import { formatFilterChipLabel } from "@/lib/filterUtils";
 import { formatFeedbackText } from "@/lib/textFormat";
 import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
-import ExcelJS from "exceljs";
-import { jsPDF } from "jspdf";
-import autoTable, { type RowInput } from "jspdf-autotable";
+import type { RowInput } from "jspdf-autotable";
 import {
   AlertCircle,
   BarChart3,
@@ -1104,6 +1102,12 @@ export function AdminFeedbackWorkspace({
   };
 
   const exportFeedbacksPdf = async () => {
+    const [{ jsPDF }, autoTableModule] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
+    const autoTable = autoTableModule.default;
+
     const rows = visibleFeedbacks.map((feedback) => ({
       id: feedback.id,
       type: feedback.type,
@@ -1168,7 +1172,7 @@ export function AdminFeedbackWorkspace({
       [
         {
           content: row.id,
-          styles: { fontStyle: "bold", textColor: [31, 41, 55] },
+          styles: { fontStyle: "bold" as const, textColor: [31, 41, 55] },
         },
         { content: row.type },
         { content: row.status },
@@ -1266,6 +1270,8 @@ export function AdminFeedbackWorkspace({
   };
 
   const exportFeedbacksXlsx = async () => {
+    const ExcelJSImport = await import("exceljs");
+    const ExcelJS = ExcelJSImport.default;
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Feedback Report", {
       views: [{ showGridLines: false }],
