@@ -108,6 +108,7 @@ const FEEDBACKS_PER_PAGE = 7;
 const CONVERSATION_MESSAGE_MAX_LENGTH = 2000;
 const EXPORT_LOGO_PATH = "/favicon.ico";
 const ADMIN_FEEDBACK_DETAIL_LAYOUT: "split" | "modal" = "modal";
+const ADMIN_LIVE_EVENT = "feedforward:admin-live-event";
 type AdminHoverFilterKey = "name" | "date" | "type" | "priority" | "status";
 const ADMIN_FILTER_TEXT_COLOR = "#171717";
 const ADMIN_FILTER_MUTED_COLOR = "#171717";
@@ -498,6 +499,53 @@ export function AdminFeedbackWorkspace({
     requestedFeedbackOpenToken,
     router,
   ]);
+
+  useEffect(() => {
+    if (!isEditDialogOpen || !selectedFeedback?.id) return;
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void loadMessages(selectedFeedback.id);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [isEditDialogOpen, loadMessages, selectedFeedback?.id]);
+
+  useEffect(() => {
+    const handleAdminLiveEvent = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        type?: string;
+        feedbackId?: string;
+      }>;
+      const payload = customEvent.detail;
+      if (!payload?.feedbackId) return;
+
+      if (payload.type === "feedback_created") {
+        void loadFeedbacks();
+        return;
+      }
+
+      if (
+        payload.type === "message_created" &&
+        selectedFeedback &&
+        payload.feedbackId === selectedFeedback.id
+      ) {
+        void loadMessages(selectedFeedback.id);
+      }
+    };
+
+    window.addEventListener(ADMIN_LIVE_EVENT, handleAdminLiveEvent as EventListener);
+    return () => {
+      window.removeEventListener(
+        ADMIN_LIVE_EVENT,
+        handleAdminLiveEvent as EventListener,
+      );
+    };
+  }, [loadFeedbacks, loadMessages, selectedFeedback]);
 
   const handleSendMessage = useCallback(
     async (draft: string) => {
@@ -1992,7 +2040,7 @@ export function AdminFeedbackWorkspace({
                               className="rounded-none border-0 bg-transparent shadow-none"
                               formatDate={formatDetailsUpdatedAt}
                               preSubjectContent={
-                                <div className="grid grid-cols-1 gap-y-8">
+                                <div className="grid grid-cols-1 gap-y-6">
                                   <div className="space-y-1">
                                     <Label className="text-muted-foreground">
                                       Submitted By
@@ -2361,7 +2409,7 @@ export function AdminFeedbackWorkspace({
                 className="rounded-none border-0 bg-transparent shadow-none"
                 formatDate={formatDetailsUpdatedAt}
                 preSubjectContent={
-                  <div className="grid grid-cols-1 gap-y-8">
+                  <div className="grid grid-cols-1 gap-y-6">
                     <div className="space-y-1">
                       <Label className="text-muted-foreground">
                         Submitted By

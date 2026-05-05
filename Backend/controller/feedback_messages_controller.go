@@ -71,11 +71,15 @@ func CreateFeedbackMessage(c *fiber.Ctx) error {
 	}
 
 	sessionID := strings.TrimSpace(c.Cookies(sessionCookieName))
+	isPublicTrackRequest := strings.EqualFold(strings.TrimSpace(c.Get("X-Track-Public")), "true")
 	senderRole := sessionRoleUser
 	var senderID *string
 	senderName := ""
 
 	if sessionID == "" {
+		if !isPublicTrackRequest {
+			return unauthorized(c, "session is required")
+		}
 		// Track page supports ID-based follow-up messages even without an
 		// authenticated session.
 		senderName = "Anonymous"
@@ -83,14 +87,10 @@ func CreateFeedbackMessage(c *fiber.Ctx) error {
 		session, err := loadMessageSession(c)
 		if err != nil {
 			var fiberErr *fiber.Error
-			// If the browser has a stale/expired cookie, gracefully fall back
-			// to tracking-ID based anonymous reply instead of hard failing.
 			if errors.As(err, &fiberErr) && (fiberErr.Code == fiber.StatusUnauthorized || fiberErr.Code == fiber.StatusForbidden) {
 				clearSessionCookie(c)
-				senderName = "Anonymous"
-			} else {
-				return err
 			}
+			return err
 		}
 		if senderName == "" {
 			senderRole = session.Role
@@ -200,6 +200,7 @@ func CreateFeedbackMessage(c *fiber.Ctx) error {
 		`UPDATE `+feedbackTable+` SET updated_at = ? WHERE id = ?`,
 		now, feedbackID,
 	).Error
+	emitAdminMessageCreated(feedback.Category, feedbackID)
 
 	return success(c, fiber.StatusCreated, record)
 }

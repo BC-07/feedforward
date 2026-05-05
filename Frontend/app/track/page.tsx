@@ -31,6 +31,21 @@ export default function TrackFeedback() {
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [canReply, setCanReply] = useState(false);
 
+  const sameMessageList = (a: FeedbackMessage[], b: FeedbackMessage[]) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) {
+      if (
+        a[i].id !== b[i].id ||
+        a[i].senderRole !== b[i].senderRole ||
+        a[i].message !== b[i].message ||
+        a[i].createdAt !== b[i].createdAt
+      ) {
+        return false;
+      }
+    }
+    return true;
+  };
+
   const normalizeTrackingId = (value: string) => value.trim().toUpperCase();
   const isValidTrackingId = (value: string) =>
     /^FF-[A-Z0-9]+$/.test(value) && value.length >= 6;
@@ -129,6 +144,24 @@ export default function TrackFeedback() {
         setIsLoadingMessages(false);
       });
   }, [feedback]);
+
+  useEffect(() => {
+    if (!feedback?.id) return;
+    const intervalId = window.setInterval(() => {
+      void listFeedbackMessages(feedback.id)
+        .then((data) => {
+          if (data.length === 0) return;
+          setMessages((prev) => (sameMessageList(prev, data) ? prev : data));
+        })
+        .catch(() => {
+          // Keep existing messages if refresh fails.
+        });
+    }, 4000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [feedback?.id]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {

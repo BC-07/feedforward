@@ -74,7 +74,7 @@ export function FeedbackDetailsCard({
     ? "grid grid-cols-1 gap-2 sm:grid-cols-2"
     : compactNoTitleLayout
       ? "grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2"
-      : "grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2";
+      : "grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2";
   const compactMetaItemClass = compactNoTitleLayout ? "space-y-2" : "space-y-1";
   const shouldIndentMessage = indentMessageFirstLineIfMultiline && isMessageMultiline;
 

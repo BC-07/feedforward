@@ -271,6 +271,7 @@ func CreateFeedback(c *fiber.Ctx) error {
 			return
 		}
 	}(createdCopy)
+	emitAdminFeedbackCreated(created.Category, created.ID)
 
 	return success(c, fiber.StatusCreated, created)
 }

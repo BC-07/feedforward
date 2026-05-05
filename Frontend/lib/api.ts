@@ -79,6 +79,12 @@ interface ApiResponse<T> {
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5566";
 
+export function openAdminEventsStream(): EventSource {
+  return new EventSource(`${API_BASE_URL}/events/admin`, {
+    withCredentials: true,
+  });
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const { headers: initHeaders, ...restInit } = init ?? {};
 
@@ -259,6 +265,7 @@ export async function createFeedbackMessagePublic(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-Track-Public": "true",
       },
       credentials: "omit",
       body: JSON.stringify(payload),

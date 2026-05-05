@@ -6,6 +6,7 @@ import {
   deleteUserAccount,
   logout,
   listFeedbacks,
+  openAdminEventsStream,
   updateAdminProfile,
   updateAdminPassword,
   updateUserPassword,
@@ -66,6 +67,7 @@ import {
 } from "@/components/admin/constants";
 
 const SESSION_EVENT = "feedforward:session-change";
+const ADMIN_LIVE_EVENT = "feedforward:admin-live-event";
 const emailLikePattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 
 function containsEmailLike(value: string): boolean {
@@ -390,6 +392,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     [adminId, adminUnit, isAdminLoggedIn],
   );
 
+  const markNotificationUnread = useCallback(
+    (feedbackId: string) => {
+      if (typeof window === "undefined") return;
+      if (!isAdminLoggedIn || !adminId || !adminUnit) return;
+      const id = feedbackId.trim();
+      if (!id) return;
+
+      const key = `adminNotificationsRead:${adminId}:${adminUnit}`;
+      setReadNotificationIds((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        localStorage.setItem(key, JSON.stringify(Array.from(next)));
+        return next;
+      });
+    },
+    [adminId, adminUnit, isAdminLoggedIn],
+  );
+
   const refreshAdminNotifications = useCallback(async () => {
     if (!isAdminLoggedIn || !adminUnit) return;
     setIsNotificationsLoading(true);
@@ -590,6 +611,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (!isAdminLoggedIn || !adminUnit) return;
     void refreshAdminNotifications();
   }, [isAdminLoggedIn, adminUnit, refreshAdminNotifications]);
+
+  useEffect(() => {
+    if (!isAdminLoggedIn || !adminUnit) return;
+
+    const intervalId = window.setInterval(() => {
+      void refreshAdminNotifications();
+    }, 5000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void refreshAdminNotifications();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [adminUnit, isAdminLoggedIn, refreshAdminNotifications]);
+
+  useEffect(() => {
+    if (!isAdminLoggedIn || !adminUnit) return;
+
+    const stream = openAdminEventsStream();
+    const handleAdminEvent = (event: Event) => {
+      const messageEvent = event as MessageEvent<string>;
+      try {
+        const payload = JSON.parse(messageEvent.data) as {
+          type?: string;
+          feedbackId?: string;
+          category?: string;
+          createdAt?: string;
+        };
+        window.dispatchEvent(
+          new CustomEvent(ADMIN_LIVE_EVENT, {
+            detail: payload,
+          }),
+        );
+        if (payload.type === "message_created" && payload.feedbackId) {
+          markNotificationUnread(payload.feedbackId);
+        }
+      } catch {
+        // Ignore malformed payloads.
+      }
+      void refreshAdminNotifications();
+    };
+
+    stream.addEventListener("admin_event", handleAdminEvent);
+    stream.onerror = () => {
+      // Keep the default EventSource auto-reconnect behavior.
+    };
+
+    return () => {
+      stream.removeEventListener("admin_event", handleAdminEvent);
+      stream.close();
+    };
+  }, [adminUnit, isAdminLoggedIn, markNotificationUnread, refreshAdminNotifications]);
 
   const toggleNotificationRead = (id: string) => {
     const next = new Set(readNotificationIds);

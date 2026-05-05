@@ -241,6 +241,23 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const isHomeView = view === "home";
   const isMySubmissionsView = view === "my-submissions";
   const isSubmitView = view === "submit-feedback";
+  const sameMessageList = useCallback(
+    (a: FeedbackMessage[], b: FeedbackMessage[]) => {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i += 1) {
+        if (
+          a[i].id !== b[i].id ||
+          a[i].senderRole !== b[i].senderRole ||
+          a[i].message !== b[i].message ||
+          a[i].createdAt !== b[i].createdAt
+        ) {
+          return false;
+        }
+      }
+      return true;
+    },
+    [],
+  );
 
   async function loadUserFeedbacks(userId: string) {
     try {
@@ -409,6 +426,27 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         setIsMessagesLoading(false);
       });
   }, [selectedFeedback]);
+
+  useEffect(() => {
+    if (!selectedFeedback?.id) return;
+
+    const refreshMessages = () => {
+      void listFeedbackMessages(selectedFeedback.id)
+        .then((data) => {
+          if (data.length === 0) return;
+          setMessages((prev) => (sameMessageList(prev, data) ? prev : data));
+        })
+        .catch(() => {
+          // Keep current thread when background refresh fails.
+        });
+    };
+
+    refreshMessages();
+    const intervalId = window.setInterval(refreshMessages, 4000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [sameMessageList, selectedFeedback?.id]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

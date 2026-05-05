@@ -64,6 +64,7 @@ func AppRoutes(app *fiber.App) {
 	app.Get("/superadmin/stats/category-counts", controller.GetCategorySubmissionCounts)
 
 	// Feedbacks
+	app.Get("/events/admin", controller.StreamAdminEvents)
 	app.Get("/feedbacks", controller.GetFeedbacks)
 	app.Get("/feedbacks/:id", controller.GetFeedbackByID)
 	app.Get("/feedbacks/:id/messages", controller.ListFeedbackMessages)
