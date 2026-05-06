@@ -29,9 +29,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,7 +40,6 @@ import { toastApiError } from "@/lib/errorHandling";
 import { formatFilterChipLabel } from "@/lib/filterUtils";
 import { formatFeedbackText } from "@/lib/textFormat";
 import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
-import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
 import {
   Select,
   SelectContent,
@@ -78,8 +74,6 @@ import {
   Plus,
   Search,
   Trash2,
-  ChevronUp,
-  ChevronDown,
   X,
 } from "lucide-react";
 
@@ -224,7 +218,12 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const [isMiniChatOpen, setIsMiniChatOpen] = useState(false);
+  const [activeFeedbackTab, setActiveFeedbackTab] = useState<
+    "details" | "messages"
+  >("details");
+  const [feedbackTabAnimDirection, setFeedbackTabAnimDirection] = useState<
+    "left" | "right"
+  >("left");
   const [isUnsentMessageDialogOpen, setIsUnsentMessageDialogOpen] =
     useState(false);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
@@ -232,8 +231,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const submissionsScrollRef = useRef<HTMLDivElement>(null);
   const conversationScrollRef = useRef<HTMLDivElement>(null);
-  const miniConversationScrollRef = useRef<HTMLDivElement>(null);
   const createSubmissionDialogContentRef = useRef<HTMLDivElement>(null);
+  const previousFeedbackTabRef = useRef<"details" | "messages">("details");
   const submissionsScrollTop = useRef(0);
   const feedbackSubmitLockRef = useRef(false);
   const [createSubmissionFormModalHeight, setCreateSubmissionFormModalHeight] =
@@ -372,7 +371,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     if (!selectedFeedback) {
       setMessages([]);
       setMessageDraft("");
-      setIsMiniChatOpen(false);
+      setActiveFeedbackTab("details");
+      previousFeedbackTabRef.current = "details";
       return;
     }
 
@@ -449,6 +449,18 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   }, [sameMessageList, selectedFeedback?.id]);
 
   useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!selectedFeedback) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [selectedFeedback]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const mediaQuery = window.matchMedia("(min-width: 1024px)");
     const handleChange = () => setIsLargeScreen(mediaQuery.matches);
@@ -497,16 +509,12 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
   const scrollConversationsToBottom = useCallback(
     (behavior: ScrollBehavior = "auto") => {
-      [
-        conversationScrollRef.current,
-        miniConversationScrollRef.current,
-      ].forEach((container) => {
-        if (!container) return;
-        window.requestAnimationFrame(() => {
-          container.scrollTo({
-            top: container.scrollHeight,
-            behavior,
-          });
+      const container = conversationScrollRef.current;
+      if (!container) return;
+      window.requestAnimationFrame(() => {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior,
         });
       });
     },
@@ -778,7 +786,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     selectedFeedback,
     isMessagesLoading,
     messages.length,
-    isMiniChatOpen,
+    activeFeedbackTab,
     scrollConversationsToBottom,
   ]);
 
@@ -828,10 +836,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const closeSelectedFeedback = useCallback(() => {
     setMessageDraft("");
     setSelectedFeedback(null);
-  }, []);
-
-  const closeMiniChat = useCallback(() => {
-    setIsMiniChatOpen(false);
   }, []);
 
   const handleAttemptCloseSelectedFeedback = useCallback(() => {
@@ -1509,35 +1513,28 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               <Card className="h-full border shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
                 <CardContent className="flex h-full flex-col gap-3 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <p
-                      className="min-h-[1.25rem] break-all text-xs"
-                      style={{ color: "#666666" }}
-                    >
+                    <p className="min-h-[1.25rem] break-all text-xs text-muted-foreground">
                       {feedback.id}
                     </p>
-                    <span
-                      className="whitespace-nowrap text-[11px]"
-                      style={{ color: "#666666" }}
-                    >
+                    <span className="whitespace-nowrap text-[11px] text-muted-foreground">
                       {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                     </span>
                   </div>
-                  <p className="line-clamp-2 min-h-[3rem] break-words font-medium leading-snug text-[#b72860]">
+                  <p className="line-clamp-2 min-h-[3rem] break-words font-medium leading-snug text-foreground">
                     {feedback.subject}
                   </p>
                   <p
-                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-red-600 ${
+                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground ${
                       feedback.message.trim().length > 70 &&
                       /\s/.test(feedback.message.trim())
                         ? "indent-5"
                         : ""
                     }`}
-                    style={{ color: "#6e6e6e" }}
                   >
                     {feedback.message}
                   </p>
                   <div className="mt-auto flex items-center justify-between">
-                    <span className="rounded-md border border-[#d7dbe2] bg-[#f8fafc] px-2 py-0.5 text-xs text-black">
+                    <span className="rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs text-foreground">
                       {feedback.category}
                     </span>
                     <span className="inline-flex items-center">
@@ -1788,7 +1785,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   ) : null}
                 </div>
                 {selectedFeedback ? (
-                  <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+                  <div className="fixed inset-0 z-[90] flex items-center justify-center p-2">
                     <button
                       type="button"
                       aria-label="Close feedback details"
@@ -1816,238 +1813,252 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                         </div>
                       </>
                     )}
-                    <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[83vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
+                    <Card className="ff-modal-panel relative z-10 w-full max-w-[530px] h-[83vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-4 top-3 z-20 h-7 w-7 text-muted-foreground hover:bg-muted hover:text-foreground focus:border-ring focus:ring-ring/50 focus:ring-[3px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                        aria-label="Close feedback details"
+                        onClick={handleAttemptCloseSelectedFeedback}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                      <CardContent className="ff-hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pt-3 pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
 
-                      <CardHeader className="space-y-0 pb-0">
-                        <div className="flex items-center justify-between gap-3">
-                          <CardTitle>Feedback Details</CardTitle>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-9 w-9 text-muted-foreground hover:bg-muted hover:text-foreground focus:border-ring focus:ring-ring/50 focus:ring-[3px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                            aria-label="Close feedback details"
-                            onClick={handleAttemptCloseSelectedFeedback}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <CardDescription
-                          className="text-black"
-                          style={{ color: "#666666" }}
+                        <Tabs
+                          value={activeFeedbackTab}
+                          onValueChange={(value) => {
+                            const next = value as "details" | "messages";
+                            const tabOrder: Array<"details" | "messages"> = [
+                              "details",
+                              "messages",
+                            ];
+                            const prevIdx = tabOrder.indexOf(previousFeedbackTabRef.current);
+                            const nextIdx = tabOrder.indexOf(next);
+                            setFeedbackTabAnimDirection(nextIdx > prevIdx ? "left" : "right");
+                            previousFeedbackTabRef.current = next;
+                            setActiveFeedbackTab(next);
+                          }}
+                          className="flex min-h-0 flex-1 flex-col gap-3"
                         >
-                          {selectedFeedback.id}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="ff-hide-scrollbar flex-1 min-h-0 overflow-y-auto space-y-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                        <div className="w-full">
-                          <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                            <FeedbackStatusCard
-                              feedback={selectedFeedback}
-                              formatDate={formatDate}
-                              className="h-[27.5rem]"
-                            />
+                          <TabsList className="mx-auto grid w-full max-w-[440px] grid-cols-2 rounded-full">
+                            <TabsTrigger value="details" className="data-[state=inactive]:text-muted-foreground data-[state=active]:text-foreground">
+                              Details
+                            </TabsTrigger>
+                            <TabsTrigger value="messages" className="data-[state=inactive]:text-muted-foreground data-[state=active]:text-foreground">
+                              Messages
+                            </TabsTrigger>
+                          </TabsList>
 
-                            <div>
-                              <FeedbackDetailsCard
-                                feedback={selectedFeedback}
-                                title="Feedback Details"
-                                formatDate={formatDate}
-                                className="h-[27.5rem]"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                      </CardContent>
-
-                      <div className="pointer-events-none absolute bottom-0 right-6 z-20">
-
-                        <div className="relative h-[360px] w-[320px]">
-                          <div
-                            className={`pointer-events-auto absolute bottom-0 right-0 z-10 h-[360px] w-[320px] overflow-hidden rounded-t-xl border-2 border-slate-300 bg-white shadow-2xl transition-transform duration-500 ease-in-out ${
-                              isMiniChatOpen
-                                ? "translate-y-0"
-                                : "translate-y-[calc(100%-2.30rem)]"
-                            }`}
-                          >
+                          <TabsContent value="details" className="mt-0 space-y-3">
                             <div
-                              className="flex cursor-pointer items-center justify-between border-b border-border bg-muted/40 px-3 py-2 transition-colors hover:bg-muted/70"
-                              onClick={() => setIsMiniChatOpen((prev) => !prev)}
+                              key={`user-details-tab-${activeFeedbackTab}`}
+                              className={feedbackTabAnimDirection === "left" ? "ff-step-slide-in-left" : "ff-step-slide-in-right"}
                             >
-                              <div className="flex items-center gap-1.5">
-                                <MessageCircle className="h-4 w-4 text-muted-foreground" />
-                                <p className="text-sm font-normal text-foreground">
-                                  Message window
-                                </p>
+                            <div className="rounded-[12px] border border-border bg-muted/20 px-5 py-4">
+                              <p className="mb-2 text-[0.85rem] tracking-[0.04em] text-foreground">
+                                Feedback details: <span className="!text-muted-foreground">{selectedFeedback.id}</span>
+                              </p>
+                              <div className="mb-2 flex items-center justify-between gap-3 border-b border-border pb-2">
+                                <div className="flex items-center gap-2">
+                                  <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                                  <p className="text-[1.05rem] font-medium leading-tight text-foreground">{selectedFeedback.subject}</p>
+                                </div>
+                                <Badge
+                                  variant="outline"
+                                  className="rounded-full border-amber-300 bg-transparent px-3 py-[0.12rem] text-[0.85rem] font-medium capitalize text-amber-600"
+                                >
+                                  {selectedFeedback.priority}
+                                </Badge>
                               </div>
-                              {isMiniChatOpen ? (
-                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                              )}
+
+                              <div className="divide-y divide-border text-[0.95rem]">
+                                <div className="grid grid-cols-[4.7rem_minmax(0,1fr)] gap-4 py-1.5">
+                                  <p className="!text-muted-foreground">Type:</p>
+                                  <p className="!text-foreground capitalize">{selectedFeedback.type}</p>
+                                </div>
+                                <div className="grid grid-cols-[4.7rem_minmax(0,1fr)] gap-4 py-1.5">
+                                  <p className="!text-muted-foreground">Category:</p>
+                                  <p className="!text-foreground">{selectedFeedback.category}</p>
+                                </div>
+                                <div className="grid grid-cols-[4.7rem_minmax(0,1fr)] gap-4 py-1.5">
+                                  <p className="!text-muted-foreground">Updated:</p>
+                                  <p className="!text-foreground">{formatDate(selectedFeedback.updatedAt)}</p>
+                                </div>
+                                <div className="grid grid-cols-[4.7rem_minmax(0,1fr)] gap-4 py-1.5">
+                                  <p className="!text-muted-foreground">Details:</p>
+                                  <p className="italic">{selectedFeedback.message}</p>
+                                </div>
+                              </div>
                             </div>
-                            <div className="grid h-[calc(100%-40px)] grid-rows-[minmax(0,1fr)_auto]">
+
+                            {(() => {
+                              const normalizedStatus = selectedFeedback.status.trim().toLowerCase();
+                              const currentIndex = ["pending", "in progress", "resolved"].indexOf(normalizedStatus);
+                              const safeIndex = Math.max(currentIndex, 0);
+                              const isPending = safeIndex === 0;
+                              const isInProgress = safeIndex === 1;
+                              const isResolved = safeIndex === 2;
+                              const statusDotClass = isResolved
+                                ? "bg-emerald-600"
+                                : isInProgress
+                                  ? "bg-blue-500"
+                                  : "bg-amber-500";
+                              const statusTextClass = isResolved
+                                ? "text-emerald-600"
+                                : isInProgress
+                                  ? "text-blue-600"
+                                  : "text-amber-600";
+
+                              return (
+                                <div>
+                                  <div className="mb-3 flex items-center gap-3">
+                                    <div className="relative h-[4px] flex-1 rounded-full bg-muted">
+                                      <div
+                                        className="absolute left-0 top-0 h-[4px] rounded-full bg-amber-500"
+                                        style={{
+                                          width: isPending ? "33.333%" : isInProgress ? "66.666%" : "100%",
+                                        }}
+                                      />
+                                    </div>
+                                    <p className="mt-3 !text-muted-foreground text-sm tracking-[0.08em] text-amber-600 uppercase ">
+                                      {normalizedStatus === "in progress" ? "In progress" : normalizedStatus}
+                                    </p>
+                                  </div>
+
+                                  <div className="grid grid-cols-3 gap-3 text-center">
+                                    <div className="space-y-1">
+                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isPending || isInProgress || isResolved ? statusDotClass : "bg-muted"}`} />
+                                      <p className={`text-[0.9rem] ${isPending || isInProgress || isResolved ? statusTextClass : "text-muted-foreground"}`}>Submitted</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isInProgress || isResolved ? statusDotClass : "bg-muted"}`} />
+                                      <p className={`text-[0.9rem] ${isInProgress || isResolved ? statusTextClass : "text-muted-foreground"}`}>In progress</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isResolved ? statusDotClass : "bg-muted"}`} />
+                                      <p className={`text-[0.9rem] ${isResolved ? statusTextClass : "text-muted-foreground"}`}>Resolved</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                            </div>
+                          </TabsContent>
+
+                          <TabsContent value="messages" className="mt-0 flex min-h-0 flex-1 flex-col">
+                            <div
+                              key={`user-messages-tab-${activeFeedbackTab}`}
+                              className={`flex min-h-0 flex-1 flex-col ${feedbackTabAnimDirection === "left" ? "ff-step-slide-in-left" : "ff-step-slide-in-right"}`}
+                            >
+                            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-muted/20">
                               <div
-                                ref={miniConversationScrollRef}
-                                className="ff-hide-scrollbar min-h-0 overflow-y-auto p-3"
+                                ref={conversationScrollRef}
+                                className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto p-3"
                               >
                                 {isMessagesLoading ? (
-                                  <p className="text-sm text-black">
-                                    Loading conversation...
-                                  </p>
+                                  <p className="text-sm text-muted-foreground">Loading conversation...</p>
                                 ) : null}
                                 {!isMessagesLoading && messages.length === 0 ? (
-                                  <p className="text-sm text-black">
-                                    No messages yet.
-                                  </p>
+                                  <p className="text-sm text-muted-foreground">No messages yet.</p>
                                 ) : null}
                                 <div className="space-y-3">
                                   {(() => {
                                     let lastDayLabel = "";
-                                    return messages.map(
-                                      (entry, index, allMessages) => {
-                                        const createdAt = entry.createdAt
-                                          ? new Date(entry.createdAt)
-                                          : null;
-                                        const today = new Date();
-                                        const yesterday = new Date();
-                                        yesterday.setDate(today.getDate() - 1);
-                                        const dayLabel = createdAt
-                                          ? createdAt.toDateString() ===
-                                            today.toDateString()
-                                            ? "Today"
-                                            : createdAt.toDateString() ===
-                                                yesterday.toDateString()
-                                              ? "Yesterday"
-                                              : createdAt.toLocaleDateString(
-                                                  undefined,
-                                                  {
-                                                    month: "short",
-                                                    day: "numeric",
-                                                    year: "numeric",
-                                                  },
-                                                )
-                                          : "";
-                                        const showDayLabel =
-                                          dayLabel && dayLabel !== lastDayLabel;
-                                        if (showDayLabel) {
-                                          lastDayLabel = dayLabel;
-                                        }
+                                    return messages.map((entry, index, allMessages) => {
+                                      const createdAt = entry.createdAt ? new Date(entry.createdAt) : null;
+                                      const today = new Date();
+                                      const yesterday = new Date();
+                                      yesterday.setDate(today.getDate() - 1);
+                                      const dayLabel = createdAt
+                                        ? createdAt.toDateString() === today.toDateString()
+                                          ? "Today"
+                                          : createdAt.toDateString() === yesterday.toDateString()
+                                            ? "Yesterday"
+                                            : createdAt.toLocaleDateString(undefined, {
+                                                month: "short",
+                                                day: "numeric",
+                                                year: "numeric",
+                                              })
+                                        : "";
+                                      const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
+                                      if (showDayLabel) {
+                                        lastDayLabel = dayLabel;
+                                      }
 
-                                        const isUser =
-                                          entry.senderRole === "user";
-                                        const name = isUser
-                                          ? "You"
-                                          : entry.senderName || "Admin";
-                                        const prev =
-                                          index > 0
-                                            ? allMessages[index - 1]
-                                            : null;
-                                        const prevIsUser = prev
-                                          ? prev.senderRole === "user"
-                                          : false;
-                                        const prevName = prev
-                                          ? prevIsUser
-                                            ? "You"
-                                            : prev.senderName || "Admin"
-                                          : "";
-                                        const showName =
-                                          !prev ||
-                                          showDayLabel ||
-                                          prev.senderRole !==
-                                            entry.senderRole ||
-                                          prevName !== name;
-                                        const isLikelyMultiLine =
-                                          (entry.message || "").includes(
-                                            "\n",
-                                          ) ||
-                                          (entry.message || "").length > 50;
+                                      const isUser = entry.senderRole === "user";
+                                      const name = isUser ? "You" : entry.senderName || "Admin";
+                                      const prev = index > 0 ? allMessages[index - 1] : null;
+                                      const prevIsUser = prev ? prev.senderRole === "user" : false;
+                                      const prevName = prev ? (prevIsUser ? "You" : prev.senderName || "Admin") : "";
+                                      const showName =
+                                        !prev ||
+                                        showDayLabel ||
+                                        prev.senderRole !== entry.senderRole ||
+                                        prevName !== name;
+                                      const isLikelyMultiLine =
+                                        (entry.message || "").includes("\n") ||
+                                        (entry.message || "").length > 50;
 
-                                        return (
-                                          <div
-                                            key={`mini-${entry.id}`}
-                                            className="space-y-2"
-                                          >
-                                            {showDayLabel ? (
-                                              <div className="flex items-center gap-2 py-1">
-                                                <div className="h-px flex-1 bg-border/60" />
-                                                <span className="text-[10px] font-normal text-black">
-                                                  {dayLabel}
-                                                </span>
-                                                <div className="h-px flex-1 bg-border/60" />
-                                              </div>
-                                            ) : null}
-                                            <div
-                                              className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                                            >
+                                      return (
+                                        <div key={`msg-${entry.id}`} className="space-y-2">
+                                          {showDayLabel ? (
+                                            <div className="flex items-center gap-2 py-1">
+                                              <div className="h-px flex-1 bg-border/60" />
+                                              <span className="text-[10px] font-normal text-muted-foreground">{dayLabel}</span>
+                                              <div className="h-px flex-1 bg-border/60" />
+                                            </div>
+                                          ) : null}
+                                          <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                                            <div className={`group relative w-fit min-w-0 max-w-[85%] ${isUser ? "text-right" : "text-left"}`}>
+                                              {showName && !isUser ? (
+                                                <p className="mb-1 px-1 text-[11px] font-normal text-muted-foreground">{name}</p>
+                                              ) : null}
                                               <div
-                                                className={`group relative w-fit min-w-0 max-w-[85%] ${isUser ? "text-right" : "text-left"}`}
+                                                className={`rounded-2xl px-3 py-2 text-xs ${
+                                                  isUser
+                                                    ? USER_MESSAGE_BUBBLE_CLASS
+                                                    : "border border-border bg-background text-foreground"
+                                                }`}
                                               >
-                                                {showName && !isUser ? (
-                                                  <p className="mb-1 px-1 text-[11px] font-normal text-black">
-                                                    {name}
-                                                  </p>
-                                                ) : null}
-                                                <div
-                                                  className={`rounded-2xl px-3 py-2 text-xs ${
-                                                    isUser
-                                                      ? USER_MESSAGE_BUBBLE_CLASS
-                                                      : "border border-border bg-slate-50 text-foreground"
+                                                <p className="whitespace-pre-line break-words">{entry.message}</p>
+                                              </div>
+                                              {entry.createdAt ? (
+                                                <span
+                                                  className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-black/50 px-2.5 py-1 text-[10px] text-white shadow-sm group-hover:inline-flex ${
+                                                    isUser ? "-left-1 -translate-x-full" : "-right-1 translate-x-full"
+                                                  } ${
+                                                    isLikelyMultiLine ? "top-1/2" : "top-[68%]"
                                                   }`}
                                                 >
-                                                  <p className="whitespace-pre-line break-words">
-                                                    {entry.message}
-                                                  </p>
-                                                </div>
-                                                {entry.createdAt ? (
-                                                  <span
-                                                    className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-black/50 px-2.5 py-1 text-[10px] text-white shadow-sm group-hover:inline-flex ${
-                                                      isUser
-                                                        ? "-left-1 -translate-x-full"
-                                                        : "-right-1 translate-x-full"
-                                                    } ${
-                                                      isLikelyMultiLine
-                                                        ? "top-1/2"
-                                                        : "top-[68%]"
-                                                    }`}
-                                                  >
-                                                    {formatLocalTime(
-                                                      entry.createdAt,
-                                                    )}
-                                                  </span>
-                                                ) : null}
-                                              </div>
+                                                  {formatLocalTime(entry.createdAt)}
+                                                </span>
+                                              ) : null}
                                             </div>
                                           </div>
-                                        );
-                                      },
-                                    );
+                                        </div>
+                                      );
+                                    });
                                   })()}
                                 </div>
                               </div>
                               <div className="border-t border-border bg-background/90 p-2">
                                 <div className="flex items-end gap-2">
                                   <Textarea
-                                    id="mini-reply-message"
+                                    id="reply-message"
                                     placeholder="Type your message..."
                                     rows={1}
                                     value={messageDraft}
                                     onChange={(e) =>
                                       setMessageDraft(
-                                        e.target.value.slice(
-                                          0,
-                                          CONVERSATION_MESSAGE_MAX_LENGTH,
-                                        ),
+                                        e.target.value.slice(0, CONVERSATION_MESSAGE_MAX_LENGTH),
                                       )
                                     }
                                     maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
                                     disabled={isSendingMessage}
                                     className="ff-hide-scrollbar w-full max-w-full min-w-0 max-h-[8rem] min-h-8 resize-none overflow-y-auto rounded-lg border border-border/70 bg-background px-3 py-2 text-xs leading-relaxed [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
                                     onKeyDown={(event) => {
-                                      if (
-                                        event.key === "Enter" &&
-                                        !event.shiftKey
-                                      ) {
+                                      if (event.key === "Enter" && !event.shiftKey) {
                                         event.preventDefault();
                                         void handleSendMessage();
                                       }
@@ -2060,29 +2071,17 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                     variant="secondary"
                                     className="h-9 w-9 shrink-0 rounded-lg border border-border/70 bg-muted/80 text-muted-foreground hover:bg-accent hover:text-white"
                                     disabled={isSendingMessage}
-                                    aria-label="Send quick chat message"
+                                    aria-label="Send message"
                                   >
                                     <Send className="h-4 w-4" />
                                   </Button>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          aria-label={
-                            isMiniChatOpen
-                              ? "Hide quick chat"
-                              : "Open quick chat"
-                          }
-                          onClick={() => setIsMiniChatOpen((prev) => !prev)}
-                          className="pointer-events-auto absolute bottom-0 right-0 z-0 h-8 w-[320px] cursor-pointer rounded-t-md border border-b-0 border-border bg-muted/90 px-6 text-xs font-normal text-foreground shadow-md transition-colors hover:bg-muted"
-                        >
-                          {isMiniChatOpen ? "Updates" : "Updates"}
-                        </button>
-                      </div>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      </CardContent>
                     </Card>
                   </div>
                 ) : null}
