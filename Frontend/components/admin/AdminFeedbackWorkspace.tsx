@@ -2390,13 +2390,13 @@ export function AdminFeedbackWorkspace({
             className="flex min-h-0 w-full flex-1 flex-col"
           >
             <TabsList className="grid w-full shrink-0 grid-cols-3 rounded-full">
-              <TabsTrigger value="details">
+              <TabsTrigger value="details" className="data-[state=inactive]:text-muted-foreground data-[state=active]:text-foreground">
                 Details
               </TabsTrigger>
-              <TabsTrigger value="messages">
+              <TabsTrigger value="messages" className="data-[state=inactive]:text-muted-foreground data-[state=active]:text-foreground">
                 Messages
               </TabsTrigger>
-              <TabsTrigger value="manage">
+              <TabsTrigger value="manage" className="data-[state=inactive]:text-muted-foreground data-[state=active]:text-foreground">
                 Manage
               </TabsTrigger>
             </TabsList>

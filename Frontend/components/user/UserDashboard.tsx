@@ -1554,10 +1554,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               <Card className="h-full border shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
                 <CardContent className="flex h-full flex-col gap-3 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="min-h-[1.25rem] break-all text-xs !text-muted-foreground">
+                    <p className="min-h-[1.25rem] break-all text-xs text-muted-foreground">
                       {feedback.id}
                     </p>
-                    <span className="whitespace-nowrap text-[11px] !text-muted-foreground">
+                    <span className="whitespace-nowrap text-[11px] text-muted-foreground">
                       {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                     </span>
                   </div>
@@ -1565,7 +1565,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     {feedback.subject}
                   </p>
                   <p
-                    className={`line-clamp-2 min-h-[2.5rem] text-sm !text-muted-foreground ${
+                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground ${
                       feedback.message.trim().length > 70 &&
                       /\s/.test(feedback.message.trim())
                         ? "indent-5"
@@ -1575,7 +1575,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     {feedback.message}
                   </p>
                   <div className="mt-auto flex items-center justify-between">
-                    <span className="rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs !text-muted-foreground">
+                    <span className="rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs text-foreground">
                       {feedback.category}
                     </span>
                     <span className="inline-flex items-center">
@@ -1980,16 +1980,16 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
                                   <div className="grid grid-cols-3 gap-3 text-center">
                                     <div className="space-y-1">
-                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isPending || isInProgress || isResolved ? statusDotClass : "bg-muted"}`} />
-                                      <p className={`text-[0.9rem] ${isPending || isInProgress || isResolved ? statusTextClass : "text-muted-foreground"}`}>Submitted</p>
+                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isPending || isInProgress || isResolved ? "bg-amber-500" : "bg-muted"}`} />
+                                      <p className={`text-[0.9rem] ${isPending || isInProgress || isResolved ? "text-amber-600" : "text-muted-foreground"}`}>Submitted</p>
                                     </div>
                                     <div className="space-y-1">
-                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isInProgress || isResolved ? statusDotClass : "bg-muted"}`} />
-                                      <p className={`text-[0.9rem] ${isInProgress || isResolved ? statusTextClass : "text-muted-foreground"}`}>In progress</p>
+                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isInProgress || isResolved ? "bg-blue-500" : "bg-muted"}`} />
+                                      <p className={`text-[0.9rem] ${isInProgress || isResolved ? "text-blue-600" : "text-muted-foreground"}`}>In progress</p>
                                     </div>
                                     <div className="space-y-1">
-                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isResolved ? statusDotClass : "bg-muted"}`} />
-                                      <p className={`text-[0.9rem] ${isResolved ? statusTextClass : "text-muted-foreground"}`}>Resolved</p>
+                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isResolved ? "bg-emerald-600" : "bg-muted"}`} />
+                                      <p className={`text-[0.9rem] ${isResolved ? "text-emerald-600" : "text-muted-foreground"}`}>Resolved</p>
                                     </div>
                                   </div>
                                 </div>

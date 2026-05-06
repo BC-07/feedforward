@@ -366,16 +366,16 @@ export default function TrackFeedback() {
 
                             <div className="grid grid-cols-3 gap-3 text-center">
                               <div className="space-y-1">
-                                <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isPending || isInProgress || isResolved ? statusDotClass : "bg-muted"}`} />
-                                <p className={`text-[0.9rem] ${isPending || isInProgress || isResolved ? statusTextClass : "text-muted-foreground"}`}>Submitted</p>
+                                <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isPending || isInProgress || isResolved ? "bg-amber-500" : "bg-muted"}`} />
+                                <p className={`text-[0.9rem] ${isPending || isInProgress || isResolved ? "text-amber-600" : "text-muted-foreground"}`}>Submitted</p>
                               </div>
                               <div className="space-y-1">
-                                <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isInProgress || isResolved ? statusDotClass : "bg-muted"}`} />
-                                <p className={`text-[0.9rem] ${isInProgress || isResolved ? statusTextClass : "text-muted-foreground"}`}>In progress</p>
+                                <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isInProgress || isResolved ? "bg-blue-500" : "bg-muted"}`} />
+                                <p className={`text-[0.9rem] ${isInProgress || isResolved ? "text-blue-600" : "text-muted-foreground"}`}>In progress</p>
                               </div>
                               <div className="space-y-1">
-                                <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isResolved ? statusDotClass : "bg-muted"}`} />
-                                <p className={`text-[0.9rem] ${isResolved ? statusTextClass : "text-muted-foreground"}`}>Resolved</p>
+                                <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isResolved ? "bg-emerald-600" : "bg-muted"}`} />
+                                <p className={`text-[0.9rem] ${isResolved ? "text-emerald-600" : "text-muted-foreground"}`}>Resolved</p>
                               </div>
                             </div>
                           </div>
