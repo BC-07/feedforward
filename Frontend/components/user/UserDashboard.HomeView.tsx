@@ -115,19 +115,19 @@ export function UserDashboardHomeView({
               <TabsList className="grid h-11 w-full grid-cols-3 gap-1 rounded-xl border border-border/60 bg-muted/50 p-1">
                 <TabsTrigger
                   value="latest"
-                  className="h-full rounded-lg border-0 text-xs font-medium text-black data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
+                  className="h-full rounded-lg border-0 text-xs font-medium data-[state=inactive]:text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
                 >
                   Latest
                 </TabsTrigger>
                 <TabsTrigger
                   value="attention"
-                  className="h-full rounded-lg border-0 text-xs font-medium text-black data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
+                  className="h-full rounded-lg border-0 text-xs font-medium data-[state=inactive]:text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
                 >
                   Needs Attention
                 </TabsTrigger>
                 <TabsTrigger
                   value="updated"
-                  className="h-full rounded-lg border-0 text-xs font-medium text-black data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
+                  className="h-full rounded-lg border-0 text-xs font-medium data-[state=inactive]:text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-black data-[state=active]:shadow-sm sm:text-sm"
                 >
                   Recently Updated
                 </TabsTrigger>

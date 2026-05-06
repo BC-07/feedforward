@@ -224,6 +224,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [feedbackTabAnimDirection, setFeedbackTabAnimDirection] = useState<
     "left" | "right"
   >("left");
+  const [feedbackModalHeight, setFeedbackModalHeight] = useState<number | null>(
+    null,
+  );
   const [isUnsentMessageDialogOpen, setIsUnsentMessageDialogOpen] =
     useState(false);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
@@ -233,6 +236,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const conversationScrollRef = useRef<HTMLDivElement>(null);
   const createSubmissionDialogContentRef = useRef<HTMLDivElement>(null);
   const previousFeedbackTabRef = useRef<"details" | "messages">("details");
+  const feedbackModalContentRef = useRef<HTMLDivElement>(null);
+  const detailsTabContentRef = useRef<HTMLDivElement>(null);
   const submissionsScrollTop = useRef(0);
   const feedbackSubmitLockRef = useRef(false);
   const [createSubmissionFormModalHeight, setCreateSubmissionFormModalHeight] =
@@ -459,6 +464,42 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       document.body.style.overflow = previousOverflow;
     };
   }, [selectedFeedback]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!selectedFeedback) {
+      setFeedbackModalHeight(null);
+      return;
+    }
+
+    const computeModalHeight = () => {
+      const maxHeightPx = Math.round(window.innerHeight * 0.83);
+
+      if (activeFeedbackTab === "messages") {
+        setFeedbackModalHeight(maxHeightPx);
+        return;
+      }
+
+      // Measure only the Details tab content so the Messages tab DOM
+      // (which stays mounted) doesn't inflate the reading.
+      const contentHeight = detailsTabContentRef.current?.scrollHeight ?? 0;
+      const desiredDetailsHeight = Math.max(420, contentHeight + 10);
+      setFeedbackModalHeight(Math.min(maxHeightPx, desiredDetailsHeight));
+    };
+
+    // Use rAF so the Details tab content is fully painted before measuring.
+    let rafId = requestAnimationFrame(computeModalHeight);
+    const updateModalHeight = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(computeModalHeight);
+    };
+
+    window.addEventListener("resize", updateModalHeight);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", updateModalHeight);
+    };
+  }, [activeFeedbackTab, selectedFeedback, selectedFeedback?.id]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1513,10 +1554,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               <Card className="h-full border shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
                 <CardContent className="flex h-full flex-col gap-3 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="min-h-[1.25rem] break-all text-xs text-muted-foreground">
+                    <p className="min-h-[1.25rem] break-all text-xs !text-muted-foreground">
                       {feedback.id}
                     </p>
-                    <span className="whitespace-nowrap text-[11px] text-muted-foreground">
+                    <span className="whitespace-nowrap text-[11px] !text-muted-foreground">
                       {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                     </span>
                   </div>
@@ -1524,7 +1565,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     {feedback.subject}
                   </p>
                   <p
-                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground ${
+                    className={`line-clamp-2 min-h-[2.5rem] text-sm !text-muted-foreground ${
                       feedback.message.trim().length > 70 &&
                       /\s/.test(feedback.message.trim())
                         ? "indent-5"
@@ -1534,7 +1575,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     {feedback.message}
                   </p>
                   <div className="mt-auto flex items-center justify-between">
-                    <span className="rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs text-foreground">
+                    <span className="rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs !text-muted-foreground">
                       {feedback.category}
                     </span>
                     <span className="inline-flex items-center">
@@ -1813,7 +1854,14 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                         </div>
                       </>
                     )}
-                    <Card className="ff-modal-panel relative z-10 w-full max-w-[530px] h-[83vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
+                    <Card
+                      className="ff-modal-panel relative z-10 w-full max-w-[530px] min-h-0 flex flex-col overflow-hidden shadow-2xl transition-[height] duration-300 ease-in-out"
+                      style={
+                        feedbackModalHeight
+                          ? { height: `${feedbackModalHeight}px` }
+                          : undefined
+                      }
+                    >
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1823,7 +1871,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       >
                         <X className="h-3.5 w-3.5" />
                       </Button>
-                      <CardContent className="ff-hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pt-3 pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                      <CardContent
+                        ref={feedbackModalContentRef}
+                        className="ff-hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pt-3 pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      >
 
                         <Tabs
                           value={activeFeedbackTab}
@@ -1852,6 +1903,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
                           <TabsContent value="details" className="mt-0 space-y-3">
                             <div
+                              ref={detailsTabContentRef}
                               key={`user-details-tab-${activeFeedbackTab}`}
                               className={feedbackTabAnimDirection === "left" ? "ff-step-slide-in-left" : "ff-step-slide-in-right"}
                             >
@@ -2021,7 +2073,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                                     : "border border-border bg-background text-foreground"
                                                 }`}
                                               >
-                                                <p className="whitespace-pre-line break-words">{entry.message}</p>
+                                                <p className={`whitespace-pre-line break-words ${isUser ? "!text-white" : ""}`}>{entry.message}</p>
                                               </div>
                                               {entry.createdAt ? (
                                                 <span
