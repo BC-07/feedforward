@@ -172,7 +172,7 @@ func ForgotPassword(c *fiber.Ctx) error {
 	if err != nil || strings.TrimSpace(user.ID) == "" {
 		admin, adminErr := fetchAdminByEmail(email)
 		if adminErr != nil || strings.TrimSpace(admin.ID) == "" {
-			return success(c, fiber.StatusOK, map[string]any{"sent": true})
+			return invalidRequest(c, "email is not registered")
 		}
 		role = "admin"
 	}

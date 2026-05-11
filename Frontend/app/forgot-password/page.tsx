@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Mail, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Mail, ShieldCheck, X } from "lucide-react";
 import { forgotPassword, verifyResetOTP } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,24 +29,51 @@ export default function ForgotPasswordPage() {
   const [step, setStep] = useState<"request" | "verify">("request");
   const [isRequesting, setIsRequesting] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [hasRequestedOtp, setHasRequestedOtp] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [otpError, setOtpError] = useState("");
+
+  useEffect(() => {
+    if (!emailError) return;
+    const timeoutId = window.setTimeout(() => {
+      setEmailError("");
+    }, 3500);
+    return () => window.clearTimeout(timeoutId);
+  }, [emailError]);
+
+  const closeOtpModal = () => {
+    setStep("request");
+    setOtp("");
+    setHasRequestedOtp(false);
+    setOtpError("");
+  };
 
   const handleRequestOTP = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalizedEmail = email.trim();
     if (!normalizedEmail) {
+      setEmailError("Please enter your email.");
       toast.error("Please enter your email.");
       return;
     }
+    setEmailError("");
     setIsRequesting(true);
     try {
       const response = await forgotPassword({ email: normalizedEmail });
       if (response.sent) {
-        toast.success("If your email exists, an OTP was sent.");
         setStep("verify");
+        setHasRequestedOtp(true);
+        setEmailError("");
+        setOtpError("");
+        toast.success("OTP sent. Check your email for the 6-digit code.");
         setOtp("");
       }
     } catch (error) {
-      toastApiError(error, "Failed to send OTP");
+      setStep("request");
+      setHasRequestedOtp(false);
+      setOtp("");
+      setOtpError("");
+      setEmailError("Email is invalid or not registered.");
     } finally {
       setIsRequesting(false);
     }
@@ -61,11 +88,13 @@ export default function ForgotPasswordPage() {
       return;
     }
     if (normalizedOtp.length !== 6) {
+      setOtpError("Enter the 6-digit OTP.");
       toast.error("Enter the 6-digit OTP sent to your email.");
       return;
     }
 
     setIsVerifying(true);
+    setOtpError("");
     try {
       const verification = await verifyResetOTP({
         email: normalizedEmail,
@@ -79,6 +108,7 @@ export default function ForgotPasswordPage() {
       }
       router.push("/reset-password");
     } catch (error) {
+      setOtpError("Incorrect or expired OTP. Please try again.");
       toastApiError(error, "Failed to verify OTP");
     } finally {
       setIsVerifying(false);
@@ -109,11 +139,25 @@ export default function ForgotPasswordPage() {
                     id="email"
                     type="email"
                     placeholder="Enter your email"
-                    className="pl-10"
+                    className={`pl-10 ${emailError ? "border-destructive ring-1 ring-destructive" : ""}`}
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (emailError) setEmailError("");
+                    }}
                     required
                   />
+                  {emailError ? (
+                    <div className="pointer-events-none absolute right-0 top-0 z-20 -translate-y-[115%]">
+                      <div className="relative flex items-center gap-2 rounded-md border border-amber-300/50 bg-amber-50/70 px-3 py-2 text-sm text-amber-900 shadow-sm backdrop-blur-sm">
+                        <div className="flex h-5 w-5 items-center justify-center rounded-sm bg-amber-400/80 text-amber-950">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                        </div>
+                        <span>{emailError}</span>
+                        <span className="absolute -bottom-1 right-4 h-2 w-2 rotate-45 border-b border-r border-amber-300/50 bg-amber-50/70" />
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
               <Button
@@ -129,8 +173,23 @@ export default function ForgotPasswordPage() {
         </Card>
 
         {step === "verify" ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 sm:px-4">
-            <Card className="w-[92vw] max-w-md border border-muted/60 bg-white shadow-xl sm:w-full">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 sm:px-4"
+            onClick={closeOtpModal}
+          >
+            <Card
+              className="relative w-[92vw] max-w-md border border-muted/60 bg-white shadow-xl sm:w-full"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                aria-label="Close OTP modal"
+                className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                onClick={closeOtpModal}
+                disabled={isVerifying || isRequesting}
+              >
+                <X className="h-4 w-4" />
+              </button>
               <CardHeader className="text-center pb-3">
                 <CardTitle className="text-lg sm:text-xl">Enter OTP</CardTitle>
                 <CardDescription>
@@ -139,28 +198,46 @@ export default function ForgotPasswordPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <form onSubmit={handleVerifyOTP} className="space-y-4">
-                  <InputOTP
-                    id="otp"
-                    maxLength={6}
-                    value={otp}
-                    onChange={setOtp}
-                    containerClassName="justify-center"
-                  >
-                  <InputOTPGroup className="gap-2 sm:gap-3">
-                    {[0, 1, 2, 3, 4, 5].map((index) => (
-                      <InputOTPSlot
-                        key={index}
-                        index={index}
-                        className="h-10 w-10 rounded-md text-sm sm:h-14 sm:w-14 sm:text-lg"
-                      />
-                    ))}
-                  </InputOTPGroup>
-                </InputOTP>
+                  <div className="relative">
+                    {otpError ? (
+                      <div className="pointer-events-none absolute bottom-full left-0 right-0 z-20 mb-2">
+                        <div className="relative flex w-full items-center gap-2 rounded-md border border-rose-300/50 bg-rose-50/70 px-3 py-2 text-sm text-rose-900 shadow-sm backdrop-blur-sm">
+                          <div className="flex h-5 w-5 items-center justify-center rounded-sm bg-rose-400/80 text-rose-950">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="min-w-0 break-words leading-5">{otpError}</span>
+                          <span className="absolute -bottom-1 right-6 h-2 w-2 rotate-45 border-b border-r border-rose-300/50 bg-rose-50/70" />
+                        </div>
+                      </div>
+                    ) : null}
+                    <InputOTP
+                      id="otp"
+                      maxLength={6}
+                      value={otp}
+                      onChange={(value) => {
+                        setOtp(value);
+                        if (otpError) setOtpError("");
+                      }}
+                      containerClassName="justify-center"
+                    >
+                      <InputOTPGroup className="gap-2 sm:gap-3">
+                        {[0, 1, 2, 3, 4, 5].map((index) => (
+                          <InputOTPSlot
+                            key={index}
+                            index={index}
+                            className={`h-10 w-10 rounded-md text-sm sm:h-14 sm:w-14 sm:text-lg ${
+                              otpError ? "border-destructive ring-1 ring-destructive" : ""
+                            }`}
+                          />
+                        ))}
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
                   <Button
                     type="submit"
                     className="w-full bg-accent hover:bg-accent/90"
                     size="lg"
-                    disabled={isVerifying}
+                    disabled={isVerifying || !hasRequestedOtp}
                   >
                     {isVerifying ? "Verifying..." : "Verify"}
                   </Button>
@@ -181,7 +258,8 @@ export default function ForgotPasswordPage() {
                     try {
                       const response = await forgotPassword({ email: normalizedEmail });
                       if (response.sent) {
-                        toast.success("If your email exists, an OTP was sent.");
+                        toast.success("OTP sent. Check your email for the 6-digit code.");
+                        setOtpError("");
                         setOtp("");
                       }
                     } catch (error) {
