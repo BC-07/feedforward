@@ -108,8 +108,7 @@ export default function ForgotPasswordPage() {
       }
       router.push("/reset-password");
     } catch (error) {
-      setOtpError("Incorrect or expired OTP. Please try again.");
-      toastApiError(error, "Failed to verify OTP");
+      setOtpError("Incorrect or expired OTP");
     } finally {
       setIsVerifying(false);
     }
@@ -191,25 +190,29 @@ export default function ForgotPasswordPage() {
                 <X className="h-4 w-4" />
               </button>
               <CardHeader className="text-center pb-3">
-                <CardTitle className="text-lg sm:text-xl">Enter OTP</CardTitle>
+                <CardTitle className="text-lg sm:text-xl">One-Time Password</CardTitle>
                 <CardDescription>
                   Code sent to {email.trim() || "your email"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <form onSubmit={handleVerifyOTP} className="space-y-4">
-                  <div className="relative">
-                    {otpError ? (
-                      <div className="pointer-events-none absolute bottom-full left-0 right-0 z-20 mb-2">
-                        <div className="relative flex w-full items-center gap-2 rounded-md border border-rose-300/50 bg-rose-50/70 px-3 py-2 text-sm text-rose-900 shadow-sm backdrop-blur-sm">
-                          <div className="flex h-5 w-5 items-center justify-center rounded-sm bg-rose-400/80 text-rose-950">
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                          </div>
-                          <span className="min-w-0 break-words leading-5">{otpError}</span>
-                          <span className="absolute -bottom-1 right-6 h-2 w-2 rotate-45 border-b border-r border-rose-300/50 bg-rose-50/70" />
+                  {otpError ? (
+                    <div className="relative">
+                      <div className="relative flex w-full items-start gap-2 rounded-xl border border-rose-300/50 bg-rose-50/70 px-4 py-3 text-rose-900 shadow-sm backdrop-blur-sm">
+                        <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-sm bg-rose-400/80 text-rose-950">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0 leading-5">
+                          <p className="font-semibold text-rose-800">Incorrect or expired OTP</p>
+                          <p className="text-rose-900/80">
+                            Double-check the code or request a new one below.
+                          </p>
                         </div>
                       </div>
-                    ) : null}
+                    </div>
+                  ) : null}
+                  <div className="relative">
                     <InputOTP
                       id="otp"
                       maxLength={6}
@@ -239,7 +242,7 @@ export default function ForgotPasswordPage() {
                     size="lg"
                     disabled={isVerifying || !hasRequestedOtp}
                   >
-                    {isVerifying ? "Verifying..." : "Verify"}
+                    {isVerifying ? "Verifying..." : otpError ? "Try again" : "Verify"}
                   </Button>
                 </form>
                 <div className="text-center text-xs text-muted-foreground">
