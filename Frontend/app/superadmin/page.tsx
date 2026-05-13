@@ -1198,15 +1198,15 @@ export default function SuperAdminDashboard() {
                       selected range.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="relative flex flex-col">
+                  <CardContent className="relative flex flex-1 flex-col">
                     {categorySubmissions7DaysChartData.length === 0 ? (
-                      <p className="py-10 text-center text-sm text-muted-foreground">
+                      <p className="flex flex-1 items-center justify-center py-10 text-center text-sm text-muted-foreground">
                         {isDashboardStatsLoading
                           ? "Loading statistics..."
                           : "No submissions in the last 7 days."}
                       </p>
                     ) : (
-                      <div className="flex flex-col gap-6">
+                      <div className="flex flex-1 flex-col gap-6">
                         <div className="grid gap-6 md:grid-cols-2">
                           {categorySubmissionColumns.map(
                             (column, columnIndex) => (
@@ -1247,14 +1247,15 @@ export default function SuperAdminDashboard() {
                             ),
                           )}
                         </div>
-                        <SimplePaginationFooter
-                          page={currentTopCategoriesPage}
-                          totalPages={topCategoriesTotalPages}
-                          onPrevious={() => setTopCategoriesPage(Math.max(1, currentTopCategoriesPage - 1))}
-                          onNext={() => setTopCategoriesPage(Math.min(topCategoriesTotalPages, currentTopCategoriesPage + 1))}
-                        />
                       </div>
                     )}
+                    <SimplePaginationFooter
+                      className="mt-auto"
+                      page={currentTopCategoriesPage}
+                      totalPages={topCategoriesTotalPages}
+                      onPrevious={() => setTopCategoriesPage(Math.max(1, currentTopCategoriesPage - 1))}
+                      onNext={() => setTopCategoriesPage(Math.min(topCategoriesTotalPages, currentTopCategoriesPage + 1))}
+                    />
                     {isDashboardStatsLoading &&
                       categorySubmissions7DaysChartData.length > 0 && (
                         <div className="pointer-events-none absolute inset-0 rounded-b-xl bg-gradient-to-br from-background/10 via-background/25 to-background/40 motion-safe:animate-pulse" />
@@ -1264,7 +1265,7 @@ export default function SuperAdminDashboard() {
               </div>
 
               <div className="grid gap-6 xl:grid-cols-2">
-                <Card>
+                <Card className="flex flex-col">
                   <CardHeader>
                     <CardTitle className="text-base">
                       Category Assignment Table
@@ -1362,7 +1363,7 @@ export default function SuperAdminDashboard() {
                       New admin accounts created
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="flex flex-1 flex-col gap-4">
                     <ChartContainer
                       config={dashboardBarChartConfig}
                       className="h-[190px] w-full"
@@ -1462,14 +1463,13 @@ export default function SuperAdminDashboard() {
                         </TableBody>
                       </Table>
                     </div>
-                    {recent7DayAdmins.length > 0 && (
-                      <SimplePaginationFooter
-                        page={currentRecentPage}
-                        totalPages={recentTotalPages}
-                        onPrevious={() => setRecentPage(Math.max(1, currentRecentPage - 1))}
-                        onNext={() => setRecentPage(Math.min(recentTotalPages, currentRecentPage + 1))}
-                      />
-                    )}
+                    <SimplePaginationFooter
+                      className="mt-auto"
+                      page={currentRecentPage}
+                      totalPages={recentTotalPages}
+                      onPrevious={() => setRecentPage(Math.max(1, currentRecentPage - 1))}
+                      onNext={() => setRecentPage(Math.min(recentTotalPages, currentRecentPage + 1))}
+                    />
                   </CardContent>
                 </Card>
               </div>

@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "./select";
+import { cn } from "./utils";
 
 type TablePaginationFooterProps = {
   page: number;
@@ -26,6 +27,7 @@ type SimplePaginationFooterProps = {
   totalPages: number;
   onPrevious: () => void;
   onNext: () => void;
+  className?: string;
 };
 
 export function SimplePaginationFooter({
@@ -33,9 +35,15 @@ export function SimplePaginationFooter({
   totalPages,
   onPrevious,
   onNext,
+  className,
 }: SimplePaginationFooterProps) {
   return (
-    <div className="flex items-center justify-end gap-2 text-xs text-black">
+    <div
+      className={cn(
+        "flex items-center justify-end gap-2 text-xs text-black",
+        className,
+      )}
+    >
       <Button
         type="button"
         variant="outline"
