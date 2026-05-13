@@ -483,7 +483,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       // Measure only the Details tab content so the Messages tab DOM
       // (which stays mounted) doesn't inflate the reading.
       const contentHeight = detailsTabContentRef.current?.scrollHeight ?? 0;
-      const desiredDetailsHeight = Math.max(420, contentHeight + 10);
+      const desiredDetailsHeight = Math.max(410, contentHeight + 70);
       setFeedbackModalHeight(Math.min(maxHeightPx, desiredDetailsHeight));
     };
 
@@ -1790,12 +1790,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       mySubmissionsTotalPages={mySubmissionsTotalPages}
                       submissionsScrollRef={submissionsScrollRef}
                       submissionsScrollKey={submissionsScrollKey}
-                      submissionsScrollTop={submissionsScrollTop}
+                      submissionsScrollTopRef={submissionsScrollTop}
                       mySubmissionsPlaceholderRowCount={mySubmissionsPlaceholderRowCount}
                       activeFilterChips={activeFilterChips}
                       activeFilterCount={activeFilterCount}
                       hoverFilterItems={hoverFilterItems}
-                      desktopInlineFilterItems={desktopInlineFilterItems}
                       onSearchChange={setSearchQuery}
                       onFilterTypeChange={setFilterType}
                       onFilterPriorityChange={setFilterPriority}

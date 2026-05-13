@@ -48,7 +48,6 @@ import {
   SUBMISSION_FILTER_CONTROL_CLASS,
   SUBMISSION_FILTER_TEXT_COLOR,
   MY_SUBMISSIONS_PAGE_SIZE_OPTIONS,
-  USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY,
   type HoverFilterKey,
 } from "./constants";
 
@@ -72,12 +71,11 @@ interface UserDashboardMySubmissionsViewProps {
   mySubmissionsTotalPages: number;
   submissionsScrollRef: React.RefObject<HTMLDivElement | null>;
   submissionsScrollKey: string;
-  submissionsScrollTop: React.MutableRefObject<number>;
+  submissionsScrollTopRef: React.MutableRefObject<number>;
   mySubmissionsPlaceholderRowCount: number;
   activeFilterChips: FilterChip[];
   activeFilterCount: number;
   hoverFilterItems: HoverFilterItem<HoverFilterKey>[];
-  desktopInlineFilterItems: HoverFilterItem<HoverFilterKey>[];
   onSearchChange: (value: string) => void;
   onFilterTypeChange: (updater: (prev: string[]) => string[]) => void;
   onFilterPriorityChange: (updater: (prev: string[]) => string[]) => void;
@@ -113,12 +111,11 @@ export function UserDashboardMySubmissionsView({
   mySubmissionsTotalPages,
   submissionsScrollRef,
   submissionsScrollKey,
-  submissionsScrollTop,
+  submissionsScrollTopRef,
   mySubmissionsPlaceholderRowCount,
   activeFilterChips,
   activeFilterCount,
   hoverFilterItems,
-  desktopInlineFilterItems,
   onSearchChange,
   onFilterTypeChange,
   onFilterPriorityChange,
@@ -140,19 +137,30 @@ export function UserDashboardMySubmissionsView({
 }: UserDashboardMySubmissionsViewProps) {
   if (feedbacks.length === 0) {
     return (
-      <Card className="h-full border shadow-sm flex flex-col">
-        <CardContent className="pt-6 flex-1 flex items-center">
-          <div className="text-center py-8 w-full">
-            <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="mb-2 text-lg font-normal">
-              No Submissions Yet
-            </h3>
-            <p className="text-black">
-              No submissions yet. Use Submit Feedback to create your first one.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <>
+        {renderCreateSubmissionDialog()}
+        <Card className="h-full border shadow-sm flex flex-col">
+          <CardContent className="pt-6 flex-1 flex items-center">
+            <div className="text-center py-8 w-full">
+              <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="mb-2 text-lg font-normal">
+                No Submissions Yet
+              </h3>
+              <p className="text-black">
+                Create your first feedback submission to start tracking it here.
+              </p>
+              <Button
+                type="button"
+                onClick={onCreateSubmissionClick}
+                className="mt-5 h-9 bg-accent hover:bg-accent/90 transition-colors duration-150 hover:-translate-y-px"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New Submission
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </>
     );
   }
 
@@ -395,7 +403,7 @@ export function UserDashboardMySubmissionsView({
         className="ff-hide-scrollbar flex-1 min-h-0 w-full max-w-full overflow-y-scroll overflow-x-hidden md:[scrollbar-gutter:stable] h-[calc(100vh-260px)]"
         onScroll={(event) => {
           const top = event.currentTarget.scrollTop;
-          submissionsScrollTop.current = top;
+          submissionsScrollTopRef.current = top;
           if (typeof window !== "undefined") {
             window.sessionStorage.setItem(submissionsScrollKey, top.toString());
           }
