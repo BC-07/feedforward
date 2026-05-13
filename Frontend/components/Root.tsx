@@ -69,7 +69,7 @@ export default function RootLayout({
       <body className="min-h-screen min-h-[100svh] bg-background flex flex-col">
         {/* Header */}
         <header className="border-b border-border bg-white">
-          <div className="container mx-auto px-4 py-4">
+          <div className="w-full py-4 pr-4">
             <div className="flex items-center justify-between">
               <Link href="/" className="flex items-center gap-2">
                 <ArrowRight className="h-8 w-8 text-accent" />

@@ -129,6 +129,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     department: string;
   } | null>(null);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [isFeedbacksLoading, setIsFeedbacksLoading] = useState(true);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [isCreateSubmissionOpen, setIsCreateSubmissionOpen] = useState(false);
   const [createSubmissionStep, setCreateSubmissionStep] =
@@ -264,11 +265,14 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   );
 
   async function loadUserFeedbacks(userId: string) {
+    setIsFeedbacksLoading(true);
     try {
       const userFeedbacks = await listFeedbacks({ userId });
       setFeedbacks(userFeedbacks);
     } catch (error) {
       toastApiError(error, "Failed to load feedbacks.");
+    } finally {
+      setIsFeedbacksLoading(false);
     }
   }
 
@@ -344,6 +348,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   useEffect(() => {
     if (!currentUser?.id) return;
 
+    setIsFeedbacksLoading(true);
     void listFeedbacks({ userId: currentUser.id })
       .then((userFeedbacks) => {
         startTransition(() => {
@@ -352,6 +357,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       })
       .catch((error) => {
         toastApiError(error, "Failed to load feedbacks.");
+      })
+      .finally(() => {
+        setIsFeedbacksLoading(false);
       });
   }, [currentUser?.id]);
 
@@ -483,7 +491,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       // Measure only the Details tab content so the Messages tab DOM
       // (which stays mounted) doesn't inflate the reading.
       const contentHeight = detailsTabContentRef.current?.scrollHeight ?? 0;
-      const desiredDetailsHeight = Math.max(410, contentHeight + 70);
+      const desiredDetailsHeight = Math.max(410, contentHeight + 77);
       setFeedbackModalHeight(Math.min(maxHeightPx, desiredDetailsHeight));
     };
 
@@ -1777,6 +1785,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   ) : isMySubmissionsView ? (
                     <UserDashboardMySubmissionsView
                       feedbacks={feedbacks}
+                      isFeedbacksLoading={isFeedbacksLoading}
                       filteredFeedbacks={filteredFeedbacks}
                       paginatedFilteredFeedbacks={paginatedFilteredFeedbacks}
                       searchQuery={searchQuery}
@@ -2008,10 +2017,22 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                 className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto p-3"
                               >
                                 {isMessagesLoading ? (
-                                  <p className="text-sm text-muted-foreground">Loading conversation...</p>
+                                  <div className="flex h-full items-center justify-center">
+                                    <p className="text-sm text-muted-foreground">Loading conversation...</p>
+                                  </div>
                                 ) : null}
                                 {!isMessagesLoading && messages.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">No messages yet.</p>
+                                  <div className="flex h-full items-center justify-center">
+                                    <div className="text-center">
+                                      <MessageCircle className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                                      <p className="text-sm text-muted-foreground">
+                                        No messages yet
+                                      </p>
+                                      <p className="text-xs text-muted-foreground/60">
+                                        Send a message to start the conversation
+                                      </p>
+                                    </div>
+                                  </div>
                                 ) : null}
                                 <div className="space-y-3">
                                   {(() => {
@@ -2066,13 +2087,13 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                                 <p className="mb-1 px-1 text-[11px] font-normal text-muted-foreground">{name}</p>
                                               ) : null}
                                               <div
-                                                className={`rounded-2xl px-3 py-2 text-xs ${
+                                                className={`rounded-2xl px-3 py-2 text-sm ${
                                                   isUser
                                                     ? USER_MESSAGE_BUBBLE_CLASS
                                                     : "border border-border bg-background text-foreground"
                                                 }`}
                                               >
-                                                <p className={`whitespace-pre-line break-words ${isUser ? "!text-white" : ""}`}>{entry.message}</p>
+                                                <p className={`whitespace-pre-line break-words leading-relaxed ${isUser ? "!text-white" : ""}`}>{entry.message}</p>
                                               </div>
                                               {entry.createdAt ? (
                                                 <span

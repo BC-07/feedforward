@@ -193,6 +193,26 @@ export async function getFeedback(id: string): Promise<Feedback> {
   return apiFetch<Feedback>(`/feedbacks/${encodeURIComponent(id)}`);
 }
 
+export async function getFeedbackPublic(id: string): Promise<Feedback> {
+  const response = await fetch(
+    `${API_BASE_URL}/feedbacks/${encodeURIComponent(id)}`,
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "X-Track-Public": "true",
+      },
+      credentials: "omit",
+    },
+  );
+
+  const payloadResponse = (await response.json()) as ApiResponse<Feedback>;
+  if (!response.ok) {
+    throw new Error(payloadResponse?.message || "Request failed");
+  }
+
+  return payloadResponse.data;
+}
+
 export async function createFeedback(
   payload: Omit<Feedback, "createdAt" | "updatedAt">,
 ): Promise<Feedback> {

@@ -24,7 +24,7 @@ export const CONVERSATION_MESSAGE_MAX_LENGTH = 2000;
 
 // Styling
 export const USER_MESSAGE_BUBBLE_CLASS =
-  "border border-[#E0A400] bg-[#F4B000] text-white";
+  "bg-accent text-white shadow-sm";
 export const SUBMISSION_FILTER_TEXT_COLOR = "#171717";
 export const SUBMISSION_FILTER_CONTROL_CLASS =
   "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";

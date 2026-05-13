@@ -26,6 +26,9 @@ func ListFeedbackMessages(c *fiber.Ctx) error {
 	if feedback.ID == "" {
 		return notFound(c, "feedback not found", nil)
 	}
+	if isPublicTrackRequest(c) && isAccountLinkedFeedback(feedback) {
+		return notFound(c, "feedback not found", nil)
+	}
 
 	var messages []model.FeedbackMessageModel
 	if err := middleware.DBConn.Raw(
@@ -54,6 +57,9 @@ func CreateFeedbackMessage(c *fiber.Ctx) error {
 	if feedback.ID == "" {
 		return notFound(c, "feedback not found", nil)
 	}
+	if isPublicTrackRequest(c) && isAccountLinkedFeedback(feedback) {
+		return notFound(c, "feedback not found", nil)
+	}
 
 	var payload feedbackMessagePayload
 	if err := parseBody(c, &payload); err != nil {
@@ -71,13 +77,13 @@ func CreateFeedbackMessage(c *fiber.Ctx) error {
 	}
 
 	sessionID := strings.TrimSpace(c.Cookies(sessionCookieName))
-	isPublicTrackRequest := strings.EqualFold(strings.TrimSpace(c.Get("X-Track-Public")), "true")
+	isPublicTrackMessage := isPublicTrackRequest(c)
 	senderRole := sessionRoleUser
 	var senderID *string
 	senderName := ""
 
 	if sessionID == "" {
-		if !isPublicTrackRequest {
+		if !isPublicTrackMessage {
 			return unauthorized(c, "session is required")
 		}
 		// Track page supports ID-based follow-up messages even without an

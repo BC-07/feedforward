@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   createFeedbackMessagePublic,
-  getFeedback,
+  getFeedbackPublic,
   listFeedbackMessages,
   type Feedback,
   type FeedbackMessage,
@@ -14,10 +14,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, MessageCircle, Clock } from "lucide-react";
+import { Search, MessageCircle, Send, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
+import {
+  CONVERSATION_MESSAGE_MAX_LENGTH,
+  USER_MESSAGE_BUBBLE_CLASS,
+} from "@/components/user/constants";
 
 export default function TrackFeedback() {
   const searchParams = useSearchParams();
@@ -52,10 +56,11 @@ export default function TrackFeedback() {
   const normalizeTrackingId = (value: string) => value.trim().toUpperCase();
   const isValidTrackingId = (value: string) =>
     /^FF-[A-Z0-9]+$/.test(value) && value.length >= 6;
+  const isAccountOwnedFeedback = !!feedback?.userId?.trim();
 
   const searchFeedback = async (id: string) => {
     try {
-      const found = await getFeedback(id.trim());
+      const found = await getFeedbackPublic(id.trim());
       setFeedback(found);
       setNotFound(false);
     } catch {
@@ -112,9 +117,8 @@ export default function TrackFeedback() {
       return;
     }
 
-    // Track page is intentionally "ID-based": anyone with a valid tracking ID
-    // can continue the conversation, even without an active account session.
-    setCanReply(true);
+    // Account-owned submissions are view-only in public tracking.
+    setCanReply(!isAccountOwnedFeedback);
 
     setIsLoadingMessages(true);
     listFeedbackMessages(feedback.id)
@@ -148,7 +152,7 @@ export default function TrackFeedback() {
       .finally(() => {
         setIsLoadingMessages(false);
       });
-  }, [feedback]);
+  }, [feedback, isAccountOwnedFeedback]);
 
   useEffect(() => {
     if (!feedback?.id) return;
@@ -186,10 +190,14 @@ export default function TrackFeedback() {
     });
   };
 
-  const formatAdminTime = formatLocalTime;
-
   const handleSendMessage = async () => {
     if (!feedback) return;
+    if (!canReply) {
+      toast.error(
+        "Messaging is disabled here for account-owned submissions. Please sign in to reply.",
+      );
+      return;
+    }
     const trimmed = messageDraft.trim();
     if (!trimmed) {
       toast.error("Please enter a message.");
@@ -390,19 +398,39 @@ export default function TrackFeedback() {
                       className={`flex min-h-0 flex-1 flex-col ${tabAnimDirection === "left" ? "ff-step-slide-in-left" : "ff-step-slide-in-right"}`}
                     >
                       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-muted/20">
+                        {!canReply ? (
+                          <div className="border-b border-border bg-amber-50/80 px-3 py-2">
+                            <p className="flex items-center gap-2 text-xs text-amber-700">
+                              <ShieldAlert className="h-3.5 w-3.5" />
+                              This is an account-owned submission. Messaging is disabled on public tracking.
+                            </p>
+                          </div>
+                        ) : null}
                         <div
                           ref={conversationScrollRef}
-                          className="ff-hide-scrollbar min-h-0 max-h-[360px] flex-1 overflow-y-auto p-3"
+                          className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto p-3"
                         >
                           {isLoadingMessages ? (
-                            <p className="text-sm text-muted-foreground">Loading conversation...</p>
+                            <div className="flex h-full items-center justify-center">
+                              <p className="text-sm text-muted-foreground">Loading conversation...</p>
+                            </div>
                           ) : null}
                           {!isLoadingMessages && messages.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                              No messages yet. Updates from the admin team will appear here.
-                            </p>
+                            <div className="flex h-full items-center justify-center">
+                              <div className="text-center">
+                                <MessageCircle className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                                <p className="text-sm text-muted-foreground">
+                                  No messages yet
+                                </p>
+                                <p className="text-xs text-muted-foreground/60">
+                                  {canReply
+                                    ? "Send a message to start the conversation"
+                                    : "Sign in to the linked account to reply"}
+                                </p>
+                              </div>
+                            </div>
                           ) : null}
-                          <div className="space-y-4">
+                          <div className="space-y-3">
                             {(() => {
                               let lastDayLabel = "";
                               return messages.map((entry, index, allMessages) => {
@@ -440,50 +468,43 @@ export default function TrackFeedback() {
                                   showDayLabel ||
                                   prev.senderRole !== entry.senderRole ||
                                   prevName !== name;
-                                const hasVeryLongToken = /\S{24,}/.test(entry.message || "");
                                 const isLikelyMultiLine =
                                   (entry.message || "").includes("\n") ||
                                   (entry.message || "").length > 60;
                                 return (
-                                  <div key={entry.id} className="space-y-3">
-                                    {showDayLabel && (
-                                      <div className="flex justify-center">
-                                        <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                                          {dayLabel}
-                                        </span>
+                                  <div key={`msg-${entry.id}`} className="space-y-2">
+                                    {showDayLabel ? (
+                                      <div className="flex items-center gap-2 py-1">
+                                        <div className="h-px flex-1 bg-border/60" />
+                                        <span className="text-[10px] font-normal text-muted-foreground">{dayLabel}</span>
+                                        <div className="h-px flex-1 bg-border/60" />
                                       </div>
-                                    )}
+                                    ) : null}
                                     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-                                      <div className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUser ? "text-right" : "text-left"}`}>
-                                        {showName && (
-                                          <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
-                                            {name}
-                                          </p>
-                                        )}
+                                      <div className={`group relative w-fit min-w-0 max-w-[85%] ${isUser ? "text-right" : "text-left"}`}>
+                                        {showName && !isUser ? (
+                                          <p className="mb-1 px-1 text-[11px] font-normal text-muted-foreground">{name}</p>
+                                        ) : null}
                                         <div
-                                          className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
+                                          className={`rounded-2xl px-3 py-2 text-sm ${
                                             isUser
-                                              ? "bg-accent text-white"
-                                              : "bg-white text-foreground border border-border"
+                                              ? USER_MESSAGE_BUBBLE_CLASS
+                                              : "border border-border bg-background text-foreground"
                                           }`}
                                         >
-                                          <p className={`whitespace-pre-line leading-relaxed ${hasVeryLongToken ? "break-all" : "break-words"}`}>
+                                          <p className={`whitespace-pre-line break-words leading-relaxed ${isUser ? "!text-white" : ""}`}>
                                             {entry.message}
                                           </p>
                                         </div>
                                         {entry.createdAt && (
                                           <span
-                                            className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-4 py-3 text-sm text-white shadow-sm group-hover:inline-flex ${
+                                            className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-black/50 px-2.5 py-1 text-[10px] text-white shadow-sm group-hover:inline-flex ${
                                               isUser ? "-left-1 -translate-x-full" : "-right-1 translate-x-full"
                                             } ${
                                               isLikelyMultiLine ? "top-1/2" : "top-[68%]"
                                             }`}
                                           >
-                                            {new Date(entry.createdAt).toLocaleDateString(
-                                              "en-US",
-                                              { weekday: "long" },
-                                            )}{" "}
-                                            {formatAdminTime(entry.createdAt)}
+                                            {formatLocalTime(entry.createdAt)}
                                           </span>
                                         )}
                                       </div>
@@ -495,16 +516,21 @@ export default function TrackFeedback() {
                           </div>
                         </div>
                         {canReply && (
-                          <div className="space-y-2 border-t border-border bg-background/90 p-2">
-                            <Label htmlFor="reply-message">Send a reply</Label>
-                            <div className="flex flex-col sm:flex-row gap-2">
+                          <div className="border-t border-border bg-background/90 p-2">
+                            <div className="flex items-end gap-2">
                               <Textarea
                                 id="reply-message"
                                 placeholder="Type your message..."
-                                rows={2}
+                                rows={1}
                                 value={messageDraft}
-                                onChange={(e) => setMessageDraft(e.target.value)}
+                                onChange={(e) =>
+                                  setMessageDraft(
+                                    e.target.value.slice(0, CONVERSATION_MESSAGE_MAX_LENGTH),
+                                  )
+                                }
+                                maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
                                 disabled={isSendingMessage}
+                                className="ff-hide-scrollbar w-full max-w-full min-w-0 max-h-[8rem] min-h-8 resize-none overflow-y-auto rounded-lg border border-border/70 bg-background px-3 py-2 text-xs leading-relaxed [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
                                 onKeyDown={(event) => {
                                   if (event.key === "Enter" && !event.shiftKey) {
                                     event.preventDefault();
@@ -515,10 +541,13 @@ export default function TrackFeedback() {
                               <Button
                                 type="button"
                                 onClick={handleSendMessage}
-                                className="bg-accent hover:bg-accent/90"
+                                size="icon"
+                                variant="secondary"
+                                className="h-9 w-9 shrink-0 rounded-lg border border-border/70 bg-muted/80 text-muted-foreground hover:bg-accent hover:text-white"
                                 disabled={isSendingMessage}
+                                aria-label="Send message"
                               >
-                                {isSendingMessage ? "Sending..." : "Send"}
+                                <Send className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>

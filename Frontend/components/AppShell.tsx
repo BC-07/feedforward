@@ -1201,7 +1201,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header
         className={`sticky top-0 z-50 border-b border-border bg-white ${collapsedSidebarOffsetClass}`}
       >
-        <div className={`container mx-auto px-4 ${topBarHeightClass}`}>
+        <div className={`w-full pl-4 pr-4 ${topBarHeightClass}`}>
           <div className="flex h-full items-center justify-between">
             <div className="flex items-center gap-3">
               {shouldShowSidebar && (

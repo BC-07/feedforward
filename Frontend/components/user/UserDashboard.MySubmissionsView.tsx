@@ -58,6 +58,7 @@ interface FilterChip {
 
 interface UserDashboardMySubmissionsViewProps {
   feedbacks: Feedback[];
+  isFeedbacksLoading: boolean;
   filteredFeedbacks: Feedback[];
   paginatedFilteredFeedbacks: Feedback[];
   searchQuery: string;
@@ -98,6 +99,7 @@ interface UserDashboardMySubmissionsViewProps {
 
 export function UserDashboardMySubmissionsView({
   feedbacks,
+  isFeedbacksLoading,
   filteredFeedbacks,
   paginatedFilteredFeedbacks,
   searchQuery,
@@ -135,6 +137,41 @@ export function UserDashboardMySubmissionsView({
   getStatusIcon,
   formatSubmittedAt,
 }: UserDashboardMySubmissionsViewProps) {
+  const [showEmptyState, setShowEmptyState] = React.useState(false);
+
+  React.useEffect(() => {
+    if (isFeedbacksLoading || feedbacks.length > 0) {
+      setShowEmptyState(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowEmptyState(true);
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [feedbacks.length, isFeedbacksLoading]);
+
+  if (feedbacks.length === 0 && !showEmptyState) {
+    return (
+      <>
+        {renderCreateSubmissionDialog()}
+        <Card className="h-full border shadow-sm flex flex-col">
+          <CardContent className="pt-6 flex-1 flex items-center">
+            <div className="text-center py-8 w-full">
+              <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground/60 mb-4" />
+              <h3 className="mb-2 text-lg font-normal">
+                Loading submissions...
+              </h3>
+            </div>
+          </CardContent>
+        </Card>
+      </>
+    );
+  }
+
   if (feedbacks.length === 0) {
     return (
       <>

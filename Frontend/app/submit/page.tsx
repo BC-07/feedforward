@@ -50,10 +50,6 @@ export default function Submit() {
     subject: "",
     message: "",
   });
-  const userEmail =
-    typeof window !== "undefined"
-      ? localStorage.getItem("currentUserEmail") || ""
-      : "";
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
@@ -112,23 +108,13 @@ export default function Submit() {
     setIsSubmittingFeedback(true);
 
     try {
-      const userId =
-        typeof window !== "undefined"
-          ? localStorage.getItem("currentUserId")
-          : null;
-      const userName =
-        typeof window !== "undefined"
-          ? localStorage.getItem("currentUserName") || "Guest"
-          : "Guest";
-
       await createFeedback({
         id: newTrackingId,
         ...formData,
         subject: normalizedSubject,
         message: normalizedMessage,
-        userId,
-        userName,
-        userEmail: userEmail || undefined,
+        userId: null,
+        userName: "Guest",
         status: "Pending",
         priority: "Medium",
         isAnonymous: true,
@@ -168,7 +154,6 @@ export default function Submit() {
       <div className="min-h-[calc(100vh-200px)] flex items-center justify-center bg-gradient-to-br from-white to-muted px-4 py-8 sm:py-12">
         <FeedbackSuccessCard
           trackingId={trackingId}
-          email={userEmail}
           onCopyTrackingId={copyToClipboard}
           onTrackSubmission={(id) =>
             router.push(`/track?trackingId=${encodeURIComponent(id)}`)
