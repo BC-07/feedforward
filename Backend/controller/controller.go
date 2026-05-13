@@ -58,6 +58,7 @@ const (
 	sessionCookieName        = "ff_session"
 	userSessionTTL           = 7 * 24 * time.Hour
 	adminSessionTTL          = 8 * time.Hour
+	rememberMeSessionTTL     = 30 * 24 * time.Hour
 	adminSessionIdleRotation = 5 * time.Minute
 	superAdminIdleTimeout    = 5 * time.Minute
 	reauthTTL                = 5 * time.Minute
@@ -83,6 +84,7 @@ type sessionRecord struct {
 	UserID             *string    `json:"userId"`
 	AdminID            *string    `json:"adminId"`
 	SuperAdminUsername *string    `json:"superAdminUsername"`
+	RememberMe         bool       `json:"rememberMe"`
 	CreatedAt          time.Time  `json:"createdAt"`
 	LastActivityAt     time.Time  `json:"lastActivityAt"`
 	ExpiresAt          time.Time  `json:"expiresAt"`
@@ -357,9 +359,9 @@ func ensureFeedbackEmailColumn() error {
 		}
 
 		feedbackEmailColumnErr = db.Exec(
-			`UPDATE `+feedbackTable+` f
+			`UPDATE ` + feedbackTable + ` f
 			 SET user_email = u.email
-			 FROM `+userTable+` u
+			 FROM ` + userTable + ` u
 			 WHERE f.user_id = u.id AND (f.user_email IS NULL OR f.user_email = '')`,
 		).Error
 	})
@@ -376,11 +378,18 @@ func ensureSessionStore() error {
 				user_id VARCHAR(64),
 				admin_id VARCHAR(64),
 				superadmin_username VARCHAR(120),
+				remember_me BOOLEAN NOT NULL DEFAULT FALSE,
 				created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 				last_activity_at TIMESTAMPTZ NOT NULL,
 				expires_at TIMESTAMPTZ NOT NULL,
 				reauth_expires_at TIMESTAMPTZ
 			)`,
+		).Error
+		if sessionTableErr != nil {
+			return
+		}
+		sessionTableErr = db.Exec(
+			`ALTER TABLE ` + sessionTable + ` ADD COLUMN IF NOT EXISTS remember_me BOOLEAN NOT NULL DEFAULT FALSE`,
 		).Error
 		if sessionTableErr != nil {
 			return
@@ -400,7 +409,7 @@ func newSessionID() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(bytes), nil
 }
 
-func createSession(role string, userID *string, adminID *string, superadminUsername *string, ttl time.Duration) (sessionRecord, error) {
+func createSession(role string, userID *string, adminID *string, superadminUsername *string, ttl time.Duration, rememberMe bool) (sessionRecord, error) {
 	if err := ensureSessionStore(); err != nil {
 		return sessionRecord{}, err
 	}
@@ -416,19 +425,21 @@ func createSession(role string, userID *string, adminID *string, superadminUsern
 		UserID:             userID,
 		AdminID:            adminID,
 		SuperAdminUsername: superadminUsername,
+		RememberMe:         rememberMe,
 		CreatedAt:          now,
 		LastActivityAt:     now,
 		ExpiresAt:          expiresAt,
 	}
 
 	if err := middleware.DBConn.Exec(
-		`INSERT INTO `+sessionTable+` (id, role, user_id, admin_id, superadmin_username, created_at, last_activity_at, expires_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO `+sessionTable+` (id, role, user_id, admin_id, superadmin_username, remember_me, created_at, last_activity_at, expires_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		session.ID,
 		session.Role,
 		session.UserID,
 		session.AdminID,
 		session.SuperAdminUsername,
+		session.RememberMe,
 		session.CreatedAt,
 		session.LastActivityAt,
 		session.ExpiresAt,
@@ -445,7 +456,7 @@ func fetchSessionByID(id string) (sessionRecord, error) {
 	}
 	var session sessionRecord
 	err := middleware.DBConn.Raw(
-		`SELECT id, role, user_id, admin_id, superadmin_username, created_at, last_activity_at, expires_at, reauth_expires_at
+		`SELECT id, role, user_id, admin_id, superadmin_username, COALESCE(remember_me, FALSE) AS remember_me, created_at, last_activity_at, expires_at, reauth_expires_at
 		 FROM `+sessionTable+` WHERE id = ?`,
 		id,
 	).Scan(&session).Error
@@ -460,15 +471,18 @@ func deleteSessionByID(id string) {
 }
 
 func setSessionCookie(c *fiber.Ctx, session sessionRecord) {
-	c.Cookie(&fiber.Cookie{
+	cookie := &fiber.Cookie{
 		Name:     sessionCookieName,
 		Value:    session.ID,
 		HTTPOnly: true,
 		Secure:   cookieSecure(),
 		SameSite: "Lax",
-		Expires:  session.ExpiresAt,
 		Path:     "/",
-	})
+	}
+	if session.RememberMe {
+		cookie.Expires = session.ExpiresAt
+	}
+	c.Cookie(cookie)
 }
 
 func clearSessionCookie(c *fiber.Ctx) {
@@ -515,7 +529,7 @@ func requireSession(c *fiber.Ctx, role string, rotateOnIdle bool) (sessionRecord
 	}
 
 	if rotateOnIdle && now.Sub(session.LastActivityAt) >= adminSessionIdleRotation {
-		newSession, err := createSession(session.Role, session.UserID, session.AdminID, session.SuperAdminUsername, time.Until(session.ExpiresAt))
+		newSession, err := createSession(session.Role, session.UserID, session.AdminID, session.SuperAdminUsername, time.Until(session.ExpiresAt), session.RememberMe)
 		if err != nil {
 			return sessionRecord{}, serverError(c, "failed to rotate session", err)
 		}
@@ -990,4 +1004,3 @@ func shouldSendResolvedEmail(previous model.FeedbackModel, updated model.Feedbac
 func utcNow() time.Time {
 	return time.Now().UTC()
 }
-

@@ -164,7 +164,7 @@ export function UserDashboardHomeView({
               <CardTitle className="text-base text-black">
                 Notifications
               </CardTitle>
-              <CardDescription className="text-black">
+              <CardDescription className="text-black !text-muted-foreground">
                 Unresolved updates
               </CardDescription>
             </CardHeader>

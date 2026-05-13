@@ -315,6 +315,7 @@ export async function registerUser(payload: {
 export async function loginUser(payload: {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }): Promise<User> {
   return apiFetch<User>("/auth/users/login", {
     method: "POST",
@@ -324,6 +325,7 @@ export async function loginUser(payload: {
 
 export async function requestUserLoginOTP(payload: {
   email: string;
+  rememberMe?: boolean;
 }): Promise<{ sent: boolean }> {
   return apiFetch<{ sent: boolean }>("/auth/users/login/request-otp", {
     method: "POST",
@@ -400,6 +402,7 @@ export async function registerAdmin(payload: {
 export async function loginAdmin(payload: {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }): Promise<Admin> {
   return apiFetch<Admin>("/auth/admins/login", {
     method: "POST",
@@ -410,6 +413,7 @@ export async function loginAdmin(payload: {
 export async function loginSuperAdmin(payload: {
   username: string;
   password: string;
+  rememberMe?: boolean;
 }): Promise<SuperAdminSession> {
   return apiFetch<SuperAdminSession>("/auth/superadmin/login", {
     method: "POST",

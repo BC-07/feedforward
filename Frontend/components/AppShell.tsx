@@ -120,25 +120,27 @@ const emptySessionSnapshot: SessionSnapshot = {
 let cachedSessionSnapshot: SessionSnapshot | null = null;
 
 function readSessionSnapshotFromStorage(): SessionSnapshot {
-  const userId = localStorage.getItem("currentUserId") || "";
-  const adminId = localStorage.getItem("currentAdminId") || "";
+  const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+  const storage = rememberMe ? localStorage : sessionStorage;
+  const userId = storage.getItem("currentUserId") || "";
+  const adminId = storage.getItem("currentAdminId") || "";
 
   return {
-    isUserLoggedIn: localStorage.getItem("isUserLoggedIn") === "true",
-    isAdminLoggedIn: localStorage.getItem("isAdminLoggedIn") === "true",
-    isSuperAdminLoggedIn: localStorage.getItem("isSuperAdminLoggedIn") === "true",
+    isUserLoggedIn: storage.getItem("isUserLoggedIn") === "true",
+    isAdminLoggedIn: storage.getItem("isAdminLoggedIn") === "true",
+    isSuperAdminLoggedIn: storage.getItem("isSuperAdminLoggedIn") === "true",
     userId,
-    userName: localStorage.getItem("currentUserName") || "",
-    userEmail: localStorage.getItem("currentUserEmail") || "",
+    userName: storage.getItem("currentUserName") || "",
+    userEmail: storage.getItem("currentUserEmail") || "",
     userAvatar: userId ? localStorage.getItem(`userAvatar_${userId}`) || "" : "",
     adminId,
-    adminName: localStorage.getItem("currentAdminName") || "",
-    adminEmail: localStorage.getItem("currentAdminEmail") || "",
-    adminUnit: localStorage.getItem("currentAdminDepartment") || "",
+    adminName: storage.getItem("currentAdminName") || "",
+    adminEmail: storage.getItem("currentAdminEmail") || "",
+    adminUnit: storage.getItem("currentAdminDepartment") || "",
     adminAvatar: adminId
       ? localStorage.getItem(`adminAvatar_${adminId}`) || ""
       : "",
-    superAdminName: localStorage.getItem("superAdminName") || "superadmin",
+    superAdminName: storage.getItem("superAdminName") || "superadmin",
   };
 }
 
@@ -695,26 +697,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const clearSessionForRole = (role: LogoutRole) => {
+    const clearKey = (key: string) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    };
+
     if (role === "user") {
-      localStorage.removeItem("isUserLoggedIn");
-      localStorage.removeItem("currentUserId");
-      localStorage.removeItem("currentUserName");
-      localStorage.removeItem("currentUserEmail");
+      clearKey("isUserLoggedIn");
+      clearKey("currentUserId");
+      clearKey("currentUserName");
+      clearKey("currentUserEmail");
       return;
     }
 
     if (role === "admin") {
-      localStorage.removeItem("isAdminLoggedIn");
-      localStorage.removeItem("currentAdminId");
-      localStorage.removeItem("currentAdminName");
-      localStorage.removeItem("currentAdminEmail");
-      localStorage.removeItem("currentAdminDepartment");
+      clearKey("isAdminLoggedIn");
+      clearKey("currentAdminId");
+      clearKey("currentAdminName");
+      clearKey("currentAdminEmail");
+      clearKey("currentAdminDepartment");
       return;
     }
 
-    localStorage.removeItem("isSuperAdminLoggedIn");
-    localStorage.removeItem("superAdminName");
-    localStorage.removeItem("superAdminExpiresAt");
+    clearKey("isSuperAdminLoggedIn");
+    clearKey("superAdminName");
+    clearKey("superAdminExpiresAt");
   };
 
   const getLogoutSuccessMessage = (role: LogoutRole) => {
@@ -757,6 +764,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     clearSessionForRole(role);
+    localStorage.removeItem("ffRememberMe");
     announceSessionChange();
     toast.success(getLogoutSuccessMessage(role));
     router.push(getLogoutRedirect(role));

@@ -25,7 +25,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { toast } from "sonner";
-import { LogIn, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { LogIn, Mail, Lock, Eye, EyeOff, Check } from "lucide-react";
 import { toastApiError } from "@/lib/errorHandling";
 
 export default function Login() {
@@ -40,6 +40,34 @@ export default function Login() {
   const [isVerifyingOTP, setIsVerifyingOTP] = useState(false);
   const [otpStep, setOtpStep] = useState<"none" | "verify">("none");
   const [expiredMessage, setExpiredMessage] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+
+  const clearAllAuthStorage = () => {
+    const keys = [
+      "isUserLoggedIn",
+      "currentUserId",
+      "currentUserName",
+      "currentUserEmail",
+      "isAdminLoggedIn",
+      "currentAdminId",
+      "currentAdminName",
+      "currentAdminEmail",
+      "currentAdminDepartment",
+      "isSuperAdminLoggedIn",
+      "superAdminName",
+      "superAdminExpiresAt",
+    ];
+    keys.forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+  };
+
+  const setRememberedStorage = (enabled: boolean) => {
+    localStorage.setItem("ffRememberMe", enabled ? "true" : "false");
+  };
+
+  const activeStorage = () => (rememberMe ? localStorage : sessionStorage);
 
   useEffect(() => {
     const storedMessage = localStorage.getItem("sessionExpiredMessage") || "";
@@ -71,37 +99,27 @@ export default function Login() {
         const admin = await loginAdmin({
           email: normalizedEmail,
           password: normalizedPassword,
+          rememberMe,
         });
         if (admin.isSuperAdmin) {
           const superName = admin.name || admin.email || "Superadmin";
-          localStorage.setItem("isSuperAdminLoggedIn", "true");
-          localStorage.setItem("superAdminName", superName);
-          localStorage.removeItem("superAdminExpiresAt");
-          localStorage.removeItem("isAdminLoggedIn");
-          localStorage.removeItem("currentAdminId");
-          localStorage.removeItem("currentAdminName");
-          localStorage.removeItem("currentAdminEmail");
-          localStorage.removeItem("currentAdminDepartment");
-          localStorage.removeItem("isUserLoggedIn");
-          localStorage.removeItem("currentUserId");
-          localStorage.removeItem("currentUserName");
-          localStorage.removeItem("currentUserEmail");
+          clearAllAuthStorage();
+          setRememberedStorage(rememberMe);
+          const storage = activeStorage();
+          storage.setItem("isSuperAdminLoggedIn", "true");
+          storage.setItem("superAdminName", superName);
           toast.success(`Welcome back, ${superName}!`);
           router.push("/superadmin");
           return;
         }
-        localStorage.setItem("isAdminLoggedIn", "true");
-        localStorage.setItem("currentAdminId", admin.id);
-        localStorage.setItem("currentAdminName", admin.name);
-        localStorage.setItem("currentAdminEmail", admin.email);
-        localStorage.setItem("currentAdminDepartment", admin.unit);
-        localStorage.removeItem("isUserLoggedIn");
-        localStorage.removeItem("currentUserId");
-        localStorage.removeItem("currentUserName");
-        localStorage.removeItem("currentUserEmail");
-        localStorage.removeItem("isSuperAdminLoggedIn");
-        localStorage.removeItem("superAdminName");
-        localStorage.removeItem("superAdminExpiresAt");
+        clearAllAuthStorage();
+        setRememberedStorage(rememberMe);
+        const storage = activeStorage();
+        storage.setItem("isAdminLoggedIn", "true");
+        storage.setItem("currentAdminId", admin.id);
+        storage.setItem("currentAdminName", admin.name);
+        storage.setItem("currentAdminEmail", admin.email);
+        storage.setItem("currentAdminDepartment", admin.unit);
         toast.success(`Welcome back, ${admin.name}!`);
         router.push("/dashboard");
         return;
@@ -110,19 +128,15 @@ export default function Login() {
           const user = await loginUser({
             email: normalizedEmail,
             password: normalizedPassword,
+            rememberMe,
           });
-          localStorage.setItem("isUserLoggedIn", "true");
-          localStorage.setItem("currentUserId", user.id);
-          localStorage.setItem("currentUserName", user.name);
-          localStorage.setItem("currentUserEmail", user.email);
-          localStorage.removeItem("isAdminLoggedIn");
-          localStorage.removeItem("currentAdminId");
-          localStorage.removeItem("currentAdminName");
-          localStorage.removeItem("currentAdminEmail");
-          localStorage.removeItem("currentAdminDepartment");
-          localStorage.removeItem("isSuperAdminLoggedIn");
-          localStorage.removeItem("superAdminName");
-          localStorage.removeItem("superAdminExpiresAt");
+          clearAllAuthStorage();
+          setRememberedStorage(rememberMe);
+          const storage = activeStorage();
+          storage.setItem("isUserLoggedIn", "true");
+          storage.setItem("currentUserId", user.id);
+          storage.setItem("currentUserName", user.name);
+          storage.setItem("currentUserEmail", user.email);
           toast.success(`Welcome back, ${user.name}!`);
           router.push("/user/home");
           return;
@@ -137,7 +151,7 @@ export default function Login() {
 
     try {
       setIsRequestingOTP(true);
-      await requestUserLoginOTP({ email: normalizedEmail });
+      await requestUserLoginOTP({ email: normalizedEmail, rememberMe });
       setOtpEmail(normalizedEmail);
       setOtp("");
       setOtpStep("verify");
@@ -171,18 +185,13 @@ export default function Login() {
         email: normalizedEmail,
         otp: normalizedOtp,
       });
-      localStorage.setItem("isUserLoggedIn", "true");
-      localStorage.setItem("currentUserId", user.id);
-      localStorage.setItem("currentUserName", user.name);
-      localStorage.setItem("currentUserEmail", user.email);
-      localStorage.removeItem("isAdminLoggedIn");
-      localStorage.removeItem("currentAdminId");
-      localStorage.removeItem("currentAdminName");
-      localStorage.removeItem("currentAdminEmail");
-      localStorage.removeItem("currentAdminDepartment");
-      localStorage.removeItem("isSuperAdminLoggedIn");
-      localStorage.removeItem("superAdminName");
-      localStorage.removeItem("superAdminExpiresAt");
+      clearAllAuthStorage();
+      setRememberedStorage(rememberMe);
+      const storage = activeStorage();
+      storage.setItem("isUserLoggedIn", "true");
+      storage.setItem("currentUserId", user.id);
+      storage.setItem("currentUserName", user.name);
+      storage.setItem("currentUserEmail", user.email);
       toast.success(`Welcome back, ${user.name}!`);
       setOtpStep("none");
       router.push("/user/home");
@@ -264,6 +273,22 @@ export default function Login() {
               >
                 {isLoggingIn ? "Logging in..." : isRequestingOTP ? "Sending OTP..." : "Log In"}
               </Button>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={rememberMe}
+                  onClick={() => setRememberMe((prev) => !prev)}
+                  className={`flex h-4 w-4 items-center justify-center rounded-[4px] border-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${
+                    rememberMe
+                      ? "border-orange-500 bg-orange-500 text-white"
+                      : "border-orange-300 bg-white text-transparent"
+                  }`}
+                >
+                  <Check className="h-3 w-3" />
+                </button>
+                Remember Me
+              </label>
               <div className="text-center">
                 <Link
                   href="/forgot-password"
