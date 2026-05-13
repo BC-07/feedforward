@@ -475,11 +475,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     const computeModalHeight = () => {
       const maxHeightPx = Math.round(window.innerHeight * 0.83);
 
-      if (activeFeedbackTab === "messages") {
-        setFeedbackModalHeight(maxHeightPx);
-        return;
-      }
-
       // Measure only the Details tab content so the Messages tab DOM
       // (which stays mounted) doesn't inflate the reading.
       const contentHeight = detailsTabContentRef.current?.scrollHeight ?? 0;
@@ -499,7 +494,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", updateModalHeight);
     };
-  }, [activeFeedbackTab, selectedFeedback, selectedFeedback?.id]);
+  }, [selectedFeedback, selectedFeedback?.id]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1827,11 +1822,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                 </div>
                 {selectedFeedback ? (
                   <div className="fixed inset-0 z-[90] flex items-center justify-center p-2">
-                    <button
-                      type="button"
-                      aria-label="Close feedback details"
+                    <div
+                      aria-hidden="true"
                       className="ff-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px]"
-                      onClick={handleAttemptCloseSelectedFeedback}
                     />
                     {/* Unsent message overlay — outside Card so overflow-hidden doesn't clip it */}
                     {isUnsentMessageDialogOpen && (

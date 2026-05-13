@@ -50,6 +50,7 @@ function DialogOverlay({
 function DialogContent({
   className,
   children,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
   return (
@@ -62,6 +63,10 @@ function DialogContent({
           className,
         )}
         {...props}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event);
+          event.preventDefault();
+        }}
       >
         {children}
         <DialogPrimitive.Close

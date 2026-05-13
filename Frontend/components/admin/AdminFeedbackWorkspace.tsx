@@ -321,6 +321,18 @@ export function AdminFeedbackWorkspace({
     ? newStatus !== selectedFeedback.status ||
       newPriority !== selectedFeedback.priority
     : false;
+  const getDetailsMessageVisibleLines = useCallback((feedback: Feedback) => {
+    const textLength = feedback.message.trim().length;
+    return Math.min(14, Math.max(2, Math.ceil(textLength / 58)));
+  }, []);
+  const getDetailsDialogHeight = useCallback((feedback: Feedback) => {
+    const messageLines = getDetailsMessageVisibleLines(feedback);
+    const maxDialogHeight =
+      typeof window === "undefined"
+        ? 760
+        : Math.min(760, window.innerHeight * 0.95);
+    return Math.min(maxDialogHeight, 430 + messageLines * 30);
+  }, [getDetailsMessageVisibleLines]);
   const formatDetailsUpdatedAt = useCallback((value: string) => {
     const date = new Date(value);
     const datePart = date.toLocaleDateString("en-US", {
@@ -419,6 +431,9 @@ export function AdminFeedbackWorkspace({
       setSelectedFeedback(feedback);
       setNewStatus(feedback.status);
       setNewPriority(feedback.priority);
+      setActiveEditTab("details");
+      previousTabRef.current = "details";
+      setDialogHeight(getDetailsDialogHeight(feedback));
       setIsEditDialogOpen(true);
       await loadMessages(feedback.id);
       if (currentAdmin?.id && currentAdmin.unit) {
@@ -429,7 +444,7 @@ export function AdminFeedbackWorkspace({
         );
       }
     },
-    [currentAdmin, loadMessages],
+    [currentAdmin, getDetailsDialogHeight, loadMessages],
   );
 
   const openFeedbackById = useCallback(
@@ -626,21 +641,19 @@ export function AdminFeedbackWorkspace({
     scrollMessagesToBottom,
   ]);
 
-  // Animate dialog height: compact for Manage tab, full for others
+  // Animate dialog height: Details and Messages share height; Manage stays compact.
   useEffect(() => {
-    if (!isEditDialogOpen) return;
+    if (!isEditDialogOpen || !selectedFeedback) return;
 
-    if (activeEditTab !== "manage") {
-      setDialogHeight(null);
-      return;
-    }
-
-    // Fixed compact height for the Manage tab (header + tabs + status + priority + save button)
     const raf = window.requestAnimationFrame(() => {
-      setDialogHeight(340);
+      setDialogHeight(
+        activeEditTab === "manage"
+          ? 340
+          : getDetailsDialogHeight(selectedFeedback),
+      );
     });
     return () => window.cancelAnimationFrame(raf);
-  }, [activeEditTab, isEditDialogOpen, selectedFeedback]);
+  }, [activeEditTab, getDetailsDialogHeight, isEditDialogOpen, selectedFeedback]);
 
   const handleUpdateFeedback = async () => {
     if (!selectedFeedback) return;
@@ -1880,7 +1893,7 @@ export function AdminFeedbackWorkspace({
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7 rounded-md"
+                                  className="h-7 w-7 rounded-md transition-none"
                                   aria-label={`Open ${feedback.id}`}
                                   title="Open feedback"
                                   onClick={(event) => {
@@ -1894,7 +1907,7 @@ export function AdminFeedbackWorkspace({
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7 rounded-md"
+                                  className="h-7 w-7 rounded-md transition-none"
                                   aria-label={`Edit ${feedback.id}`}
                                   title="Edit feedback"
                                   onClick={() =>
@@ -2045,6 +2058,10 @@ export function AdminFeedbackWorkspace({
                               title=""
                               className="rounded-none border-0 bg-transparent shadow-none"
                               formatDate={formatDetailsUpdatedAt}
+                              messageVisibleLines={getDetailsMessageVisibleLines(
+                                selectedFeedback,
+                              )}
+                              boxedSubject
                               preSubjectContent={
                                 <div className="grid grid-cols-1 gap-y-6">
                                   <div className="space-y-1">
@@ -2348,21 +2365,15 @@ export function AdminFeedbackWorkspace({
         <DialogContent
         className="flex max-w-xl flex-col overflow-hidden p-0"
         style={{
-          height: dialogHeight ? `${dialogHeight}px` : "min(680px, 85dvh)",
-          maxHeight: "min(680px, 85dvh)",
+          height: dialogHeight ? `${dialogHeight}px` : "min(760px, 95dvh)",
+          maxHeight: "min(760px, 95dvh)",
           transition: "height 280ms cubic-bezier(0.4, 0, 0.2, 1)",
         }}
         onInteractOutside={(event) => {
           event.preventDefault();
-          if (isEditDialogOpen && !isUnsentMessageDialogOpen) {
-            handleAttemptCloseEditDialog();
-          }
         }}
         onEscapeKeyDown={(event) => {
           event.preventDefault();
-          if (isEditDialogOpen && !isUnsentMessageDialogOpen) {
-            handleAttemptCloseEditDialog();
-          }
         }}
       >
         <div ref={dialogInnerRef} className="flex min-h-0 flex-1 flex-col p-6 pt-5">
@@ -2414,6 +2425,10 @@ export function AdminFeedbackWorkspace({
                 title=""
                 className="rounded-none border-0 bg-transparent shadow-none"
                 formatDate={formatDetailsUpdatedAt}
+                messageVisibleLines={getDetailsMessageVisibleLines(
+                  selectedFeedback,
+                )}
+                boxedSubject
                 preSubjectContent={
                   <div className="grid grid-cols-1 gap-y-6">
                     <div className="space-y-1">
