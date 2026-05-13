@@ -429,3 +429,8 @@
 .ff-hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+.ff-password-input::-ms-reveal,
+.ff-password-input::-ms-clear {
+  display: none;
+}

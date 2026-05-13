@@ -76,7 +76,7 @@ export default function PasswordFormCard({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="pr-10"
+                    className="ff-password-input pr-10"
                   />
                   <button
                     type="button"
@@ -102,7 +102,7 @@ export default function PasswordFormCard({
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    className="pr-10"
+                    className="ff-password-input pr-10"
                   />
                   <button
                     type="button"

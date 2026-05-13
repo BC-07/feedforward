@@ -17,6 +17,7 @@ type FeedbackDetailsCardProps = {
   dateValue?: string;
   indentMessageFirstLineIfMultiline?: boolean;
   fitMessageToContent?: boolean;
+  boxedSubject?: boolean;
 };
 
 const DEFAULT_MESSAGE_VISIBLE_LINES = 5;
@@ -59,6 +60,7 @@ export function FeedbackDetailsCard({
   dateValue,
   indentMessageFirstLineIfMultiline = false,
   fitMessageToContent = false,
+  boxedSubject = false,
 }: FeedbackDetailsCardProps) {
   const messageViewportHeightRem = messageVisibleLines * MESSAGE_LINE_HEIGHT_REM;
   const renderedDate = formatDate(dateValue ?? feedback.updatedAt);
@@ -143,27 +145,55 @@ export function FeedbackDetailsCard({
         {preSubjectContent}
 
         {compactNoTitleLayout && !hasTitle ? (
-          <div className="relative -mx-4 rounded-[1.75rem] bg-background/70 sm:-mx-5">
+          <div className="relative w-full rounded-lg bg-muted/60">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 z-20 rounded-[1.75rem] border-2 border-[#c8c8c8] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]"
+              className="pointer-events-none absolute inset-0 z-20 rounded-lg border-2 border-[#c8c8c8] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]"
             />
             <div className="relative z-10 px-4 py-4 sm:px-5">
               <p className="text-xs font-semibold" style={{ color: MUTED_TEXT_COLOR }}>Subject</p>
-              <p className="line-clamp-2 max-w-full text-[1rem] font-semibold [overflow-wrap:anywhere] break-all">
+              <p className="line-clamp-2 max-w-full text-[1rem] font-semibold [overflow-wrap:break-word] break-words">
                 {feedback.subject}
               </p>
               <p
                 ref={messageRef}
                 className={`ff-hide-scrollbar mt-2 max-w-full overflow-x-hidden ${
                   fitMessageToContent ? "overflow-y-visible" : "overflow-y-auto"
-                } px-1 text-[0.9rem] leading-[1.45rem] [text-align:justify] [text-justify:inter-word] [overflow-wrap:anywhere] break-all hyphens-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
+                } px-1 text-[0.9rem] leading-[1.45rem] [text-align:justify] [text-justify:inter-word] [overflow-wrap:break-word] break-words hyphens-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
                   shouldIndentMessage ? "[text-indent:2rem]" : ""
                 }`}
                 style={{
                   ...(fitMessageToContent
                     ? {}
                     : { maxHeight: `${messageViewportHeightRem}rem` }),
+                  scrollbarWidth: "none",
+                  msOverflowStyle: "none",
+                }}
+              >
+                {feedback.message}
+              </p>
+            </div>
+          </div>
+        ) : boxedSubject && !hasTitle ? (
+          <div className="relative w-full rounded-lg bg-muted/60">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-20 rounded-lg border-2 border-[#c8c8c8] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]"
+            />
+            <div className="relative z-10 px-4 py-4 sm:px-5">
+              <p className="text-xs font-semibold" style={{ color: MUTED_TEXT_COLOR }}>Subject</p>
+              <p className="line-clamp-2 text-[0.98rem] font-semibold break-words">
+                {feedback.subject}
+              </p>
+              <p
+                ref={messageRef}
+                className={`ff-hide-scrollbar mt-0.5 ${
+                  fitMessageToContent ? "overflow-y-visible" : "overflow-y-auto"
+                } px-1 text-[0.9rem] leading-[1.45rem] [text-align:justify] [text-justify:inter-word] [text-indent:1rem] [overflow-wrap:anywhere] break-words hyphens-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden`}
+                style={{
+                  ...(fitMessageToContent
+                    ? {}
+                    : { height: `${messageViewportHeightRem}rem` }),
                   scrollbarWidth: "none",
                   msOverflowStyle: "none",
                 }}
