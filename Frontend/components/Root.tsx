@@ -24,19 +24,21 @@ export default function RootLayout({
   const [adminName, setAdminName] = useState("");
 
   useEffect(() => {
-    const userLoggedIn = localStorage.getItem("isUserLoggedIn") === "true";
-    const adminLoggedIn = localStorage.getItem("isAdminLoggedIn") === "true";
+    const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+    const storage = rememberMe ? localStorage : sessionStorage;
+    const userLoggedIn = storage.getItem("isUserLoggedIn") === "true";
+    const adminLoggedIn = storage.getItem("isAdminLoggedIn") === "true";
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsUserLoggedIn(userLoggedIn);
     setIsAdminLoggedIn(adminLoggedIn);
 
     if (userLoggedIn) {
-      setUserName(localStorage.getItem("currentUserName") || "");
+      setUserName(storage.getItem("currentUserName") || "");
     }
 
     if (adminLoggedIn) {
-      setAdminName(localStorage.getItem("currentAdminName") || "");
+      setAdminName(storage.getItem("currentAdminName") || "");
     }
   }, [pathname]);
 
@@ -44,6 +46,9 @@ export default function RootLayout({
     localStorage.removeItem("isUserLoggedIn");
     localStorage.removeItem("currentUserId");
     localStorage.removeItem("currentUserName");
+    sessionStorage.removeItem("isUserLoggedIn");
+    sessionStorage.removeItem("currentUserId");
+    sessionStorage.removeItem("currentUserName");
 
     setIsUserLoggedIn(false);
     setUserName("");
@@ -56,6 +61,9 @@ export default function RootLayout({
     localStorage.removeItem("isAdminLoggedIn");
     localStorage.removeItem("currentAdminId");
     localStorage.removeItem("currentAdminName");
+    sessionStorage.removeItem("isAdminLoggedIn");
+    sessionStorage.removeItem("currentAdminId");
+    sessionStorage.removeItem("currentAdminName");
 
     setIsAdminLoggedIn(false);
     setAdminName("");

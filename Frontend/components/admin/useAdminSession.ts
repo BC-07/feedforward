@@ -15,21 +15,25 @@ export function useAdminSession() {
 
   const currentAdmin = useMemo(() => {
     if (typeof window === "undefined") return null;
-    if (!localStorage.getItem("isAdminLoggedIn")) return null;
+    const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+    const storage = rememberMe ? localStorage : sessionStorage;
+    if (storage.getItem("isAdminLoggedIn") !== "true") return null;
 
     return {
-      id: localStorage.getItem("currentAdminId") || "",
-      name: localStorage.getItem("currentAdminName") || "",
-      email: localStorage.getItem("currentAdminEmail") || "",
-      unit: localStorage.getItem("currentAdminDepartment") || "",
+      id: storage.getItem("currentAdminId") || "",
+      name: storage.getItem("currentAdminName") || "",
+      email: storage.getItem("currentAdminEmail") || "",
+      unit: storage.getItem("currentAdminDepartment") || "",
     };
   }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+    const storage = rememberMe ? localStorage : sessionStorage;
 
-    const isLoggedIn = localStorage.getItem("isAdminLoggedIn");
-    if (!isLoggedIn) {
+    const isLoggedIn = storage.getItem("isAdminLoggedIn");
+    if (isLoggedIn !== "true") {
       router.push("/login");
     }
   }, [router]);

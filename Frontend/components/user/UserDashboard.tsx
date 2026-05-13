@@ -295,8 +295,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const isLoggedIn = localStorage.getItem("isUserLoggedIn");
-    const userId = localStorage.getItem("currentUserId");
+    const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+    const storage = rememberMe ? localStorage : sessionStorage;
+    const isLoggedIn = storage.getItem("isUserLoggedIn");
+    const userId = storage.getItem("currentUserId");
 
     if (!isLoggedIn || !userId) {
       router.push("/login");
@@ -305,11 +307,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
     setCurrentUser({
       id: userId,
-      fullName: localStorage.getItem("currentUserName") || "",
-      name: localStorage.getItem("currentUserName") || "",
-      email: localStorage.getItem("currentUserEmail") || "",
-      school: localStorage.getItem("currentUserSchool") || "",
-      department: localStorage.getItem("currentUserDepartment") || "",
+      fullName: storage.getItem("currentUserName") || "",
+      name: storage.getItem("currentUserName") || "",
+      email: storage.getItem("currentUserEmail") || "",
+      school: storage.getItem("currentUserSchool") || "",
+      department: storage.getItem("currentUserDepartment") || "",
     });
   }, [router]);
 
@@ -592,12 +594,19 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   ]);
 
   const handleLogout = () => {
-    localStorage.removeItem("isUserLoggedIn");
-    localStorage.removeItem("currentUserId");
-    localStorage.removeItem("currentUserName");
-    localStorage.removeItem("currentUserEmail");
-    localStorage.removeItem("currentUserSchool");
-    localStorage.removeItem("currentUserDepartment");
+    const keys = [
+      "isUserLoggedIn",
+      "currentUserId",
+      "currentUserName",
+      "currentUserEmail",
+      "currentUserSchool",
+      "currentUserDepartment",
+    ];
+    keys.forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+    localStorage.removeItem("ffRememberMe");
     toast.success("Logged out successfully");
     router.push("/login");
   };
@@ -1568,7 +1577,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     {feedback.subject}
                   </p>
                   <p
-                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground ${
+                    className={`line-clamp-2 min-h-[2.5rem] text-sm !text-muted-foreground ${
                       feedback.message.trim().length > 70 &&
                       /\s/.test(feedback.message.trim())
                         ? "indent-5"
@@ -1578,7 +1587,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     {feedback.message}
                   </p>
                   <div className="mt-auto flex items-center justify-between">
-                    <span className="rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs text-foreground">
+                    <span className="rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs !text-muted-foreground">
                       {feedback.category}
                     </span>
                     <span className="inline-flex items-center">

@@ -898,7 +898,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         lastName,
       });
 
-      localStorage.setItem("currentAdminName", updatedAdmin.name);
+      const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem("currentAdminName", updatedAdmin.name);
       setAdminProfileEdit({
         firstName: "",
         lastName: "",
@@ -965,7 +967,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         });
       }
 
-      localStorage.setItem("currentUserName", updatedUser.name);
+      const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem("currentUserName", updatedUser.name);
       setUserProfileEdit({
         firstName: "",
         lastName: "",

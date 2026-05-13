@@ -115,9 +115,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
         lowerMessage.includes("session") ||
         lowerMessage.includes("expired") ||
         lowerMessage.includes("reauthentication required");
+      const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+      const storage = rememberMe ? localStorage : sessionStorage;
       const isAdminLoggedIn =
-        localStorage.getItem("isAdminLoggedIn") === "true" ||
-        localStorage.getItem("isSuperAdminLoggedIn") === "true";
+        storage.getItem("isAdminLoggedIn") === "true" ||
+        storage.getItem("isSuperAdminLoggedIn") === "true";
       if (isAdminLoggedIn && isSessionInvalid) {
         localStorage.removeItem("isAdminLoggedIn");
         localStorage.removeItem("currentAdminId");
@@ -127,6 +129,14 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
         localStorage.removeItem("isSuperAdminLoggedIn");
         localStorage.removeItem("superAdminName");
         localStorage.removeItem("superAdminExpiresAt");
+        sessionStorage.removeItem("isAdminLoggedIn");
+        sessionStorage.removeItem("currentAdminId");
+        sessionStorage.removeItem("currentAdminName");
+        sessionStorage.removeItem("currentAdminEmail");
+        sessionStorage.removeItem("currentAdminDepartment");
+        sessionStorage.removeItem("isSuperAdminLoggedIn");
+        sessionStorage.removeItem("superAdminName");
+        sessionStorage.removeItem("superAdminExpiresAt");
         localStorage.setItem(
           "sessionExpiredMessage",
           "You were signed out due to inactivity. Please log in again.",
