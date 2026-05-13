@@ -1581,7 +1581,7 @@ export default function SuperAdminDashboard() {
                   </Select>
                 </div>
 
-                <div className="w-full overflow-x-auto">
+                <div className="min-h-0 flex-1 w-full overflow-x-auto">
                   <Table className={SUPERADMIN_ADMIN_TABLE_CLASS_NAME}>
                     <TableHeader className={SUPERADMIN_TABLE_HEADER_CLASS_NAME}>
                       <TableRow>
@@ -1692,36 +1692,34 @@ export default function SuperAdminDashboard() {
                     </TableBody>
                   </Table>
                 </div>
-                {visibleAdmins.length > 0 && (
-                  <div className="shrink-0 border-t border-border/60 bg-background pt-3">
-                    <TablePaginationFooter
-                      page={currentAdminPage}
-                      totalPages={adminTotalPages}
-                      onPrevious={() =>
-                        setAdminPage(Math.max(1, currentAdminPage - 1))
-                      }
-                      onNext={() =>
-                        setAdminPage(
-                          Math.min(adminTotalPages, currentAdminPage + 1),
-                        )
-                      }
-                      pageSize={adminPageSize}
-                      pageSizeOptions={ADMIN_CONTROL_PAGE_SIZE_OPTIONS}
-                      onPageSizeChange={(value) =>
-                        setAdminPageSize(value as typeof adminPageSize)
-                      }
-                      statusText={
-                        <span className="text-sm">
-                          Viewing{" "}
-                          <span className="font-normal">{paginatedAdmins.length}</span>{" "}
-                          out of{" "}
-                          <span className="font-normal">{visibleAdmins.length}</span>{" "}
-                          admin{visibleAdmins.length !== 1 ? "s" : ""}
-                        </span>
-                      }
-                    />
-                  </div>
-                )}
+                <div className="shrink-0 border-t border-border/60 bg-background pt-3">
+                  <TablePaginationFooter
+                    page={currentAdminPage}
+                    totalPages={adminTotalPages}
+                    onPrevious={() =>
+                      setAdminPage(Math.max(1, currentAdminPage - 1))
+                    }
+                    onNext={() =>
+                      setAdminPage(
+                        Math.min(adminTotalPages, currentAdminPage + 1),
+                      )
+                    }
+                    pageSize={adminPageSize}
+                    pageSizeOptions={ADMIN_CONTROL_PAGE_SIZE_OPTIONS}
+                    onPageSizeChange={(value) =>
+                      setAdminPageSize(value as typeof adminPageSize)
+                    }
+                    statusText={
+                      <span className="text-sm">
+                        Viewing{" "}
+                        <span className="font-normal">{paginatedAdmins.length}</span>{" "}
+                        out of{" "}
+                        <span className="font-normal">{visibleAdmins.length}</span>{" "}
+                        admin{visibleAdmins.length !== 1 ? "s" : ""}
+                      </span>
+                    }
+                  />
+                </div>
               </CardContent>
             </Card>
           )}
@@ -1843,7 +1841,7 @@ export default function SuperAdminDashboard() {
                   </div>
                 </div>
 
-                <div className="w-full overflow-x-auto">
+                <div className="min-h-0 flex-1 w-full overflow-x-auto">
                   <Table className={SUPERADMIN_CATEGORY_TABLE_CLASS_NAME}>
                     <TableHeader className={SUPERADMIN_TABLE_HEADER_CLASS_NAME}>
                       <TableRow>
