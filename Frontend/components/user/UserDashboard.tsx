@@ -1193,6 +1193,25 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         "in progress": 1,
         resolved: 2,
       };
+      
+      // If tracking filter is explicitly set (not "asc"), prioritize subject sorting
+      if (filterTracking !== "asc") {
+        const subjectDiff = a.subject.localeCompare(b.subject);
+        if (subjectDiff !== 0) {
+          return filterTracking === "desc" ? -subjectDiff : subjectDiff;
+        }
+      }
+
+      // If date filter is explicitly set (not "recent"), prioritize date sorting
+      if (filterDate !== "recent") {
+        const dateDiff =
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (dateDiff !== 0) {
+          return filterDate === "oldest" ? dateDiff : -dateDiff;
+        }
+      }
+
+      // Then sort by status
       const statusDiff =
         (statusOrder[normalizeStatus(a.status)] ?? 99) -
         (statusOrder[normalizeStatus(b.status)] ?? 99);
@@ -1200,14 +1219,17 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         return statusDiff;
       }
 
-      const dateDiff =
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      if (dateDiff !== 0) {
-        return filterDate === "oldest" ? dateDiff : -dateDiff;
+      // If same status and date filter is "recent" (default), sort by date
+      if (filterDate === "recent") {
+        const dateDiff =
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (dateDiff !== 0) {
+          return -dateDiff; // newest first for "recent"
+        }
       }
-      return filterTracking === "desc"
-        ? b.id.localeCompare(a.id)
-        : a.id.localeCompare(b.id);
+
+      // Default: sort by subject (asc)
+      return a.subject.localeCompare(b.subject);
     });
   }, [
     feedbacks,
