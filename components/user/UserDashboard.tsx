@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   createFeedback,
   createFeedbackMessage,
@@ -34,13 +34,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
@@ -51,7 +44,6 @@ import { formatFilterChipLabel } from "@/lib/filterUtils";
 import { formatFeedbackText } from "@/lib/textFormat";
 import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
 import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
-import { FeedbackSuccessCard } from "@/components/feedback/FeedbackSuccessCard";
 import {
   Select,
   SelectContent,
@@ -59,6 +51,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -68,10 +66,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TablePaginationFooter } from "@/components/ui/table-pagination-footer";
-import {
-  HoverFilterPopover,
-  type HoverFilterItem,
-} from "@/components/filters/HoverFilterPopover";
+
 import {
   Send,
   Clock,
@@ -79,15 +74,13 @@ import {
   Circle,
   Wrench,
   MessageCircle,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  ChevronDown,
-  X,
   BarChart3,
   Plus,
   Search,
   Trash2,
+  ChevronUp,
+  ChevronDown,
+  X,
 } from "lucide-react";
 
 // Import constants and types
@@ -98,11 +91,13 @@ import {
   CONVERSATION_MESSAGE_MAX_LENGTH,
   USER_MESSAGE_BUBBLE_CLASS,
   MY_SUBMISSIONS_PAGE_SIZE_OPTIONS,
-  SUBMISSION_FILTER_TEXT_COLOR,
   SUBMISSION_FILTER_CONTROL_CLASS,
+  SUBMISSION_FILTER_TEXT_COLOR,
   USER_FEEDBACK_DRAFT_KEY,
   USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY,
   EMPTY_FORM,
+  SUBMISSION_FIELD_CLASS,
+  SUBMISSION_ACTION_BUTTON_HEIGHT_CLASS,
   type UserDashboardView,
   type CreateSubmissionStep,
   type HoverFilterKey,
@@ -119,9 +114,15 @@ import {
 import { UserDashboardSubmitView } from "./UserDashboard.SubmitView";
 import { UserDashboardMySubmissionsView } from "./UserDashboard.MySubmissionsView";
 import { UserDashboardHomeView } from "./UserDashboard.HomeView";
+import {
+  HoverFilterPopover,
+  type HoverFilterItem,
+} from "@/components/filters/HoverFilterPopover";
 
 export function UserDashboard({ view }: { view: UserDashboardView }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const draftKey = USER_FEEDBACK_DRAFT_KEY;
   const emptyForm = EMPTY_FORM;
   const submissionsScrollKey = USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY;
@@ -144,15 +145,38 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     string | null
   >(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState("all");
+  const [filterType, setFilterType] = useState<string[]>([]);
   const [filterCategory, setFilterCategory] = useState("all");
-  const [filterPriority, setFilterPriority] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterPriority, setFilterPriority] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string[]>([]);
   const [filterDate, setFilterDate] = useState("recent");
   const [filterTracking, setFilterTracking] = useState("asc");
   const [mySubmissionsPage, setMySubmissionsPage] = useState(1);
-  const [mySubmissionsPageSize, setMySubmissionsPageSize] =
-    useState<(typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]>(10);
+  const [mySubmissionsPageSize, setMySubmissionsPageSizeRaw] = useState<
+    (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]
+  >(() => {
+    if (typeof window === "undefined") return 10;
+    try {
+      const stored = window.sessionStorage.getItem("mySubmissions_pageSize");
+      const parsed = Number(stored);
+      if (
+        stored !== null &&
+        (MY_SUBMISSIONS_PAGE_SIZE_OPTIONS as readonly number[]).includes(parsed)
+      ) {
+        return parsed as (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number];
+      }
+    } catch {}
+    return 10;
+  });
+  const setMySubmissionsPageSize = useCallback(
+    (size: (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]) => {
+      setMySubmissionsPageSizeRaw(size);
+      try {
+        window.sessionStorage.setItem("mySubmissions_pageSize", String(size));
+      } catch {}
+    },
+    [],
+  );
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
@@ -178,11 +202,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     useState(false);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
-  const leftColumnRef = useRef<HTMLDivElement | null>(null);
-  const submissionsScrollRef = useRef<HTMLDivElement | null>(null);
-  const conversationScrollRef = useRef<HTMLDivElement | null>(null);
-  const miniConversationScrollRef = useRef<HTMLDivElement | null>(null);
-  const createSubmissionDialogContentRef = useRef<HTMLDivElement | null>(null);
+  const leftColumnRef = useRef<HTMLDivElement>(null);
+  const submissionsScrollRef = useRef<HTMLDivElement>(null);
+  const conversationScrollRef = useRef<HTMLDivElement>(null);
+  const miniConversationScrollRef = useRef<HTMLDivElement>(null);
+  const createSubmissionDialogContentRef = useRef<HTMLDivElement>(null);
   const submissionsScrollTop = useRef(0);
   const feedbackSubmitLockRef = useRef(false);
   const [createSubmissionFormModalHeight, setCreateSubmissionFormModalHeight] =
@@ -426,7 +450,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(submissionsScrollKey);
+    const stored = window.sessionStorage.getItem(submissionsScrollKey);
     if (stored) {
       const value = Number.parseInt(stored, 10);
       submissionsScrollTop.current = Number.isNaN(value) ? 0 : value;
@@ -436,7 +460,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
     if (selectedFeedback || trackingId) return;
-    const stored = window.localStorage.getItem(submissionsScrollKey);
+    const stored = window.sessionStorage.getItem(submissionsScrollKey);
     if (stored) {
       const value = Number.parseInt(stored, 10);
       submissionsScrollTop.current = Number.isNaN(value) ? 0 : value;
@@ -482,16 +506,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
-    const normalizedType = formData.type.trim();
-    const normalizedCategory = formData.category.trim();
-    if (!normalizedType) {
-      toast.error("Feedback type is required.");
-      return;
-    }
-    if (!normalizedCategory) {
-      toast.error("Category is required.");
-      return;
-    }
     if (formData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
       toast.error(
         `Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`,
@@ -501,8 +515,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
     setConfirmData({
       ...formData,
-      type: normalizedType,
-      category: normalizedCategory,
+      category: formData.category.trim(),
     });
     setIsConfirmOpen(true);
   };
@@ -510,16 +523,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const handleCreateSubmissionFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
-    const normalizedType = formData.type.trim();
-    const normalizedCategory = formData.category.trim();
-    if (!normalizedType) {
-      toast.error("Feedback type is required.");
-      return;
-    }
-    if (!normalizedCategory) {
-      toast.error("Category is required.");
-      return;
-    }
     if (formData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
       toast.error(
         `Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`,
@@ -529,8 +532,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
     setConfirmData({
       ...formData,
-      type: normalizedType,
-      category: normalizedCategory,
+      category: formData.category.trim(),
     });
     const currentModalHeight = Math.ceil(
       createSubmissionDialogContentRef.current?.getBoundingClientRect()
@@ -545,16 +547,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const handleCreateSubmissionConfirmSubmit = async () => {
     if (!currentUser) return;
     if (feedbackSubmitLockRef.current) return;
-    const normalizedType = confirmData.type.trim();
-    const normalizedCategory = confirmData.category.trim();
-    if (!normalizedType) {
-      toast.error("Feedback type is required.");
-      return;
-    }
-    if (!normalizedCategory) {
-      toast.error("Category is required.");
-      return;
-    }
     if (confirmData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
       toast.error(
         `Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`,
@@ -569,8 +561,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     try {
       await createFeedback({
         id: newTrackingId,
-        type: normalizedType,
-        category: normalizedCategory,
+        type: confirmData.type,
+        category: confirmData.category.trim(),
         subject: normalizedSubject,
         message: normalizedMessage,
         status: "Pending",
@@ -607,16 +599,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const handleConfirmSubmit = async () => {
     if (!currentUser) return;
     if (feedbackSubmitLockRef.current) return;
-    const normalizedType = confirmData.type.trim();
-    const normalizedCategory = confirmData.category.trim();
-    if (!normalizedType) {
-      toast.error("Feedback type is required.");
-      return;
-    }
-    if (!normalizedCategory) {
-      toast.error("Category is required.");
-      return;
-    }
     if (confirmData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
       toast.error(
         `Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`,
@@ -631,8 +613,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     try {
       await createFeedback({
         id: newTrackingId,
-        type: normalizedType,
-        category: normalizedCategory,
+        type: confirmData.type,
+        category: confirmData.category.trim(),
         subject: normalizedSubject,
         message: normalizedMessage,
         status: "Pending",
@@ -827,9 +809,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     return `${datePart} ${timePart}`;
   };
 
-  const submissionFieldClass =
-    "h-10 rounded-lg border-border/70 bg-background focus-visible:border-amber-400 focus-visible:ring-2 focus-visible:ring-amber-200/60";
-  const submissionActionButtonHeightClass = "h-9";
   const formatConfirmSubmittedOn = (value: string) => {
     const date = new Date(value);
     const datePart = date.toLocaleDateString("en-US", {
@@ -877,14 +856,20 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           compactNoTitleLayout
           indentMessageFirstLineIfMultiline
           hidePriority
-          dateLabel="Date"
-          dateValue={previewFeedback.createdAt}
+          hideDate
+          showSubjectSeparators
           formatDate={formatConfirmSubmittedOn}
           preSubjectContent={
             <div className="grid grid-cols-1 gap-y-4">
               <div className="space-y-1">
-                <Label className="text-muted-foreground">Submitted By</Label>
-                <p className="pt-0.5 text-[0.98rem] font-medium break-words">
+                <Label className="text-black">Date</Label>
+                <p className="pt-0.5 text-[0.98rem] font-normal break-words">
+                  {formatConfirmSubmittedOn(previewFeedback.createdAt)}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-black">Submitted By</Label>
+                <p className="pt-0.5 text-[0.98rem] font-normal break-words">
                   {isAnonymous
                     ? "*****"
                     : currentUser?.fullName || currentUser?.name || "*****"}
@@ -916,7 +901,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             >
               <SelectTrigger
                 id={`${idPrefix}-type`}
-                className={submissionFieldClass}
+                className={SUBMISSION_FIELD_CLASS}
               >
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
@@ -949,7 +934,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             >
               <SelectTrigger
                 id={`${idPrefix}-category`}
-                className={submissionFieldClass}
+                className={SUBMISSION_FIELD_CLASS}
               >
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
@@ -974,7 +959,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           <Input
             id={`${idPrefix}-subject`}
             placeholder="Brief summary of your feedback"
-            className={submissionFieldClass}
+            className={SUBMISSION_FIELD_CLASS}
             value={formData.subject}
             maxLength={FEEDBACK_SUBJECT_MAX_LENGTH}
             disabled={isSubmittingFeedback}
@@ -1006,7 +991,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             }
             required
           />
-          <p className="text-right text-xs text-muted-foreground">
+          <p className="text-right text-xs text-black">
             {formData.message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
           </p>
         </div>
@@ -1022,11 +1007,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         <div className="space-y-1">
           <Label
             htmlFor={`${idPrefix}-anonymous`}
-            className="cursor-pointer text-sm font-medium"
+            className="cursor-pointer text-sm font-normal"
           >
             Submit anonymously
           </Label>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-black">
             When checked, your name will be hidden to the admins.
           </p>
         </div>
@@ -1034,19 +1019,15 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
       <Button
         type="submit"
-        className={`${submissionActionButtonHeightClass} w-full rounded-lg bg-accent hover:bg-accent/90`}
-        disabled={
-          isSubmittingFeedback ||
-          !formData.type.trim() ||
-          !formData.category.trim()
-        }
+        className={`${SUBMISSION_ACTION_BUTTON_HEIGHT_CLASS} w-full rounded-lg bg-accent hover:bg-accent/90`}
+        disabled={isSubmittingFeedback}
       >
         <Send className="mr-2 h-4 w-4" />
         {isSubmittingFeedback ? "Submitting feedback..." : "Submit Feedback"}
       </Button>
       {isSubmittingFeedback ? (
         <p
-          className="text-center text-xs text-muted-foreground"
+          className="text-center text-xs text-black"
           aria-live="polite"
         >
           Feedback is being sent. Please wait...
@@ -1066,18 +1047,20 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         feedback.category.toLowerCase().includes(trimmedSearchQuery);
 
       const matchesType =
-        filterType === "all" || feedback.type.toLowerCase() === filterType;
+        filterType.length === 0 ||
+        filterType.some((t) => feedback.type.toLowerCase() === t);
       const matchesCategory =
         filterCategory === "all" ||
         feedback.category.toLowerCase() === filterCategory.toLowerCase();
       const matchesPriority =
-        filterPriority === "all" ||
-        feedback.priority.toLowerCase() === filterPriority;
+        filterPriority.length === 0 ||
+        filterPriority.some((p) => feedback.priority.toLowerCase() === p);
       const normalized = normalizeStatus(feedback.status);
       const matchesStatus =
-        filterStatus === "all" ||
-        normalized ===
-          (filterStatus === "inprogress" ? "in progress" : filterStatus);
+        filterStatus.length === 0 ||
+        filterStatus.some((s) =>
+          normalized === (s === "inprogress" ? "in progress" : s),
+        );
 
       return (
         matchesSearch &&
@@ -1162,39 +1145,24 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const activeFilterCount = [
     filterTracking !== "asc",
     filterDate !== "recent",
-    filterType !== "all",
+    filterType.length > 0,
     filterCategory !== "all",
-    filterPriority !== "all",
-    filterStatus !== "all",
+    filterPriority.length > 0,
+    filterStatus.length > 0,
   ].filter(Boolean).length;
   const activeFilterChips = [
     trimmedSearchQuery ? { key: "search", label: searchQuery.trim() } : null,
     filterTracking !== "asc" ? { key: "tracking", label: "Z - A" } : null,
     filterDate !== "recent" ? { key: "date", label: "Oldest" } : null,
-    filterType !== "all"
-      ? { key: "type", label: formatFilterChipLabel(filterType) }
-      : null,
+    ...filterType.map((t) => ({ key: `type:${t}`, label: formatFilterChipLabel(t) })),
     filterCategory !== "all"
-      ? {
-          key: "category",
-          label: formatFilterChipLabel(filterCategory),
-        }
+      ? { key: "category", label: formatFilterChipLabel(filterCategory) }
       : null,
-    filterPriority !== "all"
-      ? {
-          key: "priority",
-          label: formatFilterChipLabel(filterPriority),
-        }
-      : null,
-    filterStatus !== "all"
-      ? {
-          key: "status",
-          label:
-            filterStatus === "inprogress"
-              ? "In Progress"
-              : formatFilterChipLabel(filterStatus),
-        }
-      : null,
+    ...filterPriority.map((p) => ({ key: `priority:${p}`, label: formatFilterChipLabel(p) })),
+    ...filterStatus.map((s) => ({
+      key: `status:${s}`,
+      label: s === "inprogress" ? "In Progress" : formatFilterChipLabel(s),
+    })),
   ].filter((chip): chip is { key: string; label: string } => Boolean(chip));
 
   const clearSingleFilter = useCallback((key: string) => {
@@ -1208,19 +1176,20 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       case "date":
         setFilterDate("recent");
         break;
-      case "type":
-        setFilterType("all");
-        break;
       case "category":
         setFilterCategory("all");
         break;
-      case "priority":
-        setFilterPriority("all");
-        break;
-      case "status":
-        setFilterStatus("all");
-        break;
       default:
+        if (key.startsWith("type:")) {
+          const val = key.slice(5);
+          setFilterType((prev) => prev.filter((t) => t !== val));
+        } else if (key.startsWith("priority:")) {
+          const val = key.slice(9);
+          setFilterPriority((prev) => prev.filter((p) => p !== val));
+        } else if (key.startsWith("status:")) {
+          const val = key.slice(7);
+          setFilterStatus((prev) => prev.filter((s) => s !== val));
+        }
         break;
     }
   }, []);
@@ -1229,11 +1198,40 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     setSearchQuery("");
     setFilterTracking("asc");
     setFilterDate("recent");
-    setFilterType("all");
+    setFilterType([]);
     setFilterCategory("all");
-    setFilterPriority("all");
-    setFilterStatus("all");
+    setFilterPriority([]);
+    setFilterStatus([]);
   }, []);
+
+  useEffect(() => {
+    if (isMySubmissionsView) return;
+    clearAllFilters();
+    setMySubmissionsPage(1);
+  }, [clearAllFilters, isMySubmissionsView]);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.removeItem("mySubmissions_filters");
+    } catch {}
+
+    const filterKeys = ["q", "tr", "dt", "ty", "cat", "pri", "st"];
+    const params = new URLSearchParams(window.location.search);
+    const hadFilterParams = filterKeys.some((key) => params.has(key));
+    if (hadFilterParams) {
+      filterKeys.forEach((key) => params.delete(key));
+      const nextQuery = params.toString();
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+        scroll: false,
+      });
+    }
+
+    return () => {
+      try {
+        window.sessionStorage.removeItem("mySubmissions_filters");
+      } catch {}
+    };
+  }, [pathname, router]);
   const hoverFilterItems = useMemo(
     () =>
       [
@@ -1260,19 +1258,23 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         {
           key: "type" as const,
           label:
-            filterType === "all"
+            filterType.length === 0
               ? "All Types"
-              : formatFilterChipLabel(filterType),
+              : formatFilterChipLabel(filterType[filterType.length - 1]!),
           options: [
-            { value: "all", label: "All Types" },
             { value: "suggestion", label: "Suggestion" },
             { value: "complaint", label: "Complaint" },
             { value: "inquiry", label: "Inquiry" },
             { value: "request", label: "Request" },
             { value: "compliment", label: "Compliment" },
           ],
-          isSelected: (value: string) => filterType === value,
-          onSelect: setFilterType,
+          isSelected: (value: string) => filterType.includes(value),
+          onSelect: (value: string) =>
+            setFilterType((prev) =>
+              prev.includes(value)
+                ? prev.filter((t) => t !== value)
+                : [...prev, value],
+            ),
         },
         {
           key: "category" as const,
@@ -1293,32 +1295,42 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         {
           key: "priority" as const,
           label:
-            filterPriority === "all"
+            filterPriority.length === 0
               ? "All Priorities"
-              : formatFilterChipLabel(filterPriority),
+              : formatFilterChipLabel(filterPriority[filterPriority.length - 1]!),
           options: [
-            { value: "all", label: "All Priorities" },
             { value: "low", label: "Low" },
             { value: "medium", label: "Medium" },
             { value: "high", label: "High" },
           ],
-          isSelected: (value: string) => filterPriority === value,
-          onSelect: setFilterPriority,
+          isSelected: (value: string) => filterPriority.includes(value),
+          onSelect: (value: string) =>
+            setFilterPriority((prev) =>
+              prev.includes(value)
+                ? prev.filter((p) => p !== value)
+                : [...prev, value],
+            ),
         },
         {
           key: "status" as const,
           label:
-            filterStatus === "all"
+            filterStatus.length === 0
               ? "All Status"
-              : formatFilterChipLabel(filterStatus),
+              : filterStatus[filterStatus.length - 1] === "inprogress"
+                ? "In Progress"
+                : formatFilterChipLabel(filterStatus[filterStatus.length - 1]!),
           options: [
-            { value: "all", label: "All Status" },
             { value: "pending", label: "Pending" },
             { value: "inprogress", label: "In Progress" },
             { value: "resolved", label: "Resolved" },
           ],
-          isSelected: (value: string) => filterStatus === value,
-          onSelect: setFilterStatus,
+          isSelected: (value: string) => filterStatus.includes(value),
+          onSelect: (value: string) =>
+            setFilterStatus((prev) =>
+              prev.includes(value)
+                ? prev.filter((s) => s !== value)
+                : [...prev, value],
+            ),
         },
       ] satisfies HoverFilterItem<HoverFilterKey>[],
     [
@@ -1334,7 +1346,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const desktopInlineFilterItems = useMemo(
     () =>
       hoverFilterItems.filter((item) =>
-        ["tracking", "date", "type", "priority", "status"].includes(item.key),
+        ["tracking", "date"].includes(item.key),
       ),
     [hoverFilterItems],
   );
@@ -1416,7 +1428,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     if (items.length === 0) {
       return (
         <Card className="border shadow-sm">
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          <CardContent className="py-10 text-center text-sm text-black">
             {emptyMessage}
           </CardContent>
         </Card>
@@ -1436,28 +1448,35 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               <Card className="h-full border shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
                 <CardContent className="flex h-full flex-col gap-3 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="min-h-[1.25rem] break-all font-mono text-xs text-muted-foreground">
+                    <p
+                      className="min-h-[1.25rem] break-all text-xs"
+                      style={{ color: "#666666" }}
+                    >
                       {feedback.id}
                     </p>
-                    <span className="whitespace-nowrap text-[11px] text-muted-foreground">
+                    <span
+                      className="whitespace-nowrap text-[11px]"
+                      style={{ color: "#666666" }}
+                    >
                       {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                     </span>
                   </div>
-                  <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug">
+                  <p className="line-clamp-2 min-h-[3rem] break-words font-medium leading-snug text-[#b72860]">
                     {feedback.subject}
                   </p>
                   <p
-                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground ${
+                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-red-600 ${
                       feedback.message.trim().length > 70 &&
                       /\s/.test(feedback.message.trim())
                         ? "indent-5"
                         : ""
                     }`}
+                    style={{ color: "#6e6e6e" }}
                   >
                     {feedback.message}
                   </p>
                   <div className="mt-auto flex items-center justify-between">
-                    <span className="rounded-md border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
+                    <span className="rounded-md border border-[#d7dbe2] bg-[#f8fafc] px-2 py-0.5 text-xs text-black">
                       {feedback.category}
                     </span>
                     <span className="inline-flex items-center">
@@ -1466,7 +1485,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                         return (
                           <Badge
                             variant="outline"
-                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-normal ${getStatusBadgeClass(
                               feedback.status,
                             )}`}
                           >
@@ -1482,7 +1501,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             </button>
           ))}
         </div>
-        <div className="mt-2 flex items-center justify-between px-1 text-xs text-muted-foreground">
+        <div className="mt-2 flex items-center justify-between px-1 text-xs text-black">
           <p>
             {items.length > visibleItems.length
               ? `Showing ${visibleItems.length} of ${items.length} items`
@@ -1491,7 +1510,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           {items.length > visibleItems.length ? (
             <button
               type="button"
-              className="font-medium text-accent hover:underline"
+              className="font-normal text-accent hover:underline"
               onClick={() => router.push("/user/my-submissions")}
             >
               View all
@@ -1502,14 +1521,34 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     );
   };
 
-  const createSubmissionStepAnimationClass =
-    createSubmissionStepDirection === "backward"
-      ? "ff-step-slide-in-right"
-      : "ff-step-slide-in-left";
+  const handleTrackSubmission = async (id: string) => {
+    setIsCreateSubmissionOpen(false);
+    setCreateSubmissionStep("form");
+    setCreateSubmissionStepDirection("forward");
+    setCreateSubmissionTrackingId(null);
+    const existingFeedback = feedbacks.find((fb) => fb.id === id);
+    if (existingFeedback) {
+      await handleViewFeedback(existingFeedback);
+      return;
+    }
+    try {
+      const latest = await getFeedback(id);
+      setSelectedFeedback(latest);
+    } catch {
+      toast.error("Unable to open submission details right now.");
+    }
+  };
 
   const renderCreateSubmissionDialog = () => (
-    <Dialog
-      open={isCreateSubmissionOpen}
+    <CreateSubmissionDialog
+      isOpen={isCreateSubmissionOpen}
+      currentStep={createSubmissionStep}
+      stepDirection={createSubmissionStepDirection}
+      isSubmitting={isSubmittingFeedback}
+      trackingIdForSuccess={createSubmissionTrackingId}
+      currentUserEmail={currentUser?.email}
+      modalHeight={createSubmissionFormModalHeight}
+      contentRef={createSubmissionDialogContentRef}
       onOpenChange={(open) => {
         setIsCreateSubmissionOpen(open);
         if (!open) {
@@ -1519,112 +1558,40 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           setCreateSubmissionFormModalHeight(null);
         }
       }}
-    >
-      <DialogContent
-        ref={createSubmissionDialogContentRef}
-        className="w-[calc(100%-1rem)] max-w-2xl max-h-[93vh] overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl transition-[height] duration-200 sm:w-full sm:p-6 ff-hide-scrollbar"
-        style={
-          createSubmissionStep === "confirm" && createSubmissionFormModalHeight
-            ? { height: `${createSubmissionFormModalHeight}px` }
-            : undefined
+      onStepChange={goToCreateSubmissionStep}
+      renderSubmissionForm={renderSubmissionForm}
+      onFormSubmit={handleCreateSubmissionFormSubmit}
+      renderConfirmSummary={renderConfirmSummary}
+      onConfirmSubmit={handleCreateSubmissionConfirmSubmit}
+      onCopyTrackingId={copyToClipboard}
+      onTrackSubmission={async (id) => {
+        setIsCreateSubmissionOpen(false);
+        setCreateSubmissionStep("form");
+        setCreateSubmissionStepDirection("forward");
+        setCreateSubmissionTrackingId(null);
+
+        const existingFeedback = feedbacks.find((fb) => fb.id === id);
+        if (existingFeedback) {
+          await handleViewFeedback(existingFeedback);
+          return;
         }
-      >
-        {createSubmissionStep === "form" ? (
-          <div
-            key={`create-step-form-${createSubmissionStepDirection}`}
-            className={createSubmissionStepAnimationClass}
-          >
-            <DialogHeader>
-              <DialogTitle>Feedback Form</DialogTitle>
-              <DialogDescription>
-                Fill out the details below to create a new submission.
-              </DialogDescription>
-            </DialogHeader>
-            {renderSubmissionForm("modal", handleCreateSubmissionFormSubmit)}
-          </div>
-        ) : null}
-        {createSubmissionStep === "confirm" ? (
-          <div
-            key={`create-step-confirm-${createSubmissionStepDirection}`}
-            className={`${createSubmissionStepAnimationClass} flex h-full min-h-0 flex-col`}
-          >
-            <DialogHeader>
-              <DialogTitle>Confirm Your Feedback</DialogTitle>
-              <DialogDescription>
-                Review your details before we send this feedback.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {renderConfirmSummary()}
-            </div>
-            <div className="mx-auto mt-5 h-px w-[92%] bg-border/70" />
-            <div className="mt-[10px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                variant="outline"
-                className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 sm:min-w-[160px]`}
-                onClick={() => goToCreateSubmissionStep("form")}
-              >
-                Back
-              </Button>
-              <Button
-                className={`${submissionActionButtonHeightClass} rounded-lg bg-accent text-white hover:bg-accent/90 sm:min-w-[190px]`}
-                onClick={handleCreateSubmissionConfirmSubmit}
-                disabled={isSubmittingFeedback}
-              >
-                {isSubmittingFeedback
-                  ? "Submitting feedback..."
-                  : "Confirm & Submit"}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-        {createSubmissionStep === "success" ? (
-          createSubmissionTrackingId ? (
-            <div
-              key={`create-step-success-${createSubmissionStepDirection}`}
-              className={createSubmissionStepAnimationClass}
-            >
-              <FeedbackSuccessCard
-                trackingId={createSubmissionTrackingId}
-                email={currentUser?.email}
-                className="w-full max-w-none gap-4 border-0 bg-transparent shadow-none"
-                onCopyTrackingId={copyToClipboard}
-                onTrackSubmission={async (id) => {
-                  setIsCreateSubmissionOpen(false);
-                  setCreateSubmissionStep("form");
-                  setCreateSubmissionStepDirection("forward");
-                  setCreateSubmissionTrackingId(null);
-
-                  const existingFeedback = feedbacks.find(
-                    (feedback) => feedback.id === id,
-                  );
-                  if (existingFeedback) {
-                    await handleViewFeedback(existingFeedback);
-                    return;
-                  }
-
-                  try {
-                    const latest = await getFeedback(id);
-                    setSelectedFeedback(latest);
-                  } catch {
-                    toast.error("Unable to open submission details right now.");
-                  }
-                }}
-                onSubmitAnother={() => {
-                  goToCreateSubmissionStep("form");
-                  setCreateSubmissionTrackingId(null);
-                }}
-              />
-            </div>
-          ) : null
-        ) : null}
-      </DialogContent>
-    </Dialog>
+        try {
+          const latest = await getFeedback(id);
+          setSelectedFeedback(latest);
+        } catch {
+          toast.error("Unable to open submission details right now.");
+        }
+      }}
+      onSubmitAnother={() => {
+        goToCreateSubmissionStep("form");
+        setCreateSubmissionTrackingId(null);
+      }}
+    />
   );
 
   return (
     <>
-      <div className="min-h-[calc(100vh-200px)] bg-muted/20">
+      <div className="ff-user-dashboard-theme min-h-[calc(100vh-200px)] bg-muted/20">
         {/* Tracking ID Success Modal */}
         <TrackingIdSuccess
           trackingId={trackingId}
@@ -1651,7 +1618,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         <DeleteConfirmationDialog
           isOpen={isDeleteOpen}
           deleteTarget={deleteTarget}
-          onOpenChange={(open: boolean) => {
+          onOpenChange={(open) => {
             setIsDeleteOpen(open);
             if (!open) {
               setDeleteTarget(null);
@@ -1669,24 +1636,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         >
           <div className="grid gap-6 sm:gap-8 items-stretch">
             {isSubmitView && (
-              <div
-                ref={leftColumnRef}
-                className="mx-auto w-full max-w-3xl flex flex-col gap-6"
-              >
-                {/* Submit Feedback */}
-                <div>
-                  <Card className="border shadow-sm">
-                    <CardHeader className="pb-4">
-                      <CardTitle>Feedback Form</CardTitle>
-                      <CardDescription>
-                        Check anonymous if you want your name hidden from admin
-                        views.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>{renderSubmissionForm("submit")}</CardContent>
-                  </Card>
-                </div>
-              </div>
+              <UserDashboardSubmitView
+                leftColumnRef={leftColumnRef}
+                renderSubmissionForm={renderSubmissionForm}
+              />
             )}
 
             {(isMySubmissionsView || isHomeView) && (
@@ -1708,471 +1661,70 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                   }
                 >
                   {isHomeView ? (
-                    <div className="flex flex-col bg-background">
-                      {renderCreateSubmissionDialog()}
-                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <Card className="border shadow-sm">
-                          <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                              Total
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold">
-                              {dashboardStats.total}
-                            </p>
-                          </CardContent>
-                        </Card>
-                        <Card className="border shadow-sm">
-                          <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                              Pending
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold">
-                              {dashboardStats.pending}
-                            </p>
-                          </CardContent>
-                        </Card>
-                        <Card className="border shadow-sm">
-                          <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                              In Progress
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold">
-                              {dashboardStats.inProgress}
-                            </p>
-                          </CardContent>
-                        </Card>
-                        <Card className="border shadow-sm">
-                          <CardContent className="p-4">
-                            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                              Resolved
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold">
-                              {dashboardStats.resolved}
-                            </p>
-                          </CardContent>
-                        </Card>
-                      </div>
-                      <div className="mt-4">
-                        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-                          <div className="min-w-0">
-                            <Tabs defaultValue="latest">
-                              <TabsList className="grid h-11 w-full grid-cols-3 gap-1 rounded-xl border border-border/60 bg-muted/50 p-1">
-                                <TabsTrigger
-                                  value="latest"
-                                  className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
-                                >
-                                  Latest
-                                </TabsTrigger>
-                                <TabsTrigger
-                                  value="attention"
-                                  className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
-                                >
-                                  Needs Attention
-                                </TabsTrigger>
-                                <TabsTrigger
-                                  value="updated"
-                                  className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
-                                >
-                                  Recently Updated
-                                </TabsTrigger>
-                              </TabsList>
-                              <TabsContent value="latest" className="mt-3">
-                                {renderHomeSubmissionGrid(
-                                  latestSubmissionCards,
-                                  "No submissions yet. Click New Submission to create your first one.",
-                                )}
-                              </TabsContent>
-                              <TabsContent value="attention" className="mt-3">
-                                {renderHomeSubmissionGrid(
-                                  needsAttentionCards,
-                                  "Nothing needs attention right now.",
-                                )}
-                              </TabsContent>
-                              <TabsContent value="updated" className="mt-3">
-                                {renderHomeSubmissionGrid(
-                                  recentlyUpdatedCards,
-                                  "No recent updates yet.",
-                                )}
-                              </TabsContent>
-                            </Tabs>
-                          </div>
-                          <Card
-                            className="h-full border border-border/80 bg-slate-50/45 shadow-sm flex flex-col overflow-hidden"
-                            style={{
-                              maxHeight: `${notificationPanelMaxHeight}px`,
-                            }}
-                          >
-                            <CardHeader className="pb-0 pt-4">
-                              <CardTitle className="text-base">
-                                Notifications
-                              </CardTitle>
-                              <CardDescription>
-                                Unresolved updates
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="-mt-4 flex-1 min-h-0 space-y-1.5 bg-slate-50/35 pt-0 pb-3 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                              {homeNotifications.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                  No unread updates.
-                                </p>
-                              ) : (
-                                homeNotifications.map((feedback) => (
-                                  <button
-                                    key={feedback.id}
-                                    type="button"
-                                    onClick={() => handleViewFeedback(feedback)}
-                                    className="w-full rounded-md border border-border/70 bg-white/80 p-2 text-left shadow-[0_0_0_1px_rgba(15,23,42,0.05)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-muted/30 hover:shadow-md"
-                                  >
-                                    <p className="line-clamp-1 text-sm font-medium">
-                                      {feedback.subject}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {new Date(
-                                        feedback.updatedAt,
-                                      ).toLocaleDateString("en-US")}
-                                    </p>
-                                  </button>
-                                ))
-                              )}
-                            </CardContent>
-                          </Card>
-                        </div>
-                      </div>
-                    </div>
-                  ) : isMySubmissionsView && feedbacks.length > 0 ? (
-                    <div className="mx-auto flex h-full min-h-0 w-full flex-col gap-2 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="flex h-9 items-center gap-3">
-                          <div className="flex h-9 w-11 items-center justify-center rounded-2xl bg-muted/50 text-[#171717]">
-                            <BarChart3 className="h-5 w-5" />
-                          </div>
-                          <div className="flex h-9 items-center">
-                            <h2 className="text-[21px] font-semibold leading-none tracking-[-0.02em] text-[#171717]">
-                              Submission list
-                            </h2>
-                          </div>
-                        </div>
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            setCreateSubmissionStep("form");
-                            setCreateSubmissionTrackingId(null);
-                            setIsAnonymous(false);
-                            setIsCreateSubmissionOpen(true);
-                          }}
-                          className="h-9 sm:w-auto bg-accent hover:bg-accent/90 transition-colors duration-150 hover:-translate-y-px"
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          New Submission
-                        </Button>
-                      </div>
-                      <div>
-                        <div className="mb-3">
-                          <div className="hidden gap-x-3 gap-y-2 md:grid xl:grid-cols-[minmax(0,1.9fr)_repeat(5,minmax(0,1fr))]">
-                            <div className="relative">
-                              <Search
-                                className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2"
-                                style={{ color: "#8f877d" }}
-                              />
-                              <Input
-                                placeholder="Search by ID, subject, or message."
-                                value={searchQuery}
-                                onChange={(event) =>
-                                  setSearchQuery(event.target.value)
-                                }
-                                className={`${SUBMISSION_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}
-                                style={{
-                                  color: SUBMISSION_FILTER_TEXT_COLOR,
-                                  paddingLeft: "2.75rem",
-                                }}
-                              />
-                            </div>
-                            {desktopInlineFilterItems.map((filter) => {
-                              const value =
-                                filter.key === "tracking"
-                                  ? filterTracking
-                                  : filter.key === "date"
-                                    ? filterDate
-                                    : filter.key === "type"
-                                      ? filterType
-                                      : filter.key === "priority"
-                                        ? filterPriority
-                                        : filterStatus;
-                              return (
-                                <Select
-                                  key={filter.key}
-                                  value={value}
-                                  onValueChange={filter.onSelect}
-                                >
-                                  <SelectTrigger
-                                    className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`}
-                                    style={{
-                                      color: SUBMISSION_FILTER_TEXT_COLOR,
-                                    }}
-                                  >
-                                    <SelectValue placeholder={filter.label} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {filter.options.map((option) => (
-                                      <SelectItem
-                                        key={`${filter.key}-${option.value}`}
-                                        value={option.value}
-                                      >
-                                        {option.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              );
-                            })}
-                          </div>
-                          <div className="flex w-full gap-2 md:hidden">
-                            <div className="relative flex-1">
-                              <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                              <Input
-                                placeholder="Search by ID, subject, message."
-                                value={searchQuery}
-                                onChange={(event) =>
-                                  setSearchQuery(event.target.value)
-                                }
-                                className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
-                              />
-                            </div>
-                            <HoverFilterPopover
-                              items={hoverFilterItems}
-                              activeCount={activeFilterCount}
-                              onReset={clearAllFilters}
-                            />
-                          </div>
-                          {activeFilterChips.length > 0 ? (
-                            <div className="mt-5 mb-3 flex flex-wrap items-center gap-2">
-                              {activeFilterChips.map((chip) => (
-                                <span
-                                  key={chip.key}
-                                  className="inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-medium leading-none text-[#6f6255]"
-                                  style={{ columnGap: "12px" }}
-                                >
-                                  <span>{chip.label}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => clearSingleFilter(chip.key)}
-                                    className="inline-flex items-center justify-center rounded-full p-0.5 text-[#6f6255] transition-colors hover:bg-[#efe5da] hover:text-[#4d463e]"
-                                    aria-label={`Remove ${chip.label} filter`}
-                                    title={`Remove ${chip.label} filter`}
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
-                                </span>
-                              ))}
-                              <button
-                                type="button"
-                                onClick={clearAllFilters}
-                                className="inline-flex min-h-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium leading-none transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
-                                style={{ color: "#171717" }}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                                Clear all
-                              </button>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                      {renderCreateSubmissionDialog()}
-                      <div
-                        ref={submissionsScrollRef}
-                        className="ff-hide-scrollbar flex-1 min-h-0 w-full max-w-full overflow-y-scroll overflow-x-hidden md:[scrollbar-gutter:stable] h-[calc(100vh-260px)]"
-                        onScroll={(event) => {
-                          const top = event.currentTarget.scrollTop;
-                          submissionsScrollTop.current = top;
-                          if (typeof window !== "undefined") {
-                            window.localStorage.setItem(
-                              submissionsScrollKey,
-                              top.toString(),
-                            );
-                          }
-                        }}
-                      >
-                        <div className="w-full overflow-x-auto">
-                          <Table className="w-full min-w-full md:min-w-[980px] md:table-fixed text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
-                            <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                              <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                <TableHead className="w-[150px]">
-                                  Tracking ID
-                                </TableHead>
-                                <TableHead className="w-[300px]">
-                                  Subject
-                                </TableHead>
-                                <TableHead className="w-[220px]">
-                                  Category
-                                </TableHead>
-                                <TableHead className="w-[110px]">
-                                  Priority
-                                </TableHead>
-                                <TableHead className="w-[150px]">
-                                  Status
-                                </TableHead>
-                                <TableHead className="w-[130px] whitespace-nowrap">
-                                  Date
-                                </TableHead>
-                                <TableHead className="w-[88px] text-center">
-                                  Actions
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {filteredFeedbacks.length === 0 ? (
-                                <TableRow>
-                                  <TableCell
-                                    colSpan={7}
-                                    className="py-8 text-center text-sm text-muted-foreground"
-                                  >
-                                    No submissions match the current filters.
-                                  </TableCell>
-                                </TableRow>
-                              ) : (
-                                paginatedFilteredFeedbacks.map((feedback) => (
-                                  <TableRow
-                                    key={feedback.id}
-                                    className="h-14 cursor-pointer"
-                                    onClick={() => handleViewFeedback(feedback)}
-                                  >
-                                    <TableCell className="font-mono text-xs text-muted-foreground truncate">
-                                      {feedback.id}
-                                    </TableCell>
-                                    <TableCell
-                                      className="font-medium truncate"
-                                      title={feedback.subject}
-                                    >
-                                      {feedback.subject}
-                                    </TableCell>
-                                    <TableCell
-                                      className="truncate"
-                                      title={feedback.category}
-                                    >
-                                      {feedback.category}
-                                    </TableCell>
-                                    <TableCell className="truncate">
-                                      <Badge
-                                        className={getPriorityColor(
-                                          feedback.priority,
-                                        )}
-                                        variant="outline"
-                                      >
-                                        {feedback.priority}
-                                      </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                      <span className="inline-flex items-center gap-2">
-                                        {(() => {
-                                          const StatusIcon = getStatusIcon(
-                                            feedback.status,
-                                          );
-                                          return (
-                                            <Badge
-                                              variant="outline"
-                                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
-                                                feedback.status,
-                                              )}`}
-                                            >
-                                              <StatusIcon className="h-3.5 w-3.5" />
-                                              <span className="leading-none">
-                                                {feedback.status}
-                                              </span>
-                                            </Badge>
-                                          );
-                                        })()}
-                                      </span>
-                                    </TableCell>
-                                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                                      {formatSubmittedAt(feedback.createdAt)}
-                                    </TableCell>
-                                    <TableCell className="w-[88px] text-center">
-                                      {feedback.status.toLowerCase() ===
-                                      "pending" ? (
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-7 w-7 rounded-md text-rose-600 hover:bg-rose-600 hover:text-white"
-                                          aria-label="Delete submission"
-                                          title="Delete submission"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            setDeleteTarget(feedback);
-                                            setIsDeleteOpen(true);
-                                          }}
-                                        >
-                                          <Trash2 className="h-3.5 w-3.5" />
-                                        </Button>
-                                      ) : (
-                                        <span className="inline-flex h-7 w-7 items-center justify-center text-xs text-muted-foreground">
-                                          -
-                                        </span>
-                                      )}
-                                    </TableCell>
-                                  </TableRow>
-                                ))
-                              )}
-                              {filteredFeedbacks.length > 0 &&
-                              mySubmissionsPlaceholderRowCount > 0
-                                ? Array.from({
-                                    length: mySubmissionsPlaceholderRowCount,
-                                  }).map((_, index) => (
-                                    <TableRow
-                                      key={`submission-placeholder-row-${index}`}
-                                      className="h-14"
-                                      aria-hidden="true"
-                                    >
-                                      <TableCell colSpan={7} />
-                                    </TableRow>
-                                  ))
-                                : null}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </div>
-                      {filteredFeedbacks.length > 0 ? (
-                        <div className="shrink-0 border-t border-border/60 bg-background pt-3">
-                          <TablePaginationFooter
-                            page={mySubmissionsPage}
-                            totalPages={mySubmissionsTotalPages}
-                            onPrevious={() =>
-                              setMySubmissionsPage((page) =>
-                                Math.max(1, page - 1),
-                              )
-                            }
-                            onNext={() =>
-                              setMySubmissionsPage((page) =>
-                                Math.min(mySubmissionsTotalPages, page + 1),
-                              )
-                            }
-                            pageSize={mySubmissionsPageSize}
-                            pageSizeOptions={MY_SUBMISSIONS_PAGE_SIZE_OPTIONS}
-                            onPageSizeChange={(value) =>
-                              setMySubmissionsPageSize(
-                                value as typeof mySubmissionsPageSize,
-                              )
-                            }
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <Card className="h-full border shadow-sm flex flex-col">
-                      <CardContent className="pt-6 flex-1 flex items-center">
-                        <div className="text-center py-8 w-full">
-                          <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                          <h3 className="text-lg font-semibold mb-2">
-                            No Submissions Yet
-                          </h3>
-                          <p className="text-muted-foreground">
-                            No submissions yet. Use Submit Feedback to create
-                            your first one.
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                    <UserDashboardHomeView
+                      dashboardStats={dashboardStats}
+                      latestSubmissionCards={latestSubmissionCards}
+                      needsAttentionCards={needsAttentionCards}
+                      recentlyUpdatedCards={recentlyUpdatedCards}
+                      homeNotifications={homeNotifications}
+                      notificationPanelMaxHeight={notificationPanelMaxHeight}
+                      onViewFeedback={handleViewFeedback}
+                      onCreateSubmission={() => setIsCreateSubmissionOpen(true)}
+                      renderCreateSubmissionDialog={renderCreateSubmissionDialog}
+                      renderHomeSubmissionGrid={renderHomeSubmissionGrid}
+                      getStatusBadgeClass={getStatusBadgeClass}
+                      getStatusIcon={getStatusIcon}
+                    />
+                  ) : isMySubmissionsView ? (
+                    <UserDashboardMySubmissionsView
+                      feedbacks={feedbacks}
+                      filteredFeedbacks={filteredFeedbacks}
+                      paginatedFilteredFeedbacks={paginatedFilteredFeedbacks}
+                      searchQuery={searchQuery}
+                      filterType={filterType}
+                      filterPriority={filterPriority}
+                      filterStatus={filterStatus}
+                      filterTracking={filterTracking}
+                      filterDate={filterDate}
+                      mySubmissionsPage={mySubmissionsPage}
+                      mySubmissionsPageSize={mySubmissionsPageSize}
+                      mySubmissionsTotalPages={mySubmissionsTotalPages}
+                      submissionsScrollRef={submissionsScrollRef}
+                      submissionsScrollKey={submissionsScrollKey}
+                      submissionsScrollTop={submissionsScrollTop}
+                      mySubmissionsPlaceholderRowCount={mySubmissionsPlaceholderRowCount}
+                      activeFilterChips={activeFilterChips}
+                      activeFilterCount={activeFilterCount}
+                      hoverFilterItems={hoverFilterItems}
+                      desktopInlineFilterItems={desktopInlineFilterItems}
+                      onSearchChange={setSearchQuery}
+                      onFilterTypeChange={setFilterType}
+                      onFilterPriorityChange={setFilterPriority}
+                      onFilterStatusChange={setFilterStatus}
+                      onFilterTrackingChange={setFilterTracking}
+                      onFilterDateChange={setFilterDate}
+                      onViewFeedback={handleViewFeedback}
+                      onCreateSubmissionClick={() => {
+                        setCreateSubmissionStep("form");
+                        setCreateSubmissionTrackingId(null);
+                        setIsAnonymous(false);
+                        setIsCreateSubmissionOpen(true);
+                      }}
+                      onDeleteClick={(feedback) => {
+                        setDeleteTarget(feedback);
+                        setIsDeleteOpen(true);
+                      }}
+                      onClearSingleFilter={clearSingleFilter}
+                      onClearAllFilters={clearAllFilters}
+                      onPageChange={setMySubmissionsPage}
+                      onPageSizeChange={setMySubmissionsPageSize}
+                      renderCreateSubmissionDialog={renderCreateSubmissionDialog}
+                      getPriorityColor={getPriorityColor}
+                      getStatusBadgeClass={getStatusBadgeClass}
+                      getStatusIcon={getStatusIcon}
+                      formatSubmittedAt={formatSubmittedAt}
+                    />
+                  ) : null}
                 </div>
                 {selectedFeedback ? (
                   <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
@@ -2182,38 +1734,46 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       className="ff-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px]"
                       onClick={handleAttemptCloseSelectedFeedback}
                     />
-                    <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl" style={isUnsentMessageDialogOpen ? {borderColor: "transparent"} : {}}>
-                      {isUnsentMessageDialogOpen && (
-                        <>
-                          <div className="absolute -inset-px z-20 rounded-2x1 bg-black/40 backdrop-blur-[1px]" />
-                          <div className="absolute inset-0 z-30 flex items-center justify-center p-4">
-                            <div className="w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
-                              <div className="space-y-2 text-left">
-                                <h2 className="text-lg font-semibold">Discard unsent message?</h2>
-                                <p className="text-sm text-muted-foreground">You have a message that has not been sent yet.</p>
-                              </div>
-                              <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                                <Button type="button" variant="outline" onClick={() => setIsUnsentMessageDialogOpen(false)}>Keep</Button>
-                                <Button type="button" onClick={() => { setIsUnsentMessageDialogOpen(false); closeSelectedFeedback(); }}>Discard</Button>
-                              </div>
+                    {/* Unsent message overlay — outside Card so overflow-hidden doesn't clip it */}
+                    {isUnsentMessageDialogOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-[1px]"
+                          onClick={() => { setIsUnsentMessageDialogOpen(false); closeSelectedFeedback(); }}
+                        />
+                        <div className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none">
+                          <div className="pointer-events-auto w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
+                            <div className="space-y-2 text-left">
+                              <h2 className="text-lg font-normal">Discard unsent message?</h2>
+                              <p className="text-sm text-black">You have a message that has not been sent yet.</p>
+                            </div>
+                            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                              <Button type="button" variant="outline" onClick={() => setIsUnsentMessageDialogOpen(false)}>Keep</Button>
+                              <Button type="button" onClick={() => { setIsUnsentMessageDialogOpen(false); closeSelectedFeedback(); }}>Discard</Button>
                             </div>
                           </div>
-                        </>
-                      )}
+                        </div>
+                      </>
+                    )}
+                    <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[83vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
+
                       <CardHeader className="space-y-0 pb-0">
                         <div className="flex items-center justify-between gap-3">
                           <CardTitle>Feedback Details</CardTitle>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-9 w-9"
+                            className="h-9 w-9 text-muted-foreground hover:bg-muted hover:text-foreground focus:border-ring focus:ring-ring/50 focus:ring-[3px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                             aria-label="Close feedback details"
                             onClick={handleAttemptCloseSelectedFeedback}
                           >
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
-                        <CardDescription className="font-mono">
+                        <CardDescription
+                          className="text-black"
+                          style={{ color: "#666666" }}
+                        >
                           {selectedFeedback.id}
                         </CardDescription>
                       </CardHeader>
@@ -2240,7 +1800,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                       </CardContent>
 
                       <div className="pointer-events-none absolute bottom-0 right-6 z-20">
-                        {isUnsentMessageDialogOpen && <div className="absolute inset-0 z-40 rounded-t-xl bg-black/40 backdrop-blur-[1px]" />}
+
                         <div className="relative h-[360px] w-[320px]">
                           <div
                             className={`pointer-events-auto absolute bottom-0 right-0 z-10 h-[360px] w-[320px] overflow-hidden rounded-t-xl border-2 border-slate-300 bg-white shadow-2xl transition-transform duration-500 ease-in-out ${
@@ -2253,9 +1813,12 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               className="flex cursor-pointer items-center justify-between border-b border-border bg-muted/40 px-3 py-2 transition-colors hover:bg-muted/70"
                               onClick={() => setIsMiniChatOpen((prev) => !prev)}
                             >
-                              <p className="text-sm font-semibold text-foreground">
-                                Message window
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                                <p className="text-sm font-normal text-foreground">
+                                  Message window
+                                </p>
+                              </div>
                               {isMiniChatOpen ? (
                                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
                               ) : (
@@ -2268,12 +1831,12 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                 className="ff-hide-scrollbar min-h-0 overflow-y-auto p-3"
                               >
                                 {isMessagesLoading ? (
-                                  <p className="text-sm text-muted-foreground">
+                                  <p className="text-sm text-black">
                                     Loading conversation...
                                   </p>
                                 ) : null}
                                 {!isMessagesLoading && messages.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">
+                                  <p className="text-sm text-black">
                                     No messages yet.
                                   </p>
                                 ) : null}
@@ -2345,10 +1908,12 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                             className="space-y-2"
                                           >
                                             {showDayLabel ? (
-                                              <div className="flex justify-center">
-                                                <span className="rounded-full border border-border bg-white/80 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                                              <div className="flex items-center gap-2 py-1">
+                                                <div className="h-px flex-1 bg-border/60" />
+                                                <span className="text-[10px] font-normal text-black">
                                                   {dayLabel}
                                                 </span>
+                                                <div className="h-px flex-1 bg-border/60" />
                                               </div>
                                             ) : null}
                                             <div
@@ -2358,7 +1923,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                                                 className={`group relative w-fit min-w-0 max-w-[85%] ${isUser ? "text-right" : "text-left"}`}
                                               >
                                                 {showName && !isUser ? (
-                                                  <p className="mb-1 px-1 text-[11px] font-semibold text-muted-foreground">
+                                                  <p className="mb-1 px-1 text-[11px] font-normal text-black">
                                                     {name}
                                                   </p>
                                                 ) : null}
@@ -2452,7 +2017,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                               : "Open quick chat"
                           }
                           onClick={() => setIsMiniChatOpen((prev) => !prev)}
-                          className="pointer-events-auto absolute bottom-0 right-0 z-0 h-8 w-[320px] cursor-pointer rounded-t-md border border-b-0 border-border bg-muted/90 px-6 text-xs font-semibold text-foreground shadow-md transition-colors hover:bg-muted"
+                          className="pointer-events-auto absolute bottom-0 right-0 z-0 h-8 w-[320px] cursor-pointer rounded-t-md border border-b-0 border-border bg-muted/90 px-6 text-xs font-normal text-foreground shadow-md transition-colors hover:bg-muted"
                         >
                           {isMiniChatOpen ? "Updates" : "Updates"}
                         </button>

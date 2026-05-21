@@ -10,10 +10,12 @@ type FeedbackDetailsCardProps = {
   formatDate?: (value: string) => string;
   className?: string;
   preSubjectContent?: ReactNode;
+  showSubjectSeparators?: boolean;
   messageVisibleLines?: number;
   compactNoTitleLayout?: boolean;
   indentMessageFirstLineIfMultiline?: boolean;
   hidePriority?: boolean;
+  hideDate?: boolean;
   dateLabel?: string;
   dateValue?: string;
 };
@@ -46,10 +48,12 @@ export function FeedbackDetailsCard({
   formatDate = defaultFormatDate,
   className,
   preSubjectContent,
+  showSubjectSeparators,
   messageVisibleLines,
   compactNoTitleLayout,
   indentMessageFirstLineIfMultiline,
   hidePriority,
+  hideDate,
   dateLabel,
   dateValue,
 }: FeedbackDetailsCardProps) {
@@ -107,12 +111,20 @@ export function FeedbackDetailsCard({
             ) : null}
           </div>
           <div className={hasTitle ? undefined : "space-y-1"}>
-            <p className="text-xs font-semibold text-muted-foreground">{effectiveDateLabel}</p>
-            <p className="mt-0.5 text-[0.98rem] font-medium">{formatDate(effectiveDateValue)}</p>
+            {!hideDate ? (
+              <>
+                <p className="text-xs font-semibold text-muted-foreground">{effectiveDateLabel}</p>
+                <p className="mt-0.5 text-[0.98rem] font-medium">{formatDate(effectiveDateValue)}</p>
+              </>
+            ) : null}
           </div>
         </div>
 
         {preSubjectContent}
+
+        {showSubjectSeparators ? (
+          <div className="h-px w-full bg-border/70" />
+        ) : null}
 
         <div className={hasTitle ? "space-y-1" : "space-y-3"}>
           <p className="text-xs font-semibold text-muted-foreground">Subject</p>
@@ -126,6 +138,10 @@ export function FeedbackDetailsCard({
             {feedback.message}
           </p>
         </div>
+
+        {showSubjectSeparators ? (
+          <div className="h-px w-full bg-border/70" />
+        ) : null}
       </CardContent>
     </Card>
   );

@@ -35,6 +35,11 @@ export const EMPTY_FORM = {
   message: "",
 };
 
+export const SUBMISSION_FIELD_CLASS =
+  "h-10 rounded-lg border border-input bg-input-background px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50";
+
+export const SUBMISSION_ACTION_BUTTON_HEIGHT_CLASS = "h-10";
+
 export const CREATE_SUBMISSION_STEP_ORDER: Record<CreateSubmissionStep, number> = {
   form: 0,
   confirm: 1,
