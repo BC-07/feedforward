@@ -157,6 +157,14 @@ func GetFeedbackByID(c *fiber.Ctx) error {
 	return success(c, fiber.StatusOK, feedback)
 }
 
+func isPublicTrackRequest(c *fiber.Ctx) bool {
+	return strings.EqualFold(strings.TrimSpace(c.Get("X-Track-Public")), "true")
+}
+
+func isAccountLinkedFeedback(feedback model.FeedbackModel) bool {
+	return feedback.UserID != nil && strings.TrimSpace(*feedback.UserID) != ""
+}
+
 func CreateFeedback(c *fiber.Ctx) error {
 	db := middleware.DBConn
 	if err := ensureFeedbackEmailColumn(); err != nil {
@@ -271,6 +279,7 @@ func CreateFeedback(c *fiber.Ctx) error {
 			return
 		}
 	}(createdCopy)
+	emitAdminFeedbackCreated(created.Category, created.ID)
 
 	return success(c, fiber.StatusCreated, created)
 }

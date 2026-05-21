@@ -53,6 +53,11 @@ export interface SuperAdminSession {
   expiresAt: string;
 }
 
+export interface LoginRoleResponse {
+  role: "none" | "user" | "admin" | "superadmin";
+  isSuperAdmin?: boolean;
+}
+
 export interface Category {
   id: number;
   name: string;
@@ -73,6 +78,12 @@ interface ApiResponse<T> {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "http://localhost:5566";
+
+export function openAdminEventsStream(): EventSource {
+  return new EventSource(`${API_BASE_URL}/events/admin`, {
+    withCredentials: true,
+  });
+}
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const { headers: initHeaders, ...restInit } = init ?? {};
@@ -104,9 +115,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
         lowerMessage.includes("session") ||
         lowerMessage.includes("expired") ||
         lowerMessage.includes("reauthentication required");
+      const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+      const storage = rememberMe ? localStorage : sessionStorage;
       const isAdminLoggedIn =
-        localStorage.getItem("isAdminLoggedIn") === "true" ||
-        localStorage.getItem("isSuperAdminLoggedIn") === "true";
+        storage.getItem("isAdminLoggedIn") === "true" ||
+        storage.getItem("isSuperAdminLoggedIn") === "true";
       if (isAdminLoggedIn && isSessionInvalid) {
         localStorage.removeItem("isAdminLoggedIn");
         localStorage.removeItem("currentAdminId");
@@ -116,6 +129,14 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
         localStorage.removeItem("isSuperAdminLoggedIn");
         localStorage.removeItem("superAdminName");
         localStorage.removeItem("superAdminExpiresAt");
+        sessionStorage.removeItem("isAdminLoggedIn");
+        sessionStorage.removeItem("currentAdminId");
+        sessionStorage.removeItem("currentAdminName");
+        sessionStorage.removeItem("currentAdminEmail");
+        sessionStorage.removeItem("currentAdminDepartment");
+        sessionStorage.removeItem("isSuperAdminLoggedIn");
+        sessionStorage.removeItem("superAdminName");
+        sessionStorage.removeItem("superAdminExpiresAt");
         localStorage.setItem(
           "sessionExpiredMessage",
           "You were signed out due to inactivity. Please log in again.",
@@ -180,6 +201,26 @@ export async function listFeedbacks(filters?: {
 
 export async function getFeedback(id: string): Promise<Feedback> {
   return apiFetch<Feedback>(`/feedbacks/${encodeURIComponent(id)}`);
+}
+
+export async function getFeedbackPublic(id: string): Promise<Feedback> {
+  const response = await fetch(
+    `${API_BASE_URL}/feedbacks/${encodeURIComponent(id)}`,
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "X-Track-Public": "true",
+      },
+      credentials: "omit",
+    },
+  );
+
+  const payloadResponse = (await response.json()) as ApiResponse<Feedback>;
+  if (!response.ok) {
+    throw new Error(payloadResponse?.message || "Request failed");
+  }
+
+  return payloadResponse.data;
 }
 
 export async function createFeedback(
@@ -254,6 +295,7 @@ export async function createFeedbackMessagePublic(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-Track-Public": "true",
       },
       credentials: "omit",
       body: JSON.stringify(payload),
@@ -283,6 +325,7 @@ export async function registerUser(payload: {
 export async function loginUser(payload: {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }): Promise<User> {
   return apiFetch<User>("/auth/users/login", {
     method: "POST",
@@ -292,6 +335,7 @@ export async function loginUser(payload: {
 
 export async function requestUserLoginOTP(payload: {
   email: string;
+  rememberMe?: boolean;
 }): Promise<{ sent: boolean }> {
   return apiFetch<{ sent: boolean }>("/auth/users/login/request-otp", {
     method: "POST",
@@ -368,6 +412,7 @@ export async function registerAdmin(payload: {
 export async function loginAdmin(payload: {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }): Promise<Admin> {
   return apiFetch<Admin>("/auth/admins/login", {
     method: "POST",
@@ -378,11 +423,18 @@ export async function loginAdmin(payload: {
 export async function loginSuperAdmin(payload: {
   username: string;
   password: string;
+  rememberMe?: boolean;
 }): Promise<SuperAdminSession> {
   return apiFetch<SuperAdminSession>("/auth/superadmin/login", {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function getLoginRole(email: string): Promise<LoginRoleResponse> {
+  const params = new URLSearchParams();
+  params.set("email", email);
+  return apiFetch<LoginRoleResponse>(`/auth/login-role?${params.toString()}`);
 }
 
 export async function listAdmins(): Promise<Admin[]> {
@@ -404,6 +456,13 @@ export async function getCategorySubmissionsLast7Days(
 ): Promise<SuperAdminBarStatRow[]> {
   const data = await apiFetch<SuperAdminBarStatRow[] | null>(
     `/superadmin/stats/submissions-categories?range=${encodeURIComponent(range)}`,
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getCategorySubmissionCounts(): Promise<SuperAdminBarStatRow[]> {
+  const data = await apiFetch<SuperAdminBarStatRow[] | null>(
+    "/superadmin/stats/category-counts",
   );
   return Array.isArray(data) ? data : [];
 }
@@ -582,4 +641,3 @@ export async function updateAdminProfile(
     body: JSON.stringify(payload),
   });
 }
-

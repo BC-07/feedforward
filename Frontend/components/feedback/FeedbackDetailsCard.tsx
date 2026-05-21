@@ -17,6 +17,7 @@ type FeedbackDetailsCardProps = {
   dateValue?: string;
   indentMessageFirstLineIfMultiline?: boolean;
   fitMessageToContent?: boolean;
+  boxedSubject?: boolean;
 };
 
 const DEFAULT_MESSAGE_VISIBLE_LINES = 5;
@@ -31,16 +32,18 @@ const defaultFormatDate = (value: string) =>
     minute: "2-digit",
   });
 
-const getPriorityColor = (priority: string) => {
+const MUTED_TEXT_COLOR = "#6e6e6e";
+
+const getPriorityTextColor = (priority: string) => {
   switch (priority.trim().toLowerCase()) {
     case "low":
-      return "text-gray-600";
+      return "#6e6e6e";
     case "medium":
-      return "text-yellow-600";
+      return "#d97706";
     case "high":
-      return "text-orange-600";
+      return "#ea580c";
     default:
-      return "text-gray-600";
+      return "#6e6e6e";
   }
 };
 
@@ -57,6 +60,7 @@ export function FeedbackDetailsCard({
   dateValue,
   indentMessageFirstLineIfMultiline = false,
   fitMessageToContent = false,
+  boxedSubject = false,
 }: FeedbackDetailsCardProps) {
   const messageViewportHeightRem = messageVisibleLines * MESSAGE_LINE_HEIGHT_REM;
   const renderedDate = formatDate(dateValue ?? feedback.updatedAt);
@@ -72,7 +76,7 @@ export function FeedbackDetailsCard({
     ? "grid grid-cols-1 gap-2 sm:grid-cols-2"
     : compactNoTitleLayout
       ? "grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2"
-      : "grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2";
+      : "grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-2";
   const compactMetaItemClass = compactNoTitleLayout ? "space-y-2" : "space-y-1";
   const shouldIndentMessage = indentMessageFirstLineIfMultiline && isMessageMultiline;
 
@@ -112,28 +116,27 @@ export function FeedbackDetailsCard({
       <CardContent className={contentClassName}>
         <div className={gridClassName}>
           <div className={hasTitle ? undefined : compactMetaItemClass}>
-            <p className="text-xs font-semibold text-muted-foreground">Type</p>
+            <p className="text-xs font-semibold" style={{ color: MUTED_TEXT_COLOR }}>Type</p>
             <p className="mt-0.5 text-[0.98rem] font-medium capitalize">{feedback.type}</p>
           </div>
           <div className={hasTitle ? undefined : compactMetaItemClass}>
-            <p className="text-xs font-semibold text-muted-foreground">Category</p>
+            <p className="text-xs font-semibold" style={{ color: MUTED_TEXT_COLOR }}>Category</p>
             <p className="mt-0.5 text-[0.98rem] font-medium">{feedback.category}</p>
           </div>
           {!hidePriority ? (
             <div className={hasTitle ? undefined : compactMetaItemClass}>
-              <p className="text-xs font-semibold text-muted-foreground">Priority</p>
+              <p className="text-xs font-semibold" style={{ color: MUTED_TEXT_COLOR }}>Priority</p>
               <p
-                className={`mt-0.5 text-[0.98rem] font-medium capitalize ${getPriorityColor(
-                  feedback.priority,
-                )}`}
+                className="mt-0.5 text-[0.98rem] font-medium capitalize"
+                style={{ color: getPriorityTextColor(feedback.priority) }}
               >
                 {feedback.priority}
               </p>
             </div>
           ) : null}
           <div className={hasTitle ? "sm:col-span-2" : compactMetaItemClass}>
-            <p className="text-xs font-semibold text-muted-foreground">{dateLabel}</p>
-            <p className="mt-0.5 text-[0.96rem] font-medium whitespace-nowrap">
+            <p className="text-xs font-semibold" style={{ color: MUTED_TEXT_COLOR }}>{dateLabel}</p>
+            <p className="mt-0.5 text-[0.96rem] font-medium whitespace-nowrap" style={{ color: "#000000" }}>
               {renderedDate}
             </p>
           </div>
@@ -142,21 +145,21 @@ export function FeedbackDetailsCard({
         {preSubjectContent}
 
         {compactNoTitleLayout && !hasTitle ? (
-          <div className="relative -mx-4 rounded-[1.75rem] bg-background/70 sm:-mx-5">
+          <div className="relative w-full rounded-lg bg-muted/60">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 z-20 rounded-[1.75rem] border-2 border-[#c8c8c8] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]"
+              className="pointer-events-none absolute inset-0 z-20 rounded-lg border-2 border-[#c8c8c8] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]"
             />
             <div className="relative z-10 px-4 py-4 sm:px-5">
-              <p className="text-xs font-semibold text-muted-foreground">Subject</p>
-              <p className="line-clamp-2 max-w-full text-[1rem] font-semibold [overflow-wrap:anywhere] break-all">
+              <p className="text-xs font-semibold" style={{ color: MUTED_TEXT_COLOR }}>Subject</p>
+              <p className="line-clamp-2 max-w-full text-[1rem] font-semibold [overflow-wrap:break-word] break-words">
                 {feedback.subject}
               </p>
               <p
                 ref={messageRef}
                 className={`ff-hide-scrollbar mt-2 max-w-full overflow-x-hidden ${
                   fitMessageToContent ? "overflow-y-visible" : "overflow-y-auto"
-                } px-1 text-[0.9rem] leading-[1.45rem] [text-align:justify] [text-justify:inter-word] [overflow-wrap:anywhere] break-all hyphens-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
+                } px-1 text-[0.9rem] leading-[1.45rem] [text-align:justify] [text-justify:inter-word] [overflow-wrap:break-word] break-words hyphens-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
                   shouldIndentMessage ? "[text-indent:2rem]" : ""
                 }`}
                 style={{
@@ -171,9 +174,37 @@ export function FeedbackDetailsCard({
               </p>
             </div>
           </div>
+        ) : boxedSubject && !hasTitle ? (
+          <div className="relative w-full rounded-lg bg-muted/60">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-20 rounded-lg border-2 border-[#c8c8c8] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.08)]"
+            />
+            <div className="relative z-10 px-4 py-4 sm:px-5">
+              <p className="text-xs font-semibold" style={{ color: MUTED_TEXT_COLOR }}>Subject</p>
+              <p className="line-clamp-2 text-[0.98rem] font-semibold break-words">
+                {feedback.subject}
+              </p>
+              <p
+                ref={messageRef}
+                className={`ff-hide-scrollbar mt-0.5 ${
+                  fitMessageToContent ? "overflow-y-visible" : "overflow-y-auto"
+                } px-1 text-[0.9rem] leading-[1.45rem] [text-align:justify] [text-justify:inter-word] [text-indent:1rem] [overflow-wrap:anywhere] break-words hyphens-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden`}
+                style={{
+                  ...(fitMessageToContent
+                    ? {}
+                    : { height: `${messageViewportHeightRem}rem` }),
+                  scrollbarWidth: "none",
+                  msOverflowStyle: "none",
+                }}
+              >
+                {feedback.message}
+              </p>
+            </div>
+          </div>
         ) : (
           <div className={hasTitle ? "space-y-1" : "space-y-3"}>
-            <p className="text-xs font-semibold text-muted-foreground">Subject</p>
+            <p className="text-xs font-semibold" style={{ color: MUTED_TEXT_COLOR }}>Subject</p>
             <p className="line-clamp-2 text-[0.98rem] font-semibold break-words">
               {feedback.subject}
             </p>

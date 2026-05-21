@@ -15,7 +15,8 @@ import (
 )
 
 type userLoginOTPRequest struct {
-	Email string `json:"email"`
+	Email      string `json:"email"`
+	RememberMe bool   `json:"rememberMe"`
 }
 
 type userLoginVerifyOTPRequest struct {
@@ -24,8 +25,14 @@ type userLoginVerifyOTPRequest struct {
 }
 
 type userLoginOTPEntry struct {
-	Email     string
-	ExpiresAt time.Time
+	Email      string
+	RememberMe bool
+	ExpiresAt  time.Time
+}
+
+type loginRoleResponse struct {
+	Role         string `json:"role"`
+	IsSuperAdmin bool   `json:"isSuperAdmin,omitempty"`
 }
 
 var (
@@ -201,8 +208,9 @@ func RegisterAdmin(c *fiber.Ctx) error {
 func LoginUser(c *fiber.Ctx) error {
 	//Storage preparation
 	var payload struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email      string `json:"email"`
+		Password   string `json:"password"`
+		RememberMe bool   `json:"rememberMe"`
 	}
 
 	//validating user input in json
@@ -245,7 +253,11 @@ func LoginUser(c *fiber.Ctx) error {
 		return serverError(c, "failed to load user profile", err)
 	}
 
-	session, err := createSession(sessionRoleUser, &user.ID, nil, nil, userSessionTTL)
+	ttl := userSessionTTL
+	if payload.RememberMe {
+		ttl = rememberMeSessionTTL
+	}
+	session, err := createSession(sessionRoleUser, &user.ID, nil, nil, ttl, payload.RememberMe)
 	if err != nil {
 		return serverError(c, "failed to create user session", err)
 	}
@@ -282,8 +294,9 @@ func RequestUserLoginOTP(c *fiber.Ctx) error {
 	userLoginOTPMux.Lock()
 	cleanupExpiredUserLoginOTPs(now)
 	userLoginOTPs[otp] = userLoginOTPEntry{
-		Email:     email,
-		ExpiresAt: now.Add(5 * time.Minute),
+		Email:      email,
+		RememberMe: payload.RememberMe,
+		ExpiresAt:  now.Add(5 * time.Minute),
 	}
 	userLoginOTPMux.Unlock()
 
@@ -327,13 +340,49 @@ func VerifyUserLoginOTP(c *fiber.Ctx) error {
 		return unauthorized(c, "invalid email or password")
 	}
 
-	session, err := createSession(sessionRoleUser, &user.ID, nil, nil, userSessionTTL)
+	ttl := userSessionTTL
+	if entry.RememberMe {
+		ttl = rememberMeSessionTTL
+	}
+	session, err := createSession(sessionRoleUser, &user.ID, nil, nil, ttl, entry.RememberMe)
 	if err != nil {
 		return serverError(c, "failed to create user session", err)
 	}
 	setSessionCookie(c, session)
 
 	return success(c, fiber.StatusOK, user)
+}
+
+func GetLoginRole(c *fiber.Ctx) error {
+	email := normalizeEmail(c.Query("email"))
+	if email == "" {
+		return invalidRequest(c, "email is required")
+	}
+
+	admin, err := fetchAdminByEmail(email)
+	if err != nil {
+		return serverError(c, "failed to check login role", err)
+	}
+	if strings.TrimSpace(admin.ID) != "" {
+		role := sessionRoleAdmin
+		if admin.IsSuperAdmin {
+			role = sessionRoleSuperAdmin
+		}
+		return success(c, fiber.StatusOK, loginRoleResponse{
+			Role:         role,
+			IsSuperAdmin: admin.IsSuperAdmin,
+		})
+	}
+
+	user, err := fetchUserByEmail(email)
+	if err != nil {
+		return serverError(c, "failed to check login role", err)
+	}
+	if strings.TrimSpace(user.ID) != "" {
+		return success(c, fiber.StatusOK, loginRoleResponse{Role: sessionRoleUser})
+	}
+
+	return success(c, fiber.StatusOK, loginRoleResponse{Role: "none"})
 }
 
 func LoginAdmin(c *fiber.Ctx) error {
@@ -346,8 +395,9 @@ func LoginAdmin(c *fiber.Ctx) error {
 
 	//Storage preparation
 	var payload struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email      string `json:"email"`
+		Password   string `json:"password"`
+		RememberMe bool   `json:"rememberMe"`
 	}
 
 	//validating user input in json
@@ -411,7 +461,11 @@ func LoginAdmin(c *fiber.Ctx) error {
 		if displayName == "" {
 			displayName = "superadmin"
 		}
-		session, err := createSession(sessionRoleSuperAdmin, nil, &admin.ID, &displayName, superAdminTTL)
+		ttl := superAdminTTL
+		if payload.RememberMe {
+			ttl = rememberMeSessionTTL
+		}
+		session, err := createSession(sessionRoleSuperAdmin, nil, &admin.ID, &displayName, ttl, payload.RememberMe)
 		if err != nil {
 			return serverError(c, "failed to create superadmin session", err)
 		}
@@ -419,7 +473,11 @@ func LoginAdmin(c *fiber.Ctx) error {
 		return success(c, fiber.StatusOK, admin)
 	}
 
-	session, err := createSession(sessionRoleAdmin, nil, &admin.ID, nil, adminSessionTTL)
+	ttl := adminSessionTTL
+	if payload.RememberMe {
+		ttl = rememberMeSessionTTL
+	}
+	session, err := createSession(sessionRoleAdmin, nil, &admin.ID, nil, ttl, payload.RememberMe)
 	if err != nil {
 		return serverError(c, "failed to create admin session", err)
 	}
@@ -430,9 +488,10 @@ func LoginAdmin(c *fiber.Ctx) error {
 
 func LoginSuperAdmin(c *fiber.Ctx) error {
 	var payload struct {
-		Email    string `json:"email"`
-		Username string `json:"username"`
-		Password string `json:"password"`
+		Email      string `json:"email"`
+		Username   string `json:"username"`
+		Password   string `json:"password"`
+		RememberMe bool   `json:"rememberMe"`
 	}
 
 	if err := parseBody(c, &payload); err != nil {
@@ -502,7 +561,11 @@ func LoginSuperAdmin(c *fiber.Ctx) error {
 	if username == "" {
 		username = superAdminUsername()
 	}
-	session, err := createSession(sessionRoleSuperAdmin, nil, &admin.ID, &username, superAdminTTL)
+	ttl := superAdminTTL
+	if payload.RememberMe {
+		ttl = rememberMeSessionTTL
+	}
+	session, err := createSession(sessionRoleSuperAdmin, nil, &admin.ID, &username, ttl, payload.RememberMe)
 	if err != nil {
 		return serverError(c, "failed to create superadmin session", err)
 	}

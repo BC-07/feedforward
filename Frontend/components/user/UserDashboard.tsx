@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import {
   createFeedback,
   createFeedbackMessage,
@@ -20,42 +20,18 @@ import {
   type Feedback,
   type FeedbackMessage,
 } from "@/lib/api";
+import { getPlaceholderRowCount } from "@/lib/tableUtils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { parseAdminResponses } from "@/lib/responseLog";
 import { formatLocalTime } from "@/lib/time";
@@ -64,66 +40,86 @@ import { toastApiError } from "@/lib/errorHandling";
 import { formatFilterChipLabel } from "@/lib/filterUtils";
 import { formatFeedbackText } from "@/lib/textFormat";
 import { FeedbackDetailsCard } from "@/components/feedback/FeedbackDetailsCard";
-import { FeedbackStatusCard } from "@/components/feedback/FeedbackStatusCard";
-import { FeedbackSuccessCard } from "@/components/feedback/FeedbackSuccessCard";
 import {
-  HoverFilterPopover,
-  type HoverFilterItem,
-} from "@/components/filters/HoverFilterPopover";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
-  ArrowRight,
-  BarChart3,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { TablePaginationFooter } from "@/components/ui/table-pagination-footer";
+
+import {
   Send,
-  Search,
   Clock,
   CheckCircle,
   Circle,
   Wrench,
   MessageCircle,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  ChevronDown,
+  BarChart3,
+  Plus,
+  Search,
   Trash2,
   X,
-  Copy,
-  Plus,
 } from "lucide-react";
 
-export type UserDashboardView = "home" | "my-submissions" | "submit-feedback";
-type CreateSubmissionStep = "form" | "confirm" | "success";
-const CREATE_SUBMISSION_STEP_ORDER: Record<CreateSubmissionStep, number> = {
-  form: 0,
-  confirm: 1,
-  success: 2,
-};
+// Import constants and types
+import {
+  CREATE_SUBMISSION_STEP_ORDER,
+  FEEDBACK_MESSAGE_MAX_LENGTH,
+  FEEDBACK_SUBJECT_MAX_LENGTH,
+  CONVERSATION_MESSAGE_MAX_LENGTH,
+  USER_MESSAGE_BUBBLE_CLASS,
+  MY_SUBMISSIONS_PAGE_SIZE_OPTIONS,
+  SUBMISSION_FILTER_CONTROL_CLASS,
+  SUBMISSION_FILTER_TEXT_COLOR,
+  USER_FEEDBACK_DRAFT_KEY,
+  USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY,
+  EMPTY_FORM,
+  SUBMISSION_FIELD_CLASS,
+  SUBMISSION_ACTION_BUTTON_HEIGHT_CLASS,
+  type UserDashboardView,
+  type CreateSubmissionStep,
+  type HoverFilterKey,
+} from "./constants";
 
-const FEEDBACK_MESSAGE_MAX_LENGTH = 250;
-const FEEDBACK_SUBJECT_MAX_LENGTH = 50;
-const CONVERSATION_MESSAGE_MAX_LENGTH = 2000;
-const USER_MESSAGE_BUBBLE_CLASS = "border border-[#E0A400] bg-[#F4B000] text-white";
-const SUBMISSION_FILTER_TEXT_COLOR = "#171717";
-const SUBMISSION_FILTER_CONTROL_CLASS =
-  "!h-9 min-h-9 w-full rounded-[12px] border border-[#eceae5] bg-muted/50 px-4 text-[14px] font-semibold text-[#171717] shadow-none transition-colors focus-visible:border-[#e0ddd6] focus-visible:ring-0 focus-visible:ring-transparent";
+// Import dialog and view components
+import {
+  TrackingIdSuccess,
+  CreateSubmissionDialog,
+  ConfirmationDialog,
+  DeleteConfirmationDialog,
+  UnsentMessageWarning,
+} from "./UserDashboard.Dialogs";
+import { UserDashboardSubmitView } from "./UserDashboard.SubmitView";
+import { UserDashboardMySubmissionsView } from "./UserDashboard.MySubmissionsView";
+import { UserDashboardHomeView } from "./UserDashboard.HomeView";
+import {
+  HoverFilterPopover,
+  type HoverFilterItem,
+} from "@/components/filters/HoverFilterPopover";
 
 export function UserDashboard({ view }: { view: UserDashboardView }) {
-  const MY_SUBMISSIONS_PER_PAGE = 7;
-  type HoverFilterKey =
-    | "tracking"
-    | "date"
-    | "type"
-    | "category"
-    | "priority"
-    | "status";
   const router = useRouter();
-  const draftKey = "userFeedbackDraft";
-  const emptyForm = {
-    type: "",
-    category: "",
-    priority: "",
-    subject: "",
-    message: "",
-  };
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const draftKey = USER_FEEDBACK_DRAFT_KEY;
+  const emptyForm = EMPTY_FORM;
+  const submissionsScrollKey = USER_DASHBOARD_SUBMISSIONS_SCROLL_KEY;
   const [currentUser, setCurrentUser] = useState<{
     id: string;
     fullName: string;
@@ -133,22 +129,76 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     department: string;
   } | null>(null);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [isFeedbacksLoading, setIsFeedbacksLoading] = useState(true);
   const [trackingId, setTrackingId] = useState<string | null>(null);
   const [isCreateSubmissionOpen, setIsCreateSubmissionOpen] = useState(false);
   const [createSubmissionStep, setCreateSubmissionStep] =
     useState<CreateSubmissionStep>("form");
   const [createSubmissionStepDirection, setCreateSubmissionStepDirection] =
     useState<"forward" | "backward">("forward");
-  const [createSubmissionTrackingId, setCreateSubmissionTrackingId] =
-    useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [filterCategory, setFilterCategory] = useState("all");
-  const [filterPriority, setFilterPriority] = useState("all");
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterDate, setFilterDate] = useState("recent");
-  const [filterTracking, setFilterTracking] = useState("asc");
+  const [createSubmissionTrackingId, setCreateSubmissionTrackingId] = useState<
+    string | null
+  >(null);
+  // Helper: read filters from URL, falling back to sessionStorage if URL has none
+  const getInitialFilters = () => {
+    const fromUrl = new URLSearchParams(
+      typeof window !== "undefined" ? window.location.search : "",
+    );
+    const hasUrlFilters = fromUrl.toString().length > 0;
+    if (hasUrlFilters) return fromUrl;
+    try {
+      const saved = window.sessionStorage.getItem("mySubmissions_filters");
+      if (saved) return new URLSearchParams(saved);
+    } catch {}
+    return new URLSearchParams();
+  };
+  const [searchQuery, setSearchQuery] = useState(
+    () => getInitialFilters().get("q") ?? "",
+  );
+  const [filterType, setFilterType] = useState<string[]>(
+    () => getInitialFilters().getAll("ty"),
+  );
+  const [filterCategory, setFilterCategory] = useState(
+    () => getInitialFilters().get("cat") ?? "all",
+  );
+  const [filterPriority, setFilterPriority] = useState<string[]>(
+    () => getInitialFilters().getAll("pri"),
+  );
+  const [filterStatus, setFilterStatus] = useState<string[]>(
+    () => getInitialFilters().getAll("st"),
+  );
+  const [filterDate, setFilterDate] = useState(
+    () => getInitialFilters().get("dt") ?? "recent",
+  );
+  const [filterTracking, setFilterTracking] = useState(
+    () => getInitialFilters().get("tr") ?? "asc",
+  );
   const [mySubmissionsPage, setMySubmissionsPage] = useState(1);
+  const [mySubmissionsPageSize, setMySubmissionsPageSizeRaw] = useState<
+    (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]
+  >(() => {
+    if (typeof window === "undefined") return 10;
+    try {
+      const stored = window.sessionStorage.getItem("mySubmissions_pageSize");
+      const parsed = Number(stored);
+      if (
+        stored !== null &&
+        (MY_SUBMISSIONS_PAGE_SIZE_OPTIONS as readonly number[]).includes(parsed)
+      ) {
+        return parsed as (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number];
+      }
+    } catch {}
+    return 10;
+  });
+  const setMySubmissionsPageSize = useCallback(
+    (size: (typeof MY_SUBMISSIONS_PAGE_SIZE_OPTIONS)[number]) => {
+      setMySubmissionsPageSizeRaw(size);
+      try {
+        window.sessionStorage.setItem("mySubmissions_pageSize", String(size));
+      } catch {}
+    },
+    [],
+  );
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(
     null,
   );
@@ -169,31 +219,60 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const [isMiniChatOpen, setIsMiniChatOpen] = useState(false);
+  const [activeFeedbackTab, setActiveFeedbackTab] = useState<
+    "details" | "messages"
+  >("details");
+  const [feedbackTabAnimDirection, setFeedbackTabAnimDirection] = useState<
+    "left" | "right"
+  >("left");
+  const [feedbackModalHeight, setFeedbackModalHeight] = useState<number | null>(
+    null,
+  );
   const [isUnsentMessageDialogOpen, setIsUnsentMessageDialogOpen] =
     useState(false);
   const [leftColumnHeight, setLeftColumnHeight] = useState<number | null>(null);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
-  const leftColumnRef = useRef<HTMLDivElement | null>(null);
-  const submissionsScrollRef = useRef<HTMLDivElement | null>(null);
-  const conversationScrollRef = useRef<HTMLDivElement | null>(null);
-  const miniConversationScrollRef = useRef<HTMLDivElement | null>(null);
-  const createSubmissionDialogContentRef = useRef<HTMLDivElement | null>(null);
+  const leftColumnRef = useRef<HTMLDivElement>(null);
+  const submissionsScrollRef = useRef<HTMLDivElement>(null);
+  const conversationScrollRef = useRef<HTMLDivElement>(null);
+  const createSubmissionDialogContentRef = useRef<HTMLDivElement>(null);
+  const previousFeedbackTabRef = useRef<"details" | "messages">("details");
+  const feedbackModalContentRef = useRef<HTMLDivElement>(null);
+  const detailsTabContentRef = useRef<HTMLDivElement>(null);
   const submissionsScrollTop = useRef(0);
   const feedbackSubmitLockRef = useRef(false);
-  const submissionsScrollKey = "userDashboardSubmissionsScrollTop";
   const [createSubmissionFormModalHeight, setCreateSubmissionFormModalHeight] =
     useState<number | null>(null);
   const isHomeView = view === "home";
   const isMySubmissionsView = view === "my-submissions";
   const isSubmitView = view === "submit-feedback";
+  const sameMessageList = useCallback(
+    (a: FeedbackMessage[], b: FeedbackMessage[]) => {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i += 1) {
+        if (
+          a[i].id !== b[i].id ||
+          a[i].senderRole !== b[i].senderRole ||
+          a[i].message !== b[i].message ||
+          a[i].createdAt !== b[i].createdAt
+        ) {
+          return false;
+        }
+      }
+      return true;
+    },
+    [],
+  );
 
   async function loadUserFeedbacks(userId: string) {
+    setIsFeedbacksLoading(true);
     try {
       const userFeedbacks = await listFeedbacks({ userId });
       setFeedbacks(userFeedbacks);
     } catch (error) {
       toastApiError(error, "Failed to load feedbacks.");
+    } finally {
+      setIsFeedbacksLoading(false);
     }
   }
 
@@ -205,7 +284,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     (nextStep: CreateSubmissionStep) => {
       const currentOrder = CREATE_SUBMISSION_STEP_ORDER[createSubmissionStep];
       const nextOrder = CREATE_SUBMISSION_STEP_ORDER[nextStep];
-      setCreateSubmissionStepDirection(nextOrder >= currentOrder ? "forward" : "backward");
+      setCreateSubmissionStepDirection(
+        nextOrder >= currentOrder ? "forward" : "backward",
+      );
       setCreateSubmissionStep(nextStep);
     },
     [createSubmissionStep],
@@ -214,8 +295,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const isLoggedIn = localStorage.getItem("isUserLoggedIn");
-    const userId = localStorage.getItem("currentUserId");
+    const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+    const storage = rememberMe ? localStorage : sessionStorage;
+    const isLoggedIn = storage.getItem("isUserLoggedIn");
+    const userId = storage.getItem("currentUserId");
 
     if (!isLoggedIn || !userId) {
       router.push("/login");
@@ -224,17 +307,20 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
     setCurrentUser({
       id: userId,
-      fullName: localStorage.getItem("currentUserName") || "",
-      name: localStorage.getItem("currentUserName") || "",
-      email: localStorage.getItem("currentUserEmail") || "",
-      school: localStorage.getItem("currentUserSchool") || "",
-      department: localStorage.getItem("currentUserDepartment") || "",
+      fullName: storage.getItem("currentUserName") || "",
+      name: storage.getItem("currentUserName") || "",
+      email: storage.getItem("currentUserEmail") || "",
+      school: storage.getItem("currentUserSchool") || "",
+      department: storage.getItem("currentUserDepartment") || "",
     });
   }, [router]);
 
   useLayoutEffect(() => {
     if (!isCreateSubmissionOpen || createSubmissionStep !== "form") return;
-    if (typeof window === "undefined" || typeof ResizeObserver === "undefined") {
+    if (
+      typeof window === "undefined" ||
+      typeof ResizeObserver === "undefined"
+    ) {
       return;
     }
 
@@ -264,6 +350,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   useEffect(() => {
     if (!currentUser?.id) return;
 
+    setIsFeedbacksLoading(true);
     void listFeedbacks({ userId: currentUser.id })
       .then((userFeedbacks) => {
         startTransition(() => {
@@ -272,6 +359,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       })
       .catch((error) => {
         toastApiError(error, "Failed to load feedbacks.");
+      })
+      .finally(() => {
+        setIsFeedbacksLoading(false);
       });
   }, [currentUser?.id]);
 
@@ -296,7 +386,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     if (!selectedFeedback) {
       setMessages([]);
       setMessageDraft("");
-      setIsMiniChatOpen(false);
+      setActiveFeedbackTab("details");
+      previousFeedbackTabRef.current = "details";
       return;
     }
 
@@ -352,6 +443,70 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   }, [selectedFeedback]);
 
   useEffect(() => {
+    if (!selectedFeedback?.id) return;
+
+    const refreshMessages = () => {
+      void listFeedbackMessages(selectedFeedback.id)
+        .then((data) => {
+          if (data.length === 0) return;
+          setMessages((prev) => (sameMessageList(prev, data) ? prev : data));
+        })
+        .catch(() => {
+          // Keep current thread when background refresh fails.
+        });
+    };
+
+    refreshMessages();
+    const intervalId = window.setInterval(refreshMessages, 4000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [sameMessageList, selectedFeedback?.id]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!selectedFeedback) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [selectedFeedback]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!selectedFeedback) {
+      setFeedbackModalHeight(null);
+      return;
+    }
+
+    const computeModalHeight = () => {
+      const maxHeightPx = Math.round(window.innerHeight * 0.83);
+
+      // Measure only the Details tab content so the Messages tab DOM
+      // (which stays mounted) doesn't inflate the reading.
+      const contentHeight = detailsTabContentRef.current?.scrollHeight ?? 0;
+      const desiredDetailsHeight = Math.max(410, contentHeight + 77);
+      setFeedbackModalHeight(Math.min(maxHeightPx, desiredDetailsHeight));
+    };
+
+    // Use rAF so the Details tab content is fully painted before measuring.
+    let rafId = requestAnimationFrame(computeModalHeight);
+    const updateModalHeight = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(computeModalHeight);
+    };
+
+    window.addEventListener("resize", updateModalHeight);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", updateModalHeight);
+    };
+  }, [selectedFeedback, selectedFeedback?.id]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     const mediaQuery = window.matchMedia("(min-width: 1024px)");
     const handleChange = () => setIsLargeScreen(mediaQuery.matches);
@@ -383,38 +538,38 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     return () => observer.disconnect();
   }, [isLargeScreen]);
 
-  const restoreSubmissionsScroll = useCallback((force = false) => {
-    if (!force && (selectedFeedback || trackingId)) return;
-    const node = submissionsScrollRef.current;
-    if (!node) return;
-    const top = submissionsScrollTop.current;
-    requestAnimationFrame(() => {
+  const restoreSubmissionsScroll = useCallback(
+    (force = false) => {
+      if (!force && (selectedFeedback || trackingId)) return;
+      const node = submissionsScrollRef.current;
+      if (!node) return;
+      const top = submissionsScrollTop.current;
       requestAnimationFrame(() => {
-        node.scrollTop = top;
+        requestAnimationFrame(() => {
+          node.scrollTop = top;
+        });
       });
-    });
-  }, [selectedFeedback, trackingId]);
+    },
+    [selectedFeedback, trackingId],
+  );
 
   const scrollConversationsToBottom = useCallback(
     (behavior: ScrollBehavior = "auto") => {
-      [conversationScrollRef.current, miniConversationScrollRef.current].forEach(
-        (container) => {
-          if (!container) return;
-          window.requestAnimationFrame(() => {
-            container.scrollTo({
-              top: container.scrollHeight,
-              behavior,
-            });
-          });
-        },
-      );
+      const container = conversationScrollRef.current;
+      if (!container) return;
+      window.requestAnimationFrame(() => {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior,
+        });
+      });
     },
     [],
   );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(submissionsScrollKey);
+    const stored = window.sessionStorage.getItem(submissionsScrollKey);
     if (stored) {
       const value = Number.parseInt(stored, 10);
       submissionsScrollTop.current = Number.isNaN(value) ? 0 : value;
@@ -424,21 +579,34 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
     if (selectedFeedback || trackingId) return;
-    const stored = window.localStorage.getItem(submissionsScrollKey);
+    const stored = window.sessionStorage.getItem(submissionsScrollKey);
     if (stored) {
       const value = Number.parseInt(stored, 10);
       submissionsScrollTop.current = Number.isNaN(value) ? 0 : value;
     }
     restoreSubmissionsScroll();
-  }, [feedbacks.length, selectedFeedback, trackingId, leftColumnHeight, restoreSubmissionsScroll]);
+  }, [
+    feedbacks.length,
+    selectedFeedback,
+    trackingId,
+    leftColumnHeight,
+    restoreSubmissionsScroll,
+  ]);
 
   const handleLogout = () => {
-    localStorage.removeItem("isUserLoggedIn");
-    localStorage.removeItem("currentUserId");
-    localStorage.removeItem("currentUserName");
-    localStorage.removeItem("currentUserEmail");
-    localStorage.removeItem("currentUserSchool");
-    localStorage.removeItem("currentUserDepartment");
+    const keys = [
+      "isUserLoggedIn",
+      "currentUserId",
+      "currentUserName",
+      "currentUserEmail",
+      "currentUserSchool",
+      "currentUserDepartment",
+    ];
+    keys.forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+    localStorage.removeItem("ffRememberMe");
     toast.success("Logged out successfully");
     router.push("/login");
   };
@@ -465,7 +633,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     e.preventDefault();
     if (!currentUser) return;
     if (formData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
-      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      toast.error(
+        `Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`,
+      );
       return;
     }
 
@@ -480,7 +650,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     e.preventDefault();
     if (!currentUser) return;
     if (formData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
-      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      toast.error(
+        `Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`,
+      );
       return;
     }
 
@@ -489,7 +661,8 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       category: formData.category.trim(),
     });
     const currentModalHeight = Math.ceil(
-      createSubmissionDialogContentRef.current?.getBoundingClientRect().height ?? 0,
+      createSubmissionDialogContentRef.current?.getBoundingClientRect()
+        .height ?? 0,
     );
     if (currentModalHeight > 0) {
       setCreateSubmissionFormModalHeight(currentModalHeight);
@@ -501,7 +674,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     if (!currentUser) return;
     if (feedbackSubmitLockRef.current) return;
     if (confirmData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
-      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      toast.error(
+        `Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`,
+      );
       return;
     }
     feedbackSubmitLockRef.current = true;
@@ -551,7 +726,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     if (!currentUser) return;
     if (feedbackSubmitLockRef.current) return;
     if (confirmData.message.trim().length > FEEDBACK_MESSAGE_MAX_LENGTH) {
-      toast.error(`Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`);
+      toast.error(
+        `Message must be ${FEEDBACK_MESSAGE_MAX_LENGTH} characters or less.`,
+      );
       return;
     }
     feedbackSubmitLockRef.current = true;
@@ -633,7 +810,9 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       return;
     }
     if (trimmed.length > CONVERSATION_MESSAGE_MAX_LENGTH) {
-      toast.error(`Message must be ${CONVERSATION_MESSAGE_MAX_LENGTH} characters or less.`);
+      toast.error(
+        `Message must be ${CONVERSATION_MESSAGE_MAX_LENGTH} characters or less.`,
+      );
       return;
     }
     const normalizedMessage = formatFeedbackText(trimmed);
@@ -656,14 +835,16 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     if (!selectedFeedback) return;
     if (isMessagesLoading) return;
     scrollConversationsToBottom();
-  }, [selectedFeedback, isMessagesLoading, messages.length, isMiniChatOpen, scrollConversationsToBottom]);
+  }, [
+    selectedFeedback,
+    isMessagesLoading,
+    messages.length,
+    activeFeedbackTab,
+    scrollConversationsToBottom,
+  ]);
 
   const normalizeStatus = (status: string) =>
-    status
-      .trim()
-      .toLowerCase()
-      .replace(/[_-]+/g, " ")
-      .replace(/\s+/g, " ");
+    status.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
 
   const getStatusBadgeClass = (status: string) => {
     switch (normalizeStatus(status)) {
@@ -710,10 +891,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     setSelectedFeedback(null);
   }, []);
 
-  const closeMiniChat = useCallback(() => {
-    setIsMiniChatOpen(false);
-  }, []);
-
   const handleAttemptCloseSelectedFeedback = useCallback(() => {
     if (messageDraft.trim().length > 0) {
       setIsUnsentMessageDialogOpen(true);
@@ -754,9 +931,6 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     return `${datePart} ${timePart}`;
   };
 
-  const submissionFieldClass =
-    "h-10 rounded-lg border-border/70 bg-background focus-visible:border-amber-400 focus-visible:ring-2 focus-visible:ring-amber-200/60";
-  const submissionActionButtonHeightClass = "h-9";
   const formatConfirmSubmittedOn = (value: string) => {
     const date = new Date(value);
     const datePart = date.toLocaleDateString("en-US", {
@@ -810,11 +984,11 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           preSubjectContent={
             <div className="grid grid-cols-1 gap-y-4">
               <div className="space-y-1">
-                <Label className="text-muted-foreground">
-                  Submitted By
-                </Label>
-                <p className="pt-0.5 text-[0.98rem] font-medium break-words">
-                  {isAnonymous ? "*****" : currentUser?.fullName || currentUser?.name || "*****"}
+                <Label className="text-black">Submitted By</Label>
+                <p className="pt-0.5 text-[0.98rem] font-normal break-words">
+                  {isAnonymous
+                    ? "*****"
+                    : currentUser?.fullName || currentUser?.name || "*****"}
                 </p>
               </div>
             </div>
@@ -843,7 +1017,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             >
               <SelectTrigger
                 id={`${idPrefix}-type`}
-                className={submissionFieldClass}
+                className={SUBMISSION_FIELD_CLASS}
               >
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
@@ -856,7 +1030,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               </SelectContent>
             </Select>
           ) : (
-            <div className="h-10 rounded-lg border bg-muted/30" aria-hidden="true" />
+            <div
+              className="h-10 rounded-lg border bg-muted/30"
+              aria-hidden="true"
+            />
           )}
         </div>
 
@@ -873,7 +1050,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             >
               <SelectTrigger
                 id={`${idPrefix}-category`}
-                className={submissionFieldClass}
+                className={SUBMISSION_FIELD_CLASS}
               >
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
@@ -886,52 +1063,53 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               </SelectContent>
             </Select>
           ) : (
-            <div className="h-10 rounded-lg border bg-muted/30" aria-hidden="true" />
+            <div
+              className="h-10 rounded-lg border bg-muted/30"
+              aria-hidden="true"
+            />
           )}
         </div>
 
-      
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-subject`}>Subject *</Label>
+          <Input
+            id={`${idPrefix}-subject`}
+            placeholder="Brief summary of your feedback"
+            className={SUBMISSION_FIELD_CLASS}
+            value={formData.subject}
+            maxLength={FEEDBACK_SUBJECT_MAX_LENGTH}
+            disabled={isSubmittingFeedback}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                subject: e.target.value.slice(0, FEEDBACK_SUBJECT_MAX_LENGTH),
+              })
+            }
+            required
+          />
+        </div>
 
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-subject`}>Subject *</Label>
-        <Input
-          id={`${idPrefix}-subject`}
-          placeholder="Brief summary of your feedback"
-          className={submissionFieldClass}
-          value={formData.subject}
-          maxLength={FEEDBACK_SUBJECT_MAX_LENGTH}
-          disabled={isSubmittingFeedback}
-          onChange={(e) =>
-            setFormData({
-              ...formData,
-              subject: e.target.value.slice(0, FEEDBACK_SUBJECT_MAX_LENGTH),
-            })
-          }
-          required
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor={`${idPrefix}-message`}>Message *</Label>
-        <Textarea
-          id={`${idPrefix}-message`}
-          placeholder="Provide detailed information about your feedback..."
-          rows={1}
-          className="ff-hide-scrollbar w-full max-w-full min-h-[2.5rem] max-h-[4rem] rounded-lg border-border/70 bg-background overflow-y-auto focus-visible:border-amber-400 focus-visible:ring-2 focus-visible:ring-amber-200/60 [field-sizing:content] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
-          maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
-          value={formData.message}
-          disabled={isSubmittingFeedback}
-          onChange={(e) =>
-            setFormData({
-              ...formData,
-              message: e.target.value.slice(0, FEEDBACK_MESSAGE_MAX_LENGTH),
-            })
-          }
-          required
-        />
-        <p className="text-right text-xs text-muted-foreground">
-          {formData.message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
-        </p>
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-message`}>Message *</Label>
+          <Textarea
+            id={`${idPrefix}-message`}
+            placeholder="Provide detailed information about your feedback..."
+            rows={1}
+            className="ff-hide-scrollbar w-full max-w-full min-h-[2.5rem] max-h-[4rem] rounded-lg border-border/70 bg-background overflow-y-auto focus-visible:border-amber-400 focus-visible:ring-2 focus-visible:ring-amber-200/60 [field-sizing:content] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
+            maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
+            value={formData.message}
+            disabled={isSubmittingFeedback}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                message: e.target.value.slice(0, FEEDBACK_MESSAGE_MAX_LENGTH),
+              })
+            }
+            required
+          />
+          <p className="text-right text-xs text-black">
+            {formData.message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
+          </p>
         </div>
       </div>
       <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-4">
@@ -943,10 +1121,13 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           className="mt-0.5"
         />
         <div className="space-y-1">
-          <Label htmlFor={`${idPrefix}-anonymous`} className="cursor-pointer text-sm font-medium">
+          <Label
+            htmlFor={`${idPrefix}-anonymous`}
+            className="cursor-pointer text-sm font-normal"
+          >
             Submit anonymously
           </Label>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-black">
             When checked, your name will be hidden to the admins.
           </p>
         </div>
@@ -954,14 +1135,17 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
       <Button
         type="submit"
-        className={`${submissionActionButtonHeightClass} w-full rounded-lg bg-accent hover:bg-accent/90`}
+        className={`${SUBMISSION_ACTION_BUTTON_HEIGHT_CLASS} w-full rounded-lg bg-accent hover:bg-accent/90`}
         disabled={isSubmittingFeedback}
       >
         <Send className="mr-2 h-4 w-4" />
         {isSubmittingFeedback ? "Submitting feedback..." : "Submit Feedback"}
       </Button>
       {isSubmittingFeedback ? (
-        <p className="text-center text-xs text-muted-foreground" aria-live="polite">
+        <p
+          className="text-center text-xs text-black"
+          aria-live="polite"
+        >
           Feedback is being sent. Please wait...
         </p>
       ) : null}
@@ -979,17 +1163,20 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         feedback.category.toLowerCase().includes(trimmedSearchQuery);
 
       const matchesType =
-        filterType === "all" || feedback.type.toLowerCase() === filterType;
+        filterType.length === 0 ||
+        filterType.some((t) => feedback.type.toLowerCase() === t);
       const matchesCategory =
         filterCategory === "all" ||
         feedback.category.toLowerCase() === filterCategory.toLowerCase();
       const matchesPriority =
-        filterPriority === "all" ||
-        feedback.priority.toLowerCase() === filterPriority;
+        filterPriority.length === 0 ||
+        filterPriority.some((p) => feedback.priority.toLowerCase() === p);
       const normalized = normalizeStatus(feedback.status);
       const matchesStatus =
-        filterStatus === "all" ||
-        normalized === (filterStatus === "inprogress" ? "in progress" : filterStatus);
+        filterStatus.length === 0 ||
+        filterStatus.some((s) =>
+          normalized === (s === "inprogress" ? "in progress" : s),
+        );
 
       return (
         matchesSearch &&
@@ -1006,6 +1193,25 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         "in progress": 1,
         resolved: 2,
       };
+      
+      // If tracking filter is explicitly set (not "asc"), prioritize subject sorting
+      if (filterTracking !== "asc") {
+        const subjectDiff = a.subject.localeCompare(b.subject);
+        if (subjectDiff !== 0) {
+          return filterTracking === "desc" ? -subjectDiff : subjectDiff;
+        }
+      }
+
+      // If date filter is explicitly set (not "recent"), prioritize date sorting
+      if (filterDate !== "recent") {
+        const dateDiff =
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (dateDiff !== 0) {
+          return filterDate === "oldest" ? dateDiff : -dateDiff;
+        }
+      }
+
+      // Then sort by status
       const statusDiff =
         (statusOrder[normalizeStatus(a.status)] ?? 99) -
         (statusOrder[normalizeStatus(b.status)] ?? 99);
@@ -1013,14 +1219,17 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         return statusDiff;
       }
 
-      const dateDiff =
-        new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      if (dateDiff !== 0) {
-        return filterDate === "oldest" ? dateDiff : -dateDiff;
+      // If same status and date filter is "recent" (default), sort by date
+      if (filterDate === "recent") {
+        const dateDiff =
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        if (dateDiff !== 0) {
+          return -dateDiff; // newest first for "recent"
+        }
       }
-      return filterTracking === "desc"
-        ? b.id.localeCompare(a.id)
-        : a.id.localeCompare(b.id);
+
+      // Default: sort by subject (asc)
+      return a.subject.localeCompare(b.subject);
     });
   }, [
     feedbacks,
@@ -1035,19 +1244,21 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
   const mySubmissionsTotalPages = Math.max(
     1,
-    Math.ceil(filteredFeedbacks.length / MY_SUBMISSIONS_PER_PAGE),
+    Math.ceil(filteredFeedbacks.length / mySubmissionsPageSize),
   );
 
   const paginatedFilteredFeedbacks = useMemo(() => {
-    const startIndex = (mySubmissionsPage - 1) * MY_SUBMISSIONS_PER_PAGE;
+    const startIndex = (mySubmissionsPage - 1) * mySubmissionsPageSize;
     return filteredFeedbacks.slice(
       startIndex,
-      startIndex + MY_SUBMISSIONS_PER_PAGE,
+      startIndex + mySubmissionsPageSize,
     );
-  }, [filteredFeedbacks, mySubmissionsPage]);
-  const mySubmissionsPlaceholderRowCount = Math.max(
-    0,
-    MY_SUBMISSIONS_PER_PAGE - paginatedFilteredFeedbacks.length,
+  }, [filteredFeedbacks, mySubmissionsPage, mySubmissionsPageSize]);
+  const mySubmissionsPlaceholderRowCount = getPlaceholderRowCount(
+    mySubmissionsPage,
+    mySubmissionsPageSize,
+    10,
+    paginatedFilteredFeedbacks.length,
   );
 
   useEffect(() => {
@@ -1060,6 +1271,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     filterCategory,
     filterPriority,
     filterStatus,
+    mySubmissionsPageSize,
   ]);
 
   useEffect(() => {
@@ -1071,45 +1283,24 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   const activeFilterCount = [
     filterTracking !== "asc",
     filterDate !== "recent",
-    filterType !== "all",
+    filterType.length > 0,
     filterCategory !== "all",
-    filterPriority !== "all",
-    filterStatus !== "all",
+    filterPriority.length > 0,
+    filterStatus.length > 0,
   ].filter(Boolean).length;
   const activeFilterChips = [
-    trimmedSearchQuery
-      ? { key: "search", label: searchQuery.trim() }
-      : null,
-    filterTracking !== "asc"
-      ? { key: "tracking", label: "Z - A" }
-      : null,
-    filterDate !== "recent"
-      ? { key: "date", label: "Oldest" }
-      : null,
-    filterType !== "all"
-      ? { key: "type", label: formatFilterChipLabel(filterType) }
-      : null,
+    trimmedSearchQuery ? { key: "search", label: searchQuery.trim() } : null,
+    filterTracking !== "asc" ? { key: "tracking", label: "Z - A" } : null,
+    filterDate !== "recent" ? { key: "date", label: "Oldest" } : null,
+    ...filterType.map((t) => ({ key: `type:${t}`, label: formatFilterChipLabel(t) })),
     filterCategory !== "all"
-      ? {
-          key: "category",
-          label: formatFilterChipLabel(filterCategory),
-        }
+      ? { key: "category", label: formatFilterChipLabel(filterCategory) }
       : null,
-    filterPriority !== "all"
-      ? {
-          key: "priority",
-          label: formatFilterChipLabel(filterPriority),
-        }
-      : null,
-    filterStatus !== "all"
-      ? {
-          key: "status",
-          label:
-            filterStatus === "inprogress"
-              ? "In Progress"
-              : formatFilterChipLabel(filterStatus),
-        }
-      : null,
+    ...filterPriority.map((p) => ({ key: `priority:${p}`, label: formatFilterChipLabel(p) })),
+    ...filterStatus.map((s) => ({
+      key: `status:${s}`,
+      label: s === "inprogress" ? "In Progress" : formatFilterChipLabel(s),
+    })),
   ].filter((chip): chip is { key: string; label: string } => Boolean(chip));
 
   const clearSingleFilter = useCallback((key: string) => {
@@ -1123,19 +1314,20 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
       case "date":
         setFilterDate("recent");
         break;
-      case "type":
-        setFilterType("all");
-        break;
       case "category":
         setFilterCategory("all");
         break;
-      case "priority":
-        setFilterPriority("all");
-        break;
-      case "status":
-        setFilterStatus("all");
-        break;
       default:
+        if (key.startsWith("type:")) {
+          const val = key.slice(5);
+          setFilterType((prev) => prev.filter((t) => t !== val));
+        } else if (key.startsWith("priority:")) {
+          const val = key.slice(9);
+          setFilterPriority((prev) => prev.filter((p) => p !== val));
+        } else if (key.startsWith("status:")) {
+          const val = key.slice(7);
+          setFilterStatus((prev) => prev.filter((s) => s !== val));
+        }
         break;
     }
   }, []);
@@ -1144,11 +1336,42 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     setSearchQuery("");
     setFilterTracking("asc");
     setFilterDate("recent");
-    setFilterType("all");
+    setFilterType([]);
     setFilterCategory("all");
-    setFilterPriority("all");
-    setFilterStatus("all");
+    setFilterPriority([]);
+    setFilterStatus([]);
   }, []);
+
+  // Sync filter state → URL + sessionStorage so filters survive sidebar navigation
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    if (filterTracking !== "asc") params.set("tr", filterTracking);
+    if (filterDate !== "recent") params.set("dt", filterDate);
+    filterType.forEach((t) => params.append("ty", t));
+    if (filterCategory !== "all") params.set("cat", filterCategory);
+    filterPriority.forEach((p) => params.append("pri", p));
+    filterStatus.forEach((s) => params.append("st", s));
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    try {
+      if (qs) {
+        window.sessionStorage.setItem("mySubmissions_filters", qs);
+      } else {
+        window.sessionStorage.removeItem("mySubmissions_filters");
+      }
+    } catch {}
+  }, [
+    searchQuery,
+    filterTracking,
+    filterDate,
+    filterType,
+    filterCategory,
+    filterPriority,
+    filterStatus,
+    pathname,
+    router,
+  ]);
   const hoverFilterItems = useMemo(
     () =>
       [
@@ -1174,21 +1397,31 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         },
         {
           key: "type" as const,
-          label: filterType === "all" ? "All Types" : formatFilterChipLabel(filterType),
+          label:
+            filterType.length === 0
+              ? "All Types"
+              : formatFilterChipLabel(filterType[filterType.length - 1]!),
           options: [
-            { value: "all", label: "All Types" },
             { value: "suggestion", label: "Suggestion" },
             { value: "complaint", label: "Complaint" },
             { value: "inquiry", label: "Inquiry" },
             { value: "request", label: "Request" },
             { value: "compliment", label: "Compliment" },
           ],
-          isSelected: (value: string) => filterType === value,
-          onSelect: setFilterType,
+          isSelected: (value: string) => filterType.includes(value),
+          onSelect: (value: string) =>
+            setFilterType((prev) =>
+              prev.includes(value)
+                ? prev.filter((t) => t !== value)
+                : [...prev, value],
+            ),
         },
         {
           key: "category" as const,
-          label: filterCategory === "all" ? "All Categories" : formatFilterChipLabel(filterCategory),
+          label:
+            filterCategory === "all"
+              ? "All Categories"
+              : formatFilterChipLabel(filterCategory),
           options: [
             { value: "all", label: "All Categories" },
             ...categories.map((category) => ({
@@ -1201,35 +1434,59 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
         },
         {
           key: "priority" as const,
-          label: filterPriority === "all" ? "All Priorities" : formatFilterChipLabel(filterPriority),
+          label:
+            filterPriority.length === 0
+              ? "All Priorities"
+              : formatFilterChipLabel(filterPriority[filterPriority.length - 1]!),
           options: [
-            { value: "all", label: "All Priorities" },
             { value: "low", label: "Low" },
             { value: "medium", label: "Medium" },
             { value: "high", label: "High" },
           ],
-          isSelected: (value: string) => filterPriority === value,
-          onSelect: setFilterPriority,
+          isSelected: (value: string) => filterPriority.includes(value),
+          onSelect: (value: string) =>
+            setFilterPriority((prev) =>
+              prev.includes(value)
+                ? prev.filter((p) => p !== value)
+                : [...prev, value],
+            ),
         },
         {
           key: "status" as const,
-          label: filterStatus === "all" ? "All Status" : formatFilterChipLabel(filterStatus),
+          label:
+            filterStatus.length === 0
+              ? "All Status"
+              : filterStatus[filterStatus.length - 1] === "inprogress"
+                ? "In Progress"
+                : formatFilterChipLabel(filterStatus[filterStatus.length - 1]!),
           options: [
-            { value: "all", label: "All Status" },
             { value: "pending", label: "Pending" },
             { value: "inprogress", label: "In Progress" },
             { value: "resolved", label: "Resolved" },
           ],
-          isSelected: (value: string) => filterStatus === value,
-          onSelect: setFilterStatus,
+          isSelected: (value: string) => filterStatus.includes(value),
+          onSelect: (value: string) =>
+            setFilterStatus((prev) =>
+              prev.includes(value)
+                ? prev.filter((s) => s !== value)
+                : [...prev, value],
+            ),
         },
       ] satisfies HoverFilterItem<HoverFilterKey>[],
-    [categories, filterCategory, filterDate, filterPriority, filterStatus, filterTracking, filterType],
+    [
+      categories,
+      filterCategory,
+      filterDate,
+      filterPriority,
+      filterStatus,
+      filterTracking,
+      filterType,
+    ],
   );
   const desktopInlineFilterItems = useMemo(
     () =>
       hoverFilterItems.filter((item) =>
-        ["tracking", "date", "type", "priority", "status"].includes(item.key),
+        ["tracking", "date"].includes(item.key),
       ),
     [hoverFilterItems],
   );
@@ -1252,11 +1509,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
   }, [feedbacks]);
   const latestSubmissionCards = useMemo(
     () =>
-      [...feedbacks]
-        .sort(
-          (a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-        ),
+      [...feedbacks].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      ),
     [feedbacks],
   );
 
@@ -1276,11 +1532,10 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
 
   const recentlyUpdatedCards = useMemo(
     () =>
-      [...feedbacks]
-        .sort(
-          (a, b) =>
-            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-        ),
+      [...feedbacks].sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      ),
     [feedbacks],
   );
 
@@ -1300,9 +1555,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     const notificationCount = homeNotifications.length;
     const viewportCap = isLargeScreen ? 387 : 520;
     const contentAwareHeight =
-      notificationCount === 0
-        ? 180
-        : 136 + notificationCount * 76;
+      notificationCount === 0 ? 180 : 136 + notificationCount * 76;
 
     return Math.min(viewportCap, contentAwareHeight);
   }, [homeNotifications.length, isLargeScreen]);
@@ -1315,7 +1568,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     if (items.length === 0) {
       return (
         <Card className="border shadow-sm">
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
+          <CardContent className="py-10 text-center text-sm text-black">
             {emptyMessage}
           </CardContent>
         </Card>
@@ -1335,19 +1588,20 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
               <Card className="h-full border shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:shadow-md">
                 <CardContent className="flex h-full flex-col gap-3 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="min-h-[1.25rem] break-all font-mono text-xs text-muted-foreground">
+                    <p className="min-h-[1.25rem] break-all text-xs text-muted-foreground">
                       {feedback.id}
                     </p>
                     <span className="whitespace-nowrap text-[11px] text-muted-foreground">
                       {new Date(feedback.createdAt).toLocaleDateString("en-US")}
                     </span>
                   </div>
-                  <p className="line-clamp-2 min-h-[3rem] break-words font-semibold leading-snug">
+                  <p className="line-clamp-2 min-h-[3rem] break-words font-medium leading-snug text-foreground">
                     {feedback.subject}
                   </p>
                   <p
-                    className={`line-clamp-2 min-h-[2.5rem] text-sm text-muted-foreground ${
-                      feedback.message.trim().length > 70 && /\s/.test(feedback.message.trim())
+                    className={`line-clamp-2 min-h-[2.5rem] text-sm !text-muted-foreground ${
+                      feedback.message.trim().length > 70 &&
+                      /\s/.test(feedback.message.trim())
                         ? "indent-5"
                         : ""
                     }`}
@@ -1355,7 +1609,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                     {feedback.message}
                   </p>
                   <div className="mt-auto flex items-center justify-between">
-                    <span className="rounded-md border border-border/70 px-2 py-0.5 text-xs text-muted-foreground">
+                    <span className="rounded-md border border-border bg-muted/30 px-2 py-0.5 text-xs !text-muted-foreground">
                       {feedback.category}
                     </span>
                     <span className="inline-flex items-center">
@@ -1364,7 +1618,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
                         return (
                           <Badge
                             variant="outline"
-                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-normal ${getStatusBadgeClass(
                               feedback.status,
                             )}`}
                           >
@@ -1380,7 +1634,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
             </button>
           ))}
         </div>
-        <div className="mt-2 flex items-center justify-between px-1 text-xs text-muted-foreground">
+        <div className="mt-2 flex items-center justify-between px-1 text-xs text-black">
           <p>
             {items.length > visibleItems.length
               ? `Showing ${visibleItems.length} of ${items.length} items`
@@ -1389,7 +1643,7 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           {items.length > visibleItems.length ? (
             <button
               type="button"
-              className="font-medium text-accent hover:underline"
+              className="font-normal text-accent hover:underline"
               onClick={() => router.push("/user/my-submissions")}
             >
               View all
@@ -1400,14 +1654,34 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
     );
   };
 
-  const createSubmissionStepAnimationClass =
-    createSubmissionStepDirection === "backward"
-      ? "ff-step-slide-in-right"
-      : "ff-step-slide-in-left";
+  const handleTrackSubmission = async (id: string) => {
+    setIsCreateSubmissionOpen(false);
+    setCreateSubmissionStep("form");
+    setCreateSubmissionStepDirection("forward");
+    setCreateSubmissionTrackingId(null);
+    const existingFeedback = feedbacks.find((fb) => fb.id === id);
+    if (existingFeedback) {
+      await handleViewFeedback(existingFeedback);
+      return;
+    }
+    try {
+      const latest = await getFeedback(id);
+      setSelectedFeedback(latest);
+    } catch {
+      toast.error("Unable to open submission details right now.");
+    }
+  };
 
   const renderCreateSubmissionDialog = () => (
-    <Dialog
-      open={isCreateSubmissionOpen}
+    <CreateSubmissionDialog
+      isOpen={isCreateSubmissionOpen}
+      currentStep={createSubmissionStep}
+      stepDirection={createSubmissionStepDirection}
+      isSubmitting={isSubmittingFeedback}
+      trackingIdForSuccess={createSubmissionTrackingId}
+      currentUserEmail={currentUser?.email}
+      modalHeight={createSubmissionFormModalHeight}
+      contentRef={createSubmissionDialogContentRef}
       onOpenChange={(open) => {
         setIsCreateSubmissionOpen(open);
         if (!open) {
@@ -1417,1162 +1691,501 @@ export function UserDashboard({ view }: { view: UserDashboardView }) {
           setCreateSubmissionFormModalHeight(null);
         }
       }}
-    >
-      <DialogContent
-        ref={createSubmissionDialogContentRef}
-        className="w-[calc(100%-1rem)] max-w-2xl max-h-[93vh] overflow-y-auto rounded-2xl border bg-white p-4 shadow-2xl transition-[height] duration-200 sm:w-full sm:p-6 ff-hide-scrollbar"
-        style={
-          createSubmissionStep === "confirm" && createSubmissionFormModalHeight
-            ? { height: `${createSubmissionFormModalHeight}px` }
-            : undefined
+      onStepChange={goToCreateSubmissionStep}
+      renderSubmissionForm={renderSubmissionForm}
+      onFormSubmit={handleCreateSubmissionFormSubmit}
+      renderConfirmSummary={renderConfirmSummary}
+      onConfirmSubmit={handleCreateSubmissionConfirmSubmit}
+      onCopyTrackingId={copyToClipboard}
+      onTrackSubmission={async (id) => {
+        setIsCreateSubmissionOpen(false);
+        setCreateSubmissionStep("form");
+        setCreateSubmissionStepDirection("forward");
+        setCreateSubmissionTrackingId(null);
+
+        const existingFeedback = feedbacks.find((fb) => fb.id === id);
+        if (existingFeedback) {
+          await handleViewFeedback(existingFeedback);
+          return;
         }
-      >
-        {createSubmissionStep === "form" ? (
-          <div key={`create-step-form-${createSubmissionStepDirection}`} className={createSubmissionStepAnimationClass}>
-            <DialogHeader>
-              <DialogTitle>Feedback Form</DialogTitle>
-              <DialogDescription>
-                Fill out the details below to create a new submission.
-              </DialogDescription>
-            </DialogHeader>
-            {renderSubmissionForm(
-              "modal",
-              handleCreateSubmissionFormSubmit,
-            )}
-          </div>
-        ) : null}
-        {createSubmissionStep === "confirm" ? (
-          <div
-            key={`create-step-confirm-${createSubmissionStepDirection}`}
-            className={`${createSubmissionStepAnimationClass} flex h-full min-h-0 flex-col`}
-          >
-            <DialogHeader>
-              <DialogTitle>Confirm Your Feedback</DialogTitle>
-              <DialogDescription>
-                Review your details before we send this feedback.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {renderConfirmSummary()}
-            </div>
-            <div className="mx-auto mt-5 h-px w-[92%] bg-border/70" />
-            <div className="mt-[10px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                variant="outline"
-                className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 sm:min-w-[160px]`}
-                onClick={() => goToCreateSubmissionStep("form")}
-              >
-                Back
-              </Button>
-              <Button
-                className={`${submissionActionButtonHeightClass} rounded-lg bg-accent text-white hover:bg-accent/90 sm:min-w-[190px]`}
-                onClick={handleCreateSubmissionConfirmSubmit}
-                disabled={isSubmittingFeedback}
-              >
-                {isSubmittingFeedback ? "Submitting feedback..." : "Confirm & Submit"}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-        {createSubmissionStep === "success" ? (
-          createSubmissionTrackingId ? (
-            <div key={`create-step-success-${createSubmissionStepDirection}`} className={createSubmissionStepAnimationClass}>
-              <FeedbackSuccessCard
-                trackingId={createSubmissionTrackingId}
-                email={currentUser?.email}
-                className="w-full max-w-none gap-4 border-0 bg-transparent shadow-none"
-                onCopyTrackingId={copyToClipboard}
-                onTrackSubmission={async (id) => {
-                  setIsCreateSubmissionOpen(false);
-                  setCreateSubmissionStep("form");
-                  setCreateSubmissionStepDirection("forward");
-                  setCreateSubmissionTrackingId(null);
-
-                  const existingFeedback = feedbacks.find((feedback) => feedback.id === id);
-                  if (existingFeedback) {
-                    await handleViewFeedback(existingFeedback);
-                    return;
-                  }
-
-                  try {
-                    const latest = await getFeedback(id);
-                    setSelectedFeedback(latest);
-                  } catch {
-                    toast.error("Unable to open submission details right now.");
-                  }
-                }}
-                onSubmitAnother={() => {
-                  goToCreateSubmissionStep("form");
-                  setCreateSubmissionTrackingId(null);
-                }}
-              />
-            </div>
-          ) : null
-        ) : null}
-      </DialogContent>
-    </Dialog>
+        try {
+          const latest = await getFeedback(id);
+          setSelectedFeedback(latest);
+        } catch {
+          toast.error("Unable to open submission details right now.");
+        }
+      }}
+      onSubmitAnother={() => {
+        goToCreateSubmissionStep("form");
+        setCreateSubmissionTrackingId(null);
+      }}
+    />
   );
 
   return (
     <>
-    <div className="min-h-[calc(100vh-200px)] bg-muted/20">
-      {trackingId && (
-        <div
-          className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center px-4 py-8 animate-in fade-in-0"
-          onClick={() => {
+      <div className="ff-user-dashboard-theme min-h-[calc(100vh-200px)] bg-muted/20">
+        {/* Tracking ID Success Modal */}
+        <TrackingIdSuccess
+          trackingId={trackingId}
+          currentUserEmail={currentUser?.email}
+          onClose={() => {
             setTrackingId(null);
             setSelectedFeedback(null);
             setTimeout(() => {
               restoreSubmissionsScroll(true);
             }, 200);
           }}
-        >
-          <div className="w-full max-w-lg -translate-y-[10%]">
-            <Card
-              className="relative shadow-lg animate-in zoom-in-95 fade-in-0"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <button
-                type="button"
-                className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Close"
-                onClick={() => {
-                  setTrackingId(null);
-                  setSelectedFeedback(null);
-                  setTimeout(() => {
-                    restoreSubmissionsScroll(true);
-                  }, 200);
-                }}
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <CardHeader className="text-center">
-                <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-accent/10 flex items-center justify-center">
-                  <ArrowRight className="h-8 w-8 text-accent" />
-                </div>
-                <CardTitle>Feedback Submitted!</CardTitle>
-                <CardDescription>
-                  Your feedback has been received successfully
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="w-full bg-muted rounded-lg p-4 text-center relative">
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Your Tracking ID
-                  </p>
-                  <p className="text-2xl font-bold text-primary">
-                    {trackingId}
-                  </p>
-                  <button
-                    type="button"
-                    className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border/70 bg-white/80 text-muted-foreground hover:bg-white hover:text-foreground"
-                    onClick={() => copyToClipboard(trackingId)}
-                    aria-label="Copy tracking ID"
-                    title="Copy tracking ID"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                </div>
-                <p className="text-sm text-muted-foreground text-center">
-                  Please save this tracking ID to check the status of your
-                  submission.
-                </p>
-                {currentUser?.email && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    A copy of this tracking ID was sent to {currentUser.email}.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-      <DialogContent className="w-[calc(100%-1.5rem)] max-w-lg max-h-[90vh] flex flex-col overflow-hidden p-5 sm:w-full sm:p-6">
-          <DialogHeader>
-            <DialogTitle>Confirm Your Feedback</DialogTitle>
-            <DialogDescription>
-              Review your details before we send this feedback.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            {renderConfirmSummary()}
-          </div>
-          <div className="mx-auto mt-5 h-px w-[92%] bg-border/70" />
-          <div className="mt-[10px] mb-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Button
-              variant="outline"
-              className={`${submissionActionButtonHeightClass} rounded-lg border border-gray-300 sm:min-w-[160px]`}
-              onClick={() => setIsConfirmOpen(false)}
-            >
-              Back
-            </Button>
-            <Button
-              className={`${submissionActionButtonHeightClass} rounded-lg bg-accent text-white hover:bg-accent/90 sm:min-w-[190px]`}
-              onClick={handleConfirmSubmit}
-              disabled={isSubmittingFeedback}
-            >
-              {isSubmittingFeedback ? "Submitting feedback..." : "Confirm & Submit"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={isDeleteOpen}
-        onOpenChange={(open) => {
-          setIsDeleteOpen(open);
-          if (!open) {
-            setDeleteTarget(null);
-          }
-        }}
-      >
-        <DialogContent className="w-full max-w-md">
-          <DialogHeader>
-            <DialogTitle>Delete Submission?</DialogTitle>
-            <DialogDescription>
-              This will permanently remove your pending feedback.
-            </DialogDescription>
-          </DialogHeader>
-          {deleteTarget && (
-            <div className="min-w-0 rounded-lg border bg-muted/30 p-3 text-sm">
-              <p className="font-semibold break-words break-all">
-                {deleteTarget.subject}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground font-mono break-all">
-                {deleteTarget.id}
-              </p>
-            </div>
-          )}
-          <div className="mt-4 flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsDeleteOpen(false);
-                setDeleteTarget(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={async () => {
-                if (deleteTarget) {
-                  await handleDeleteFeedback(deleteTarget);
-                }
-                setIsDeleteOpen(false);
-                setDeleteTarget(null);
-              }}
-            >
-              Delete
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      {isUnsentMessageDialogOpen ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center p-4">
-          <div className="w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg">
-            <div className="space-y-2 text-left">
-              <h2 className="text-lg font-semibold">Discard unsent message?</h2>
-              <p className="text-muted-foreground text-sm">
-                You have a message that has not been sent yet.
-              </p>
-            </div>
-            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsUnsentMessageDialogOpen(false)}
-              >
-                Keep
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  setIsUnsentMessageDialogOpen(false);
-                  closeSelectedFeedback();
-                }}
-              >
-                Discard
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      <div
-        className={`mx-auto w-full px-4 ${
-          isHomeView || isMySubmissionsView
-            ? "pt-4 pb-4 sm:px-6 sm:pt-5 sm:pb-5"
-            : "py-6 sm:px-6 sm:py-8"
-        } ${
-          isMySubmissionsView || isHomeView ? "max-w-none" : "max-w-5xl"
-        }`}
-      >
-        <div className="grid gap-6 sm:gap-8 items-stretch">
-          {isSubmitView && (
-            <div ref={leftColumnRef} className="mx-auto w-full max-w-3xl flex flex-col gap-6">
-            {/* Submit Feedback */}
-            <div>
-              <Card className="border shadow-sm">
-                <CardHeader className="pb-4">
-                  <CardTitle>Feedback Form</CardTitle>
-                  <CardDescription>
-                    Check anonymous if you want your name hidden from
-                    admin views.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>{renderSubmissionForm("submit")}</CardContent>
-              </Card>
-            </div>
-          </div>
-          )}
+          onCopyTrackingId={copyToClipboard}
+        />
 
-          {(isMySubmissionsView || isHomeView) && (
-          <div
-            className={`flex flex-col ${
-              isMySubmissionsView ? "min-h-0 h-full overflow-visible" : ""
-            }`}
-            style={
-              isMySubmissionsView && leftColumnHeight
-                ? { height: leftColumnHeight }
-                : undefined
+        {/* Confirmation Dialog */}
+        <ConfirmationDialog
+          isOpen={isConfirmOpen}
+          onOpenChange={setIsConfirmOpen}
+          onConfirm={handleConfirmSubmit}
+          isLoading={isSubmittingFeedback}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          isOpen={isDeleteOpen}
+          deleteTarget={deleteTarget}
+          onOpenChange={(open) => {
+            setIsDeleteOpen(open);
+            if (!open) {
+              setDeleteTarget(null);
             }
-          >
-            <div className={selectedFeedback ? "blur-[2px] pointer-events-none select-none" : ""}>
-            {isHomeView ? (
-              <div className="flex flex-col bg-background">
-                {renderCreateSubmissionDialog()}
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  <Card className="border shadow-sm">
-                    <CardContent className="p-4">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Total</p>
-                      <p className="mt-1 text-2xl font-semibold">{dashboardStats.total}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="border shadow-sm">
-                    <CardContent className="p-4">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending</p>
-                      <p className="mt-1 text-2xl font-semibold">{dashboardStats.pending}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="border shadow-sm">
-                    <CardContent className="p-4">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">In Progress</p>
-                      <p className="mt-1 text-2xl font-semibold">{dashboardStats.inProgress}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="border shadow-sm">
-                    <CardContent className="p-4">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Resolved</p>
-                      <p className="mt-1 text-2xl font-semibold">{dashboardStats.resolved}</p>
-                    </CardContent>
-                  </Card>
-                </div>
-                <div className="mt-4">
-                  <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-                    <div className="min-w-0">
-                      <Tabs defaultValue="latest">
-                        <TabsList className="grid h-11 w-full grid-cols-3 gap-1 rounded-xl border border-border/60 bg-muted/50 p-1">
-                          <TabsTrigger
-                            value="latest"
-                            className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
-                          >
-                            Latest
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="attention"
-                            className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
-                          >
-                            Needs Attention
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="updated"
-                            className="h-full rounded-lg border-0 text-xs font-medium text-muted-foreground data-[state=active]:bg-white data-[state=active]:font-semibold data-[state=active]:text-foreground data-[state=active]:shadow-sm sm:text-sm"
-                          >
-                            Recently Updated
-                          </TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="latest" className="mt-3">
-                          {renderHomeSubmissionGrid(
-                            latestSubmissionCards,
-                            "No submissions yet. Click New Submission to create your first one.",
-                          )}
-                        </TabsContent>
-                        <TabsContent value="attention" className="mt-3">
-                          {renderHomeSubmissionGrid(
-                            needsAttentionCards,
-                            "Nothing needs attention right now.",
-                          )}
-                        </TabsContent>
-                        <TabsContent value="updated" className="mt-3">
-                          {renderHomeSubmissionGrid(
-                            recentlyUpdatedCards,
-                            "No recent updates yet.",
-                          )}
-                        </TabsContent>
-                      </Tabs>
-                    </div>
-                    <Card
-                      className="h-full border border-border/80 bg-slate-50/45 shadow-sm flex flex-col overflow-hidden"
-                      style={{ maxHeight: `${notificationPanelMaxHeight}px` }}
-                    >
-                      <CardHeader className="pb-0 pt-4">
-                        <CardTitle className="text-base">Notifications</CardTitle>
-                        <CardDescription>Unresolved updates</CardDescription>
-                      </CardHeader>
-                      <CardContent className="-mt-4 flex-1 min-h-0 space-y-1.5 bg-slate-50/35 pt-0 pb-3 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                        {homeNotifications.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">
-                            No unread updates.
-                          </p>
-                        ) : (
-                          homeNotifications.map((feedback) => (
-                            <button
-                              key={feedback.id}
-                              type="button"
-                              onClick={() => handleViewFeedback(feedback)}
-                              className="w-full rounded-md border border-border/70 bg-white/80 p-2 text-left shadow-[0_0_0_1px_rgba(15,23,42,0.05)] transition-all duration-150 hover:-translate-y-0.5 hover:bg-muted/30 hover:shadow-md"
-                            >
-                              <p className="line-clamp-1 text-sm font-medium">
-                                {feedback.subject}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(feedback.updatedAt).toLocaleDateString("en-US")}
-                              </p>
-                            </button>
-                          ))
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </div>
-            ) : isMySubmissionsView && feedbacks.length > 0 ? (
-              <div className="mx-auto flex h-full min-h-0 w-full flex-col gap-2 rounded-[28px] border border-[#e7dfd3] bg-white px-5 py-6 shadow-[0_24px_80px_rgba(34,25,12,0.08)] sm:px-8 sm:py-8">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex h-9 items-center gap-3">
-                    <div className="flex h-9 w-11 items-center justify-center rounded-2xl bg-muted/50 text-[#171717]">
-                      <BarChart3 className="h-5 w-5" />
-                    </div>
-                    <div className="flex h-9 items-center">
-                      <h2 className="text-[21px] font-semibold leading-none tracking-[-0.02em] text-[#171717]">
-                        Submission list
-                      </h2>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setCreateSubmissionStep("form");
-                      setCreateSubmissionTrackingId(null);
-                      setIsAnonymous(false);
-                      setIsCreateSubmissionOpen(true);
-                    }}
-                    className="h-9 sm:w-auto bg-accent hover:bg-accent/90 transition-colors duration-150 hover:-translate-y-px"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Submission
-                  </Button>
-                </div>
-                <div>
-                  <div className="mb-3">
-                    <div className="hidden gap-x-3 gap-y-2 md:grid xl:grid-cols-[minmax(0,1.9fr)_repeat(5,minmax(0,1fr))]">
-                      <div className="relative">
-                        <Search
-                          className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2"
-                          style={{ color: "#8f877d" }}
-                        />
-                        <Input
-                          placeholder="Search by ID, subject, or message."
-                          value={searchQuery}
-                          onChange={(event) => setSearchQuery(event.target.value)}
-                          className={`${SUBMISSION_FILTER_CONTROL_CLASS} placeholder:text-[#8f877d]`}
-                          style={{
-                            color: SUBMISSION_FILTER_TEXT_COLOR,
-                            paddingLeft: "2.75rem",
-                          }}
-                        />
-                      </div>
-                      {desktopInlineFilterItems.map((filter) => {
-                        const value =
-                          filter.key === "tracking"
-                            ? filterTracking
-                            : filter.key === "date"
-                              ? filterDate
-                              : filter.key === "type"
-                                ? filterType
-                                : filter.key === "priority"
-                                  ? filterPriority
-                                  : filterStatus;
-                        return (
-                          <Select
-                            key={filter.key}
-                            value={value}
-                            onValueChange={filter.onSelect}
-                          >
-                            <SelectTrigger
-                              className={`${SUBMISSION_FILTER_CONTROL_CLASS} [&_svg]:text-[#6f6255]`}
-                              style={{ color: SUBMISSION_FILTER_TEXT_COLOR }}
-                            >
-                              <SelectValue placeholder={filter.label} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {filter.options.map((option) => (
-                                <SelectItem key={`${filter.key}-${option.value}`} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        );
-                      })}
-                    </div>
-                    <div className="flex w-full gap-2 md:hidden">
-                      <div className="relative flex-1">
-                        <Search className="pointer-events-none absolute left-3 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input
-                          placeholder="Search by ID, subject, message."
-                          value={searchQuery}
-                          onChange={(event) => setSearchQuery(event.target.value)}
-                          className="h-8 text-sm border-border/60 bg-background pl-8.5 transition-colors duration-200 focus-visible:border-border/60 focus-visible:ring-0 focus-visible:ring-transparent"
-                        />
-                      </div>
-                      <HoverFilterPopover
-                        items={hoverFilterItems}
-                        activeCount={activeFilterCount}
-                        onReset={clearAllFilters}
-                      />
-                    </div>
-                    {activeFilterChips.length > 0 ? (
-                      <div className="mt-5 mb-3 flex flex-wrap items-center gap-2">
-                        {activeFilterChips.map((chip) => (
-                          <span
-                            key={chip.key}
-                            className="inline-flex min-h-0 items-center rounded-full border border-[#ddd4c9] bg-white px-3 py-1 text-[11px] font-medium leading-none text-[#6f6255]"
-                            style={{ columnGap: "12px" }}
-                          >
-                            <span>{chip.label}</span>
-                              <button
-                                type="button"
-                                onClick={() => clearSingleFilter(chip.key)}
-                                className="inline-flex items-center justify-center rounded-full p-0.5 text-[#6f6255] transition-colors hover:bg-[#efe5da] hover:text-[#4d463e]"
-                                aria-label={`Remove ${chip.label} filter`}
-                                title={`Remove ${chip.label} filter`}
-                              >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </span>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={clearAllFilters}
-                          className="inline-flex min-h-0 items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium leading-none transition-colors hover:bg-[#f7f3ee] hover:text-[#4d463e]"
-                          style={{ color: "#171717" }}
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Clear all
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-                {renderCreateSubmissionDialog()}
-                <div
-                  ref={submissionsScrollRef}
-                  className="ff-hide-scrollbar flex-1 min-h-0 w-full max-w-full overflow-y-scroll overflow-x-hidden md:[scrollbar-gutter:stable] h-[calc(100vh-260px)]"
-                  onScroll={(event) => {
-                    const top = event.currentTarget.scrollTop;
-                    submissionsScrollTop.current = top;
-                    if (typeof window !== "undefined") {
-                      window.localStorage.setItem(
-                        submissionsScrollKey,
-                        top.toString(),
-                      );
-                    }
-                  }}
-                >
-                  <div className="w-full overflow-x-auto">
-                    <Table className="w-full min-w-full md:min-w-[980px] md:table-fixed text-xs sm:text-sm [&_td]:px-3 [&_th]:px-3">
-                      <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                        <TableRow className="bg-muted/50 hover:bg-muted/50">
-                          <TableHead className="w-[150px]">Tracking ID</TableHead>
-                          <TableHead className="w-[300px]">Subject</TableHead>
-                          <TableHead className="w-[220px]">Category</TableHead>
-                          <TableHead className="w-[110px]">Priority</TableHead>
-                          <TableHead className="w-[150px]">Status</TableHead>
-                          <TableHead className="w-[130px] whitespace-nowrap">Date</TableHead>
-                          <TableHead className="w-[88px] text-center">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredFeedbacks.length === 0 ? (
-                          <TableRow>
-                            <TableCell
-                              colSpan={7}
-                              className="py-8 text-center text-sm text-muted-foreground"
-                            >
-                              No submissions match the current filters.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          paginatedFilteredFeedbacks.map((feedback) => (
-                            <TableRow
-                              key={feedback.id}
-                              className="h-14 cursor-pointer"
-                              onClick={() => handleViewFeedback(feedback)}
-                            >
-                              <TableCell className="font-mono text-xs text-muted-foreground truncate">
-                                {feedback.id}
-                              </TableCell>
-                              <TableCell className="font-medium truncate" title={feedback.subject}>
-                                {feedback.subject}
-                              </TableCell>
-                              <TableCell className="truncate" title={feedback.category}>
-                                {feedback.category}
-                              </TableCell>
-                              <TableCell className="truncate">
-                                <Badge
-                                  className={getPriorityColor(feedback.priority)}
-                                  variant="outline"
-                                >
-                                  {feedback.priority}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <span className="inline-flex items-center gap-2">
-                                  {(() => {
-                                    const StatusIcon = getStatusIcon(feedback.status);
-                                    return (
-                                      <Badge
-                                        variant="outline"
-                                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
-                                          feedback.status,
-                                        )}`}
-                                      >
-                                        <StatusIcon className="h-3.5 w-3.5" />
-                                        <span className="leading-none">
-                                          {feedback.status}
-                                        </span>
-                                      </Badge>
-                                    );
-                                  })()}
-                                </span>
-                              </TableCell>
-                              <TableCell className="whitespace-nowrap text-muted-foreground">
-                                {formatSubmittedAt(feedback.createdAt)}
-                              </TableCell>
-                              <TableCell className="w-[88px] text-center">
-                                {feedback.status.toLowerCase() === "pending" ? (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 rounded-md text-rose-600 hover:bg-rose-600 hover:text-white"
-                                    aria-label="Delete submission"
-                                    title="Delete submission"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      setDeleteTarget(feedback);
-                                      setIsDeleteOpen(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                ) : (
-                                  <span className="inline-flex h-7 w-7 items-center justify-center text-xs text-muted-foreground">
-                                    -
-                                  </span>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                        {filteredFeedbacks.length > 0 &&
-                          mySubmissionsPlaceholderRowCount > 0
-                          ? Array.from({
-                              length: mySubmissionsPlaceholderRowCount,
-                            }).map((_, index) => (
-                              <TableRow
-                                key={`submission-placeholder-row-${index}`}
-                                className="h-14"
-                                aria-hidden="true"
-                              >
-                                <TableCell colSpan={7} />
-                              </TableRow>
-                            ))
-                          : null}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-                {filteredFeedbacks.length > 0 ? (
-                  <div className="shrink-0 border-t border-border/60 bg-background pt-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9"
-                        onClick={() =>
-                          setMySubmissionsPage((page) => Math.max(1, page - 1))
-                        }
-                        disabled={mySubmissionsPage === 1}
-                        aria-label="Previous page"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <span className="text-sm text-muted-foreground">
-                        Page {mySubmissionsPage} of {mySubmissionsTotalPages}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9"
-                        onClick={() =>
-                          setMySubmissionsPage((page) =>
-                            Math.min(mySubmissionsTotalPages, page + 1),
-                          )
-                        }
-                        disabled={mySubmissionsPage === mySubmissionsTotalPages}
-                        aria-label="Next page"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <Card className="h-full border shadow-sm flex flex-col">
-                <CardContent className="pt-6 flex-1 flex items-center">
-                  <div className="text-center py-8 w-full">
-                    <MessageCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">
-                      No Submissions Yet
-                    </h3>
-                    <p className="text-muted-foreground">
-                      No submissions yet. Use Submit Feedback to create your first one.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+          }}
+          onDelete={handleDeleteFeedback}
+        />
+
+        <div
+          className={`mx-auto w-full px-4 ${
+            isHomeView || isMySubmissionsView
+              ? "pt-4 pb-4 sm:px-6 sm:pt-5 sm:pb-5"
+              : "py-6 sm:px-6 sm:py-8"
+          } ${isMySubmissionsView || isHomeView ? "max-w-none" : "max-w-5xl"}`}
+        >
+          <div className="grid gap-6 sm:gap-8 items-stretch">
+            {isSubmitView && (
+              <UserDashboardSubmitView
+                leftColumnRef={leftColumnRef}
+                renderSubmissionForm={renderSubmissionForm}
+              />
             )}
-            </div>
-            {selectedFeedback ? (
-              <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-                <button
-                  type="button"
-                  aria-label="Close feedback details"
-                  className="ff-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px]"
-                  onClick={handleAttemptCloseSelectedFeedback}
-                />
-                <Card className="ff-modal-panel relative z-10 w-full max-w-4xl h-[90vh] min-h-0 flex flex-col overflow-hidden shadow-2xl">
-                  <CardHeader className="space-y-0 pb-0">
-                    <div className="flex items-center justify-between gap-3">
-                      <CardTitle>Feedback Details</CardTitle>
+
+            {(isMySubmissionsView || isHomeView) && (
+              <div
+                className={`flex flex-col ${
+                  isMySubmissionsView ? "min-h-0 h-full overflow-visible" : ""
+                }`}
+                style={
+                  isMySubmissionsView && leftColumnHeight
+                    ? { height: leftColumnHeight }
+                    : undefined
+                }
+              >
+                <div
+                  className={
+                    selectedFeedback
+                      ? "blur-[2px] pointer-events-none select-none"
+                      : ""
+                  }
+                >
+                  {isHomeView ? (
+                    <UserDashboardHomeView
+                      dashboardStats={dashboardStats}
+                      latestSubmissionCards={latestSubmissionCards}
+                      needsAttentionCards={needsAttentionCards}
+                      recentlyUpdatedCards={recentlyUpdatedCards}
+                      homeNotifications={homeNotifications}
+                      notificationPanelMaxHeight={notificationPanelMaxHeight}
+                      onViewFeedback={handleViewFeedback}
+                      onCreateSubmission={() => setIsCreateSubmissionOpen(true)}
+                      renderCreateSubmissionDialog={renderCreateSubmissionDialog}
+                      renderHomeSubmissionGrid={renderHomeSubmissionGrid}
+                      getStatusBadgeClass={getStatusBadgeClass}
+                      getStatusIcon={getStatusIcon}
+                    />
+                  ) : isMySubmissionsView ? (
+                    <UserDashboardMySubmissionsView
+                      feedbacks={feedbacks}
+                      isFeedbacksLoading={isFeedbacksLoading}
+                      filteredFeedbacks={filteredFeedbacks}
+                      paginatedFilteredFeedbacks={paginatedFilteredFeedbacks}
+                      searchQuery={searchQuery}
+                      filterType={filterType}
+                      filterPriority={filterPriority}
+                      filterStatus={filterStatus}
+                      filterTracking={filterTracking}
+                      filterDate={filterDate}
+                      mySubmissionsPage={mySubmissionsPage}
+                      mySubmissionsPageSize={mySubmissionsPageSize}
+                      mySubmissionsTotalPages={mySubmissionsTotalPages}
+                      submissionsScrollRef={submissionsScrollRef}
+                      submissionsScrollKey={submissionsScrollKey}
+                      submissionsScrollTopRef={submissionsScrollTop}
+                      mySubmissionsPlaceholderRowCount={mySubmissionsPlaceholderRowCount}
+                      activeFilterChips={activeFilterChips}
+                      activeFilterCount={activeFilterCount}
+                      hoverFilterItems={hoverFilterItems}
+                      onSearchChange={setSearchQuery}
+                      onFilterTypeChange={setFilterType}
+                      onFilterPriorityChange={setFilterPriority}
+                      onFilterStatusChange={setFilterStatus}
+                      onFilterTrackingChange={setFilterTracking}
+                      onFilterDateChange={setFilterDate}
+                      onViewFeedback={handleViewFeedback}
+                      onCreateSubmissionClick={() => {
+                        setCreateSubmissionStep("form");
+                        setCreateSubmissionTrackingId(null);
+                        setIsAnonymous(false);
+                        setIsCreateSubmissionOpen(true);
+                      }}
+                      onDeleteClick={(feedback) => {
+                        setDeleteTarget(feedback);
+                        setIsDeleteOpen(true);
+                      }}
+                      onClearSingleFilter={clearSingleFilter}
+                      onClearAllFilters={clearAllFilters}
+                      onPageChange={setMySubmissionsPage}
+                      onPageSizeChange={setMySubmissionsPageSize}
+                      renderCreateSubmissionDialog={renderCreateSubmissionDialog}
+                      getPriorityColor={getPriorityColor}
+                      getStatusBadgeClass={getStatusBadgeClass}
+                      getStatusIcon={getStatusIcon}
+                      formatSubmittedAt={formatSubmittedAt}
+                    />
+                  ) : null}
+                </div>
+                {selectedFeedback ? (
+                  <div className="fixed inset-0 z-[90] flex items-center justify-center p-2">
+                    <div
+                      aria-hidden="true"
+                      className="ff-modal-backdrop absolute inset-0 bg-black/40 backdrop-blur-[1px]"
+                    />
+                    {/* Unsent message overlay — outside Card so overflow-hidden doesn't clip it */}
+                    {isUnsentMessageDialogOpen && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-[1px]"
+                          onClick={() => { setIsUnsentMessageDialogOpen(false); closeSelectedFeedback(); }}
+                        />
+                        <div className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none">
+                          <div className="pointer-events-auto w-full max-w-sm rounded-lg border bg-background p-6 shadow-lg">
+                            <div className="space-y-2 text-left">
+                              <h2 className="text-lg font-normal">Discard unsent message?</h2>
+                              <p className="text-sm text-black">You have a message that has not been sent yet.</p>
+                            </div>
+                            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                              <Button type="button" variant="outline" onClick={() => setIsUnsentMessageDialogOpen(false)}>Keep</Button>
+                              <Button type="button" onClick={() => { setIsUnsentMessageDialogOpen(false); closeSelectedFeedback(); }}>Discard</Button>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    <Card
+                      className="ff-modal-panel relative z-10 w-full max-w-[530px] min-h-0 flex flex-col overflow-hidden shadow-2xl transition-[height] duration-300 ease-in-out"
+                      style={
+                        feedbackModalHeight
+                          ? { height: `${feedbackModalHeight}px` }
+                          : undefined
+                      }
+                    >
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-9 w-9"
+                        className="absolute right-4 top-3 z-20 h-7 w-7 text-muted-foreground hover:bg-muted hover:text-foreground focus:border-ring focus:ring-ring/50 focus:ring-[3px] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                         aria-label="Close feedback details"
                         onClick={handleAttemptCloseSelectedFeedback}
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-3.5 w-3.5" />
                       </Button>
-                    </div>
-                    <CardDescription className="font-mono">
-                      {selectedFeedback.id}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="ff-hide-scrollbar flex-1 min-h-0 overflow-y-auto space-y-6 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                  <div className="w-full">
-                    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                      <FeedbackStatusCard
-                        feedback={selectedFeedback}
-                        formatDate={formatDate}
-                        className="h-[27.5rem]"
-                      />
+                      <CardContent
+                        ref={feedbackModalContentRef}
+                        className="ff-hide-scrollbar flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pt-3 pb-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      >
 
-                      <div>
-                        <FeedbackDetailsCard
-                          feedback={selectedFeedback}
-                          title="Feedback Details"
-                          formatDate={formatDate}
-                          className="h-[27.5rem]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Card className="shadow-lg bg-muted/40 border-border gap-2">
-                    <CardHeader className="pb-0">
-                      <CardTitle className="text-base">Feedback Updates</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="grid max-h-[420px] min-h-0 grid-rows-[minmax(0,1fr)_auto] overflow-hidden rounded-xl border border-border bg-white/70">
-                        <div
-                          ref={conversationScrollRef}
-                          className="ff-hide-scrollbar min-h-0 overflow-y-auto p-4"
+                        <Tabs
+                          value={activeFeedbackTab}
+                          onValueChange={(value) => {
+                            const next = value as "details" | "messages";
+                            const tabOrder: Array<"details" | "messages"> = [
+                              "details",
+                              "messages",
+                            ];
+                            const prevIdx = tabOrder.indexOf(previousFeedbackTabRef.current);
+                            const nextIdx = tabOrder.indexOf(next);
+                            setFeedbackTabAnimDirection(nextIdx > prevIdx ? "left" : "right");
+                            previousFeedbackTabRef.current = next;
+                            setActiveFeedbackTab(next);
+                          }}
+                          className="flex min-h-0 flex-1 flex-col gap-3"
                         >
-                          {isMessagesLoading && (
-                            <p className="text-sm text-muted-foreground">
-                              Loading conversation...
-                            </p>
-                          )}
-                          {!isMessagesLoading && messages.length === 0 && (
-                            <p className="text-sm text-muted-foreground">
-                              No messages yet. Updates from the admin team will appear here.
-                            </p>
-                          )}
-                          <div className="space-y-4">
+                          <TabsList className="mx-auto grid w-full max-w-[440px] grid-cols-2 rounded-full">
+                            <TabsTrigger value="details" className="data-[state=inactive]:text-muted-foreground data-[state=active]:text-foreground">
+                              Details
+                            </TabsTrigger>
+                            <TabsTrigger value="messages" className="data-[state=inactive]:text-muted-foreground data-[state=active]:text-foreground">
+                              Messages
+                            </TabsTrigger>
+                          </TabsList>
+
+                          <TabsContent value="details" className="mt-0 space-y-3">
+                            <div
+                              ref={detailsTabContentRef}
+                              key={`user-details-tab-${activeFeedbackTab}`}
+                              className={feedbackTabAnimDirection === "left" ? "ff-step-slide-in-left" : "ff-step-slide-in-right"}
+                            >
+                            <div className="rounded-[12px] border border-border bg-muted/20 px-5 py-4">
+                              <p className="mb-2 text-[0.85rem] tracking-[0.04em] text-foreground">
+                                Feedback details: <span className="!text-muted-foreground">{selectedFeedback.id}</span>
+                              </p>
+                              <div className="mb-2 flex items-center justify-between gap-3 border-b border-border pb-2">
+                                <div className="flex items-center gap-2">
+                                  <MessageCircle className="h-4 w-4 text-muted-foreground" />
+                                  <p className="text-[1.05rem] font-medium leading-tight text-foreground">{selectedFeedback.subject}</p>
+                                </div>
+                                <Badge
+                                  variant="outline"
+                                  className="rounded-full border-amber-300 bg-transparent px-3 py-[0.12rem] text-[0.85rem] font-medium capitalize text-amber-600"
+                                >
+                                  {selectedFeedback.priority}
+                                </Badge>
+                              </div>
+
+                              <div className="divide-y divide-border text-[0.95rem]">
+                                <div className="grid grid-cols-[4.7rem_minmax(0,1fr)] gap-4 py-1.5">
+                                  <p className="!text-muted-foreground">Type:</p>
+                                  <p className="!text-foreground capitalize">{selectedFeedback.type}</p>
+                                </div>
+                                <div className="grid grid-cols-[4.7rem_minmax(0,1fr)] gap-4 py-1.5">
+                                  <p className="!text-muted-foreground">Category:</p>
+                                  <p className="!text-foreground">{selectedFeedback.category}</p>
+                                </div>
+                                <div className="grid grid-cols-[4.7rem_minmax(0,1fr)] gap-4 py-1.5">
+                                  <p className="!text-muted-foreground">Updated:</p>
+                                  <p className="!text-foreground">{formatDate(selectedFeedback.updatedAt)}</p>
+                                </div>
+                                <div className="grid grid-cols-[4.7rem_minmax(0,1fr)] gap-4 py-1.5">
+                                  <p className="!text-muted-foreground">Details:</p>
+                                  <p className="italic">{selectedFeedback.message}</p>
+                                </div>
+                              </div>
+                            </div>
+
                             {(() => {
-                              let lastDayLabel = "";
-                              return messages.map((entry, index, allMessages) => {
-                                const createdAt = entry.createdAt
-                                  ? new Date(entry.createdAt)
-                                  : null;
-                                const today = new Date();
-                                const yesterday = new Date();
-                                yesterday.setDate(today.getDate() - 1);
+                              const normalizedStatus = selectedFeedback.status.trim().toLowerCase();
+                              const currentIndex = ["pending", "in progress", "resolved"].indexOf(normalizedStatus);
+                              const safeIndex = Math.max(currentIndex, 0);
+                              const isPending = safeIndex === 0;
+                              const isInProgress = safeIndex === 1;
+                              const isResolved = safeIndex === 2;
+                              const statusDotClass = isResolved
+                                ? "bg-emerald-600"
+                                : isInProgress
+                                  ? "bg-blue-500"
+                                  : "bg-amber-500";
+                              const statusTextClass = isResolved
+                                ? "text-emerald-600"
+                                : isInProgress
+                                  ? "text-blue-600"
+                                  : "text-amber-600";
 
-                                const dayLabel = createdAt
-                                  ? createdAt.toDateString() === today.toDateString()
-                                    ? "Today"
-                                    : createdAt.toDateString() === yesterday.toDateString()
-                                      ? "Yesterday"
-                                      : createdAt.toLocaleDateString(undefined, {
-                                          month: "short",
-                                          day: "numeric",
-                                          year: "numeric",
-                                        })
-                                  : "";
-                                const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
-                                if (showDayLabel) {
-                                  lastDayLabel = dayLabel;
-                                }
-
-                                const isUser = entry.senderRole === "user";
-                                const name = isUser ? "You" : entry.senderName || "Admin";
-                                const prev = index > 0 ? allMessages[index - 1] : null;
-                                const prevIsUser = prev ? prev.senderRole === "user" : false;
-                                const prevName = prev
-                                  ? prevIsUser
-                                    ? "You"
-                                    : prev.senderName || "Admin"
-                                  : "";
-                                const showName =
-                                  !prev ||
-                                  showDayLabel ||
-                                  prev.senderRole !== entry.senderRole ||
-                                  prevName !== name;
-                                const hasVeryLongToken = /\S{24,}/.test(
-                                  entry.message || "",
-                                );
-                                const isLikelyMultiLine =
-                                  (entry.message || "").includes("\n") ||
-                                  (entry.message || "").length > 60;
-
-                                return (
-                                  <div key={entry.id} className="space-y-3">
-                                    {showDayLabel ? (
-                                      <div className="flex justify-center">
-                                        <span className="rounded-full border border-border bg-white/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-                                          {dayLabel}
-                                        </span>
-                                      </div>
-                                    ) : null}
-                                    <div
-                                      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                                    >
+                              return (
+                                <div>
+                                  <div className="mb-3 flex items-center gap-3">
+                                    <div className="relative h-[4px] flex-1 rounded-full bg-muted">
                                       <div
-                                        className={`group relative w-fit min-w-0 max-w-[78%] sm:max-w-md ${isUser ? "text-right" : "text-left"}`}
-                                      >
-                                        {showName && !isUser ? (
-                                          <p className="mb-1 px-1 text-sm font-semibold text-muted-foreground">
-                                            {name}
-                                          </p>
-                                        ) : null}
-                                          <div
-                                            className={`rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                                              isUser
-                                                ? USER_MESSAGE_BUBBLE_CLASS
-                                                : "border border-border bg-slate-50 text-foreground"
-                                            }`}
-                                          >
-                                          <p
-                                            className={`whitespace-pre-line leading-relaxed ${
-                                              hasVeryLongToken
-                                                ? "break-all"
-                                                : "break-words"
-                                            }`}
-                                          >
-                                            {entry.message}
-                                          </p>
-                                        </div>
-                                        {entry.createdAt ? (
-                                          <span
-                                            className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-2xl bg-black/50 px-3 py-1.5 text-xs text-white shadow-sm group-hover:inline-flex ${
-                                              isUser
-                                                ? "-left-1 -translate-x-full"
-                                                : "-right-1 translate-x-full"
-                                            } ${
-                                              isLikelyMultiLine
-                                                ? "top-1/2"
-                                                : "top-[68%]"
-                                            }`}
-                                          >
-                                            {formatLocalTime(entry.createdAt)}
-                                          </span>
-                                        ) : null}
-                                      </div>
+                                        className="absolute left-0 top-0 h-[4px] rounded-full bg-amber-500"
+                                        style={{
+                                          width: isPending ? "33.333%" : isInProgress ? "66.666%" : "100%",
+                                        }}
+                                      />
+                                    </div>
+                                    <p className="mt-3 !text-muted-foreground text-sm tracking-[0.08em] text-amber-600 uppercase ">
+                                      {normalizedStatus === "in progress" ? "In progress" : normalizedStatus}
+                                    </p>
+                                  </div>
+
+                                  <div className="grid grid-cols-3 gap-3 text-center">
+                                    <div className="space-y-1">
+                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isPending || isInProgress || isResolved ? "bg-amber-500" : "bg-muted"}`} />
+                                      <p className={`text-[0.9rem] ${isPending || isInProgress || isResolved ? "text-amber-600" : "text-muted-foreground"}`}>Submitted</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isInProgress || isResolved ? "bg-blue-500" : "bg-muted"}`} />
+                                      <p className={`text-[0.9rem] ${isInProgress || isResolved ? "text-blue-600" : "text-muted-foreground"}`}>In progress</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <div className={`mx-auto h-2.5 w-2.5 rounded-full ${isResolved ? "bg-emerald-600" : "bg-muted"}`} />
+                                      <p className={`text-[0.9rem] ${isResolved ? "text-emerald-600" : "text-muted-foreground"}`}>Resolved</p>
                                     </div>
                                   </div>
-                                );
-                              });
+                                </div>
+                              );
                             })()}
-                          </div>
-                        </div>
-                        <div className="space-y-2 bg-background/85 p-4 backdrop-blur-sm">
-                          <div className="flex items-end gap-2">
-                            <Textarea
-                              id="reply-message"
-                              placeholder="Type your message..."
-                              rows={1}
-                              value={messageDraft}
-                              onChange={(e) =>
-                                setMessageDraft(
-                                  e.target.value.slice(0, CONVERSATION_MESSAGE_MAX_LENGTH),
-                                )
-                              }
-                              maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
-                              disabled={isSendingMessage}
-                              className="ff-hide-scrollbar w-full max-w-full min-w-0 max-h-[10.5rem] min-h-8 resize-none overflow-y-auto rounded-xl border border-border/70 bg-background px-4 py-2 leading-relaxed shadow-sm [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap] focus-visible:ring-2 focus-visible:ring-accent/30"
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" && !event.shiftKey) {
-                                  event.preventDefault();
-                                  void handleSendMessage();
-                                }
-                              }}
-                            />
-                            <Button
-                              type="button"
-                              onClick={handleSendMessage}
-                              size="icon"
-                              variant="secondary"
-                              className="h-12 w-12 shrink-0 rounded-xl border border-border/70 bg-muted/80 text-muted-foreground hover:bg-accent hover:text-white"
-                              disabled={isSendingMessage}
+                            </div>
+                          </TabsContent>
+
+                          <TabsContent value="messages" className="mt-0 flex min-h-0 flex-1 flex-col">
+                            <div
+                              key={`user-messages-tab-${activeFeedbackTab}`}
+                              className={`flex min-h-0 flex-1 flex-col ${feedbackTabAnimDirection === "left" ? "ff-step-slide-in-left" : "ff-step-slide-in-right"}`}
                             >
-                              <Send className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  </CardContent>
-
-                  <div className="pointer-events-none absolute bottom-0 right-6 z-20">
-                    <div className="relative h-[360px] w-[320px]">
-                      <div
-                        className={`pointer-events-auto absolute bottom-0 right-0 z-10 h-[360px] w-[320px] overflow-hidden rounded-t-xl border-2 border-slate-300 bg-white shadow-2xl transition-transform duration-500 ease-in-out ${
-                          isMiniChatOpen
-                            ? "translate-y-0"
-                            : "translate-y-[calc(100%-2.30rem)]"
-                        }`}
-                      >
-                        <div
-                          className="flex cursor-pointer items-center justify-between border-b border-border bg-muted/40 px-3 py-2 transition-colors hover:bg-muted/70"
-                          onClick={() => setIsMiniChatOpen((prev) => !prev)}
-                        >
-                          <p className="text-sm font-semibold text-foreground">
-                            Message window
-                          </p>
-                          {isMiniChatOpen ? (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="grid h-[calc(100%-40px)] grid-rows-[minmax(0,1fr)_auto]">
-                          <div
-                            ref={miniConversationScrollRef}
-                            className="ff-hide-scrollbar min-h-0 overflow-y-auto p-3"
-                          >
-                            {isMessagesLoading ? (
-                              <p className="text-sm text-muted-foreground">
-                                Loading conversation...
-                              </p>
-                            ) : null}
-                            {!isMessagesLoading && messages.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">
-                                No messages yet.
-                              </p>
-                            ) : null}
-                            <div className="space-y-3">
-                              {(() => {
-                                let lastDayLabel = "";
-                                return messages.map((entry, index, allMessages) => {
-                                  const createdAt = entry.createdAt
-                                    ? new Date(entry.createdAt)
-                                    : null;
-                                  const today = new Date();
-                                  const yesterday = new Date();
-                                  yesterday.setDate(today.getDate() - 1);
-                                  const dayLabel = createdAt
-                                    ? createdAt.toDateString() === today.toDateString()
-                                      ? "Today"
-                                      : createdAt.toDateString() === yesterday.toDateString()
-                                        ? "Yesterday"
-                                        : createdAt.toLocaleDateString(undefined, {
-                                            month: "short",
-                                            day: "numeric",
-                                            year: "numeric",
-                                          })
-                                    : "";
-                                  const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
-                                  if (showDayLabel) {
-                                    lastDayLabel = dayLabel;
-                                  }
-
-                                  const isUser = entry.senderRole === "user";
-                                  const name = isUser ? "You" : entry.senderName || "Admin";
-                                  const prev = index > 0 ? allMessages[index - 1] : null;
-                                  const prevIsUser = prev ? prev.senderRole === "user" : false;
-                                  const prevName = prev
-                                    ? prevIsUser
-                                      ? "You"
-                                      : prev.senderName || "Admin"
-                                    : "";
-                                  const showName =
-                                    !prev ||
-                                    showDayLabel ||
-                                    prev.senderRole !== entry.senderRole ||
-                                    prevName !== name;
-                                  const isLikelyMultiLine =
-                                    (entry.message || "").includes("\n") ||
-                                    (entry.message || "").length > 50;
-
-                                  return (
-                                    <div key={`mini-${entry.id}`} className="space-y-2">
-                                      {showDayLabel ? (
-                                        <div className="flex justify-center">
-                                          <span className="rounded-full border border-border bg-white/80 px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
-                                            {dayLabel}
-                                          </span>
-                                        </div>
-                                      ) : null}
-                                      <div
-                                        className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-                                      >
-                                        <div
-                                          className={`group relative w-fit min-w-0 max-w-[85%] ${isUser ? "text-right" : "text-left"}`}
-                                        >
-                                          {showName && !isUser ? (
-                                            <p className="mb-1 px-1 text-[11px] font-semibold text-muted-foreground">
-                                              {name}
-                                            </p>
-                                          ) : null}
-                                          <div
-                                            className={`rounded-2xl px-3 py-2 text-xs ${
-                                              isUser
-                                                ? USER_MESSAGE_BUBBLE_CLASS
-                                                : "border border-border bg-slate-50 text-foreground"
-                                            }`}
-                                          >
-                                            <p className="whitespace-pre-line break-words">
-                                              {entry.message}
-                                            </p>
-                                          </div>
-                                          {entry.createdAt ? (
-                                            <span
-                                              className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-black/50 px-2.5 py-1 text-[10px] text-white shadow-sm group-hover:inline-flex ${
-                                                isUser
-                                                  ? "-left-1 -translate-x-full"
-                                                  : "-right-1 translate-x-full"
-                                              } ${
-                                                isLikelyMultiLine
-                                                  ? "top-1/2"
-                                                  : "top-[68%]"
-                                              }`}
-                                            >
-                                              {formatLocalTime(entry.createdAt)}
-                                            </span>
-                                          ) : null}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                });
-                              })()}
-                            </div>
-                          </div>
-                          <div className="border-t border-border bg-background/90 p-2">
-                            <div className="flex items-end gap-2">
-                              <Textarea
-                                id="mini-reply-message"
-                                placeholder="Type your message..."
-                                rows={1}
-                                value={messageDraft}
-                                onChange={(e) =>
-                                  setMessageDraft(
-                                    e.target.value.slice(0, CONVERSATION_MESSAGE_MAX_LENGTH),
-                                  )
-                                }
-                                maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
-                                disabled={isSendingMessage}
-                                className="ff-hide-scrollbar w-full max-w-full min-w-0 max-h-[8rem] min-h-8 resize-none overflow-y-auto rounded-lg border border-border/70 bg-background px-3 py-2 text-xs leading-relaxed [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter" && !event.shiftKey) {
-                                    event.preventDefault();
-                                    void handleSendMessage();
-                                  }
-                                }}
-                              />
-                              <Button
-                                type="button"
-                                onClick={handleSendMessage}
-                                size="icon"
-                                variant="secondary"
-                                className="h-9 w-9 shrink-0 rounded-lg border border-border/70 bg-muted/80 text-muted-foreground hover:bg-accent hover:text-white"
-                                disabled={isSendingMessage}
-                                aria-label="Send quick chat message"
+                            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-muted/20">
+                              <div
+                                ref={conversationScrollRef}
+                                className="ff-hide-scrollbar min-h-0 flex-1 overflow-y-auto p-3"
                               >
-                                <Send className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                                {isMessagesLoading ? (
+                                  <div className="flex h-full items-center justify-center">
+                                    <p className="text-sm text-muted-foreground">Loading conversation...</p>
+                                  </div>
+                                ) : null}
+                                {!isMessagesLoading && messages.length === 0 ? (
+                                  <div className="flex h-full items-center justify-center">
+                                    <div className="text-center">
+                                      <MessageCircle className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                                      <p className="text-sm text-muted-foreground">
+                                        No messages yet
+                                      </p>
+                                      <p className="text-xs text-muted-foreground/60">
+                                        Send a message to start the conversation
+                                      </p>
+                                    </div>
+                                  </div>
+                                ) : null}
+                                <div className="space-y-3">
+                                  {(() => {
+                                    let lastDayLabel = "";
+                                    return messages.map((entry, index, allMessages) => {
+                                      const createdAt = entry.createdAt ? new Date(entry.createdAt) : null;
+                                      const today = new Date();
+                                      const yesterday = new Date();
+                                      yesterday.setDate(today.getDate() - 1);
+                                      const dayLabel = createdAt
+                                        ? createdAt.toDateString() === today.toDateString()
+                                          ? "Today"
+                                          : createdAt.toDateString() === yesterday.toDateString()
+                                            ? "Yesterday"
+                                            : createdAt.toLocaleDateString(undefined, {
+                                                month: "short",
+                                                day: "numeric",
+                                                year: "numeric",
+                                              })
+                                        : "";
+                                      const showDayLabel = dayLabel && dayLabel !== lastDayLabel;
+                                      if (showDayLabel) {
+                                        lastDayLabel = dayLabel;
+                                      }
 
-                    <button
-                      type="button"
-                      aria-label={
-                        isMiniChatOpen
-                          ? "Hide quick chat"
-                          : "Open quick chat"
-                      }
-                      onClick={() => setIsMiniChatOpen((prev) => !prev)}
-                      className="pointer-events-auto absolute bottom-0 right-0 z-0 h-8 w-[320px] cursor-pointer rounded-t-md border border-b-0 border-border bg-muted/90 px-6 text-xs font-semibold text-foreground shadow-md transition-colors hover:bg-muted"
-                    >
-                      {isMiniChatOpen ? "Updates" : "Updates"}
-                    </button>
+                                      const isUser = entry.senderRole === "user";
+                                      const name = isUser ? "You" : entry.senderName || "Admin";
+                                      const prev = index > 0 ? allMessages[index - 1] : null;
+                                      const prevIsUser = prev ? prev.senderRole === "user" : false;
+                                      const prevName = prev ? (prevIsUser ? "You" : prev.senderName || "Admin") : "";
+                                      const showName =
+                                        !prev ||
+                                        showDayLabel ||
+                                        prev.senderRole !== entry.senderRole ||
+                                        prevName !== name;
+                                      const isLikelyMultiLine =
+                                        (entry.message || "").includes("\n") ||
+                                        (entry.message || "").length > 50;
+
+                                      return (
+                                        <div key={`msg-${entry.id}`} className="space-y-2">
+                                          {showDayLabel ? (
+                                            <div className="flex items-center gap-2 py-1">
+                                              <div className="h-px flex-1 bg-border/60" />
+                                              <span className="text-[10px] font-normal text-muted-foreground">{dayLabel}</span>
+                                              <div className="h-px flex-1 bg-border/60" />
+                                            </div>
+                                          ) : null}
+                                          <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                                            <div className={`group relative w-fit min-w-0 max-w-[85%] ${isUser ? "text-right" : "text-left"}`}>
+                                              {showName && !isUser ? (
+                                                <p className="mb-1 px-1 text-[11px] font-normal text-muted-foreground">{name}</p>
+                                              ) : null}
+                                              <div
+                                                className={`rounded-2xl px-3 py-2 text-sm ${
+                                                  isUser
+                                                    ? USER_MESSAGE_BUBBLE_CLASS
+                                                    : "border border-border bg-background text-foreground"
+                                                }`}
+                                              >
+                                                <p className={`whitespace-pre-line break-words leading-relaxed ${isUser ? "!text-white" : ""}`}>{entry.message}</p>
+                                              </div>
+                                              {entry.createdAt ? (
+                                                <span
+                                                  className={`pointer-events-none absolute z-10 hidden -translate-y-1/2 whitespace-nowrap rounded-xl bg-black/50 px-2.5 py-1 text-[10px] text-white shadow-sm group-hover:inline-flex ${
+                                                    isUser ? "-left-1 -translate-x-full" : "-right-1 translate-x-full"
+                                                  } ${
+                                                    isLikelyMultiLine ? "top-1/2" : "top-[68%]"
+                                                  }`}
+                                                >
+                                                  {formatLocalTime(entry.createdAt)}
+                                                </span>
+                                              ) : null}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
+                                </div>
+                              </div>
+                              <div className="border-t border-border bg-background/90 p-2">
+                                <div className="flex items-end gap-2">
+                                  <Textarea
+                                    id="reply-message"
+                                    placeholder="Type your message..."
+                                    rows={1}
+                                    value={messageDraft}
+                                    onChange={(e) =>
+                                      setMessageDraft(
+                                        e.target.value.slice(0, CONVERSATION_MESSAGE_MAX_LENGTH),
+                                      )
+                                    }
+                                    maxLength={CONVERSATION_MESSAGE_MAX_LENGTH}
+                                    disabled={isSendingMessage}
+                                    className="ff-hide-scrollbar w-full max-w-full min-w-0 max-h-[8rem] min-h-8 resize-none overflow-y-auto rounded-lg border border-border/70 bg-background px-3 py-2 text-xs leading-relaxed [field-sizing:fixed] [max-inline-size:100%] [overflow-wrap:anywhere] [word-break:break-word] [white-space:pre-wrap]"
+                                    onKeyDown={(event) => {
+                                      if (event.key === "Enter" && !event.shiftKey) {
+                                        event.preventDefault();
+                                        void handleSendMessage();
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    type="button"
+                                    onClick={handleSendMessage}
+                                    size="icon"
+                                    variant="secondary"
+                                    className="h-9 w-9 shrink-0 rounded-lg border border-border/70 bg-muted/80 text-muted-foreground hover:bg-accent hover:text-white"
+                                    disabled={isSendingMessage}
+                                    aria-label="Send message"
+                                  >
+                                    <Send className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      </CardContent>
+                    </Card>
                   </div>
-                </Card>
+                ) : null}
               </div>
-            ) : null}
+            )}
           </div>
-          )}
         </div>
       </div>
-    </div>
-  </>
+    </>
   );
 }
-
-
-
-
-
-
-

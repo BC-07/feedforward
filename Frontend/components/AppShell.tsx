@@ -6,6 +6,7 @@ import {
   deleteUserAccount,
   logout,
   listFeedbacks,
+  openAdminEventsStream,
   updateAdminProfile,
   updateAdminPassword,
   updateUserPassword,
@@ -66,6 +67,7 @@ import {
 } from "@/components/admin/constants";
 
 const SESSION_EVENT = "feedforward:session-change";
+const ADMIN_LIVE_EVENT = "feedforward:admin-live-event";
 const emailLikePattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 
 function containsEmailLike(value: string): boolean {
@@ -118,25 +120,27 @@ const emptySessionSnapshot: SessionSnapshot = {
 let cachedSessionSnapshot: SessionSnapshot | null = null;
 
 function readSessionSnapshotFromStorage(): SessionSnapshot {
-  const userId = localStorage.getItem("currentUserId") || "";
-  const adminId = localStorage.getItem("currentAdminId") || "";
+  const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+  const storage = rememberMe ? localStorage : sessionStorage;
+  const userId = storage.getItem("currentUserId") || "";
+  const adminId = storage.getItem("currentAdminId") || "";
 
   return {
-    isUserLoggedIn: localStorage.getItem("isUserLoggedIn") === "true",
-    isAdminLoggedIn: localStorage.getItem("isAdminLoggedIn") === "true",
-    isSuperAdminLoggedIn: localStorage.getItem("isSuperAdminLoggedIn") === "true",
+    isUserLoggedIn: storage.getItem("isUserLoggedIn") === "true",
+    isAdminLoggedIn: storage.getItem("isAdminLoggedIn") === "true",
+    isSuperAdminLoggedIn: storage.getItem("isSuperAdminLoggedIn") === "true",
     userId,
-    userName: localStorage.getItem("currentUserName") || "",
-    userEmail: localStorage.getItem("currentUserEmail") || "",
+    userName: storage.getItem("currentUserName") || "",
+    userEmail: storage.getItem("currentUserEmail") || "",
     userAvatar: userId ? localStorage.getItem(`userAvatar_${userId}`) || "" : "",
     adminId,
-    adminName: localStorage.getItem("currentAdminName") || "",
-    adminEmail: localStorage.getItem("currentAdminEmail") || "",
-    adminUnit: localStorage.getItem("currentAdminDepartment") || "",
+    adminName: storage.getItem("currentAdminName") || "",
+    adminEmail: storage.getItem("currentAdminEmail") || "",
+    adminUnit: storage.getItem("currentAdminDepartment") || "",
     adminAvatar: adminId
       ? localStorage.getItem(`adminAvatar_${adminId}`) || ""
       : "",
-    superAdminName: localStorage.getItem("superAdminName") || "superadmin",
+    superAdminName: storage.getItem("superAdminName") || "superadmin",
   };
 }
 
@@ -390,6 +394,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     [adminId, adminUnit, isAdminLoggedIn],
   );
 
+  const markNotificationUnread = useCallback(
+    (feedbackId: string) => {
+      if (typeof window === "undefined") return;
+      if (!isAdminLoggedIn || !adminId || !adminUnit) return;
+      const id = feedbackId.trim();
+      if (!id) return;
+
+      const key = `adminNotificationsRead:${adminId}:${adminUnit}`;
+      setReadNotificationIds((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        localStorage.setItem(key, JSON.stringify(Array.from(next)));
+        return next;
+      });
+    },
+    [adminId, adminUnit, isAdminLoggedIn],
+  );
+
   const refreshAdminNotifications = useCallback(async () => {
     if (!isAdminLoggedIn || !adminUnit) return;
     setIsNotificationsLoading(true);
@@ -591,6 +614,64 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     void refreshAdminNotifications();
   }, [isAdminLoggedIn, adminUnit, refreshAdminNotifications]);
 
+  useEffect(() => {
+    if (!isAdminLoggedIn || !adminUnit) return;
+
+    const intervalId = window.setInterval(() => {
+      void refreshAdminNotifications();
+    }, 5000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void refreshAdminNotifications();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [adminUnit, isAdminLoggedIn, refreshAdminNotifications]);
+
+  useEffect(() => {
+    if (!isAdminLoggedIn || !adminUnit) return;
+
+    const stream = openAdminEventsStream();
+    const handleAdminEvent = (event: Event) => {
+      const messageEvent = event as MessageEvent<string>;
+      try {
+        const payload = JSON.parse(messageEvent.data) as {
+          type?: string;
+          feedbackId?: string;
+          category?: string;
+          createdAt?: string;
+        };
+        window.dispatchEvent(
+          new CustomEvent(ADMIN_LIVE_EVENT, {
+            detail: payload,
+          }),
+        );
+        if (payload.type === "message_created" && payload.feedbackId) {
+          markNotificationUnread(payload.feedbackId);
+        }
+      } catch {
+        // Ignore malformed payloads.
+      }
+      void refreshAdminNotifications();
+    };
+
+    stream.addEventListener("admin_event", handleAdminEvent);
+    stream.onerror = () => {
+      // Keep the default EventSource auto-reconnect behavior.
+    };
+
+    return () => {
+      stream.removeEventListener("admin_event", handleAdminEvent);
+      stream.close();
+    };
+  }, [adminUnit, isAdminLoggedIn, markNotificationUnread, refreshAdminNotifications]);
+
   const toggleNotificationRead = (id: string) => {
     const next = new Set(readNotificationIds);
     if (next.has(id)) {
@@ -616,26 +697,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   const clearSessionForRole = (role: LogoutRole) => {
+    const clearKey = (key: string) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    };
+
     if (role === "user") {
-      localStorage.removeItem("isUserLoggedIn");
-      localStorage.removeItem("currentUserId");
-      localStorage.removeItem("currentUserName");
-      localStorage.removeItem("currentUserEmail");
+      clearKey("isUserLoggedIn");
+      clearKey("currentUserId");
+      clearKey("currentUserName");
+      clearKey("currentUserEmail");
       return;
     }
 
     if (role === "admin") {
-      localStorage.removeItem("isAdminLoggedIn");
-      localStorage.removeItem("currentAdminId");
-      localStorage.removeItem("currentAdminName");
-      localStorage.removeItem("currentAdminEmail");
-      localStorage.removeItem("currentAdminDepartment");
+      clearKey("isAdminLoggedIn");
+      clearKey("currentAdminId");
+      clearKey("currentAdminName");
+      clearKey("currentAdminEmail");
+      clearKey("currentAdminDepartment");
       return;
     }
 
-    localStorage.removeItem("isSuperAdminLoggedIn");
-    localStorage.removeItem("superAdminName");
-    localStorage.removeItem("superAdminExpiresAt");
+    clearKey("isSuperAdminLoggedIn");
+    clearKey("superAdminName");
+    clearKey("superAdminExpiresAt");
   };
 
   const getLogoutSuccessMessage = (role: LogoutRole) => {
@@ -678,6 +764,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     clearSessionForRole(role);
+    localStorage.removeItem("ffRememberMe");
     announceSessionChange();
     toast.success(getLogoutSuccessMessage(role));
     router.push(getLogoutRedirect(role));
@@ -811,7 +898,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         lastName,
       });
 
-      localStorage.setItem("currentAdminName", updatedAdmin.name);
+      const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem("currentAdminName", updatedAdmin.name);
       setAdminProfileEdit({
         firstName: "",
         lastName: "",
@@ -878,7 +967,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         });
       }
 
-      localStorage.setItem("currentUserName", updatedUser.name);
+      const rememberMe = localStorage.getItem("ffRememberMe") === "true";
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem("currentUserName", updatedUser.name);
       setUserProfileEdit({
         firstName: "",
         lastName: "",
@@ -1122,7 +1213,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header
         className={`sticky top-0 z-50 border-b border-border bg-white ${collapsedSidebarOffsetClass}`}
       >
-        <div className={`container mx-auto px-4 ${topBarHeightClass}`}>
+        <div className={`w-full pl-4 pr-4 ${topBarHeightClass}`}>
           <div className="flex h-full items-center justify-between">
             <div className="flex items-center gap-3">
               {shouldShowSidebar && (

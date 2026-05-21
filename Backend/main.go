@@ -33,7 +33,7 @@ func main() {
 			}
 			return "http://localhost:3000"
 		}(),
-		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization, X-Track-Public",
 		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
 		AllowCredentials: true,
 	}))

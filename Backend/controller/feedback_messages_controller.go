@@ -26,6 +26,9 @@ func ListFeedbackMessages(c *fiber.Ctx) error {
 	if feedback.ID == "" {
 		return notFound(c, "feedback not found", nil)
 	}
+	if isPublicTrackRequest(c) && isAccountLinkedFeedback(feedback) {
+		return notFound(c, "feedback not found", nil)
+	}
 
 	var messages []model.FeedbackMessageModel
 	if err := middleware.DBConn.Raw(
@@ -54,6 +57,9 @@ func CreateFeedbackMessage(c *fiber.Ctx) error {
 	if feedback.ID == "" {
 		return notFound(c, "feedback not found", nil)
 	}
+	if isPublicTrackRequest(c) && isAccountLinkedFeedback(feedback) {
+		return notFound(c, "feedback not found", nil)
+	}
 
 	var payload feedbackMessagePayload
 	if err := parseBody(c, &payload); err != nil {
@@ -71,11 +77,15 @@ func CreateFeedbackMessage(c *fiber.Ctx) error {
 	}
 
 	sessionID := strings.TrimSpace(c.Cookies(sessionCookieName))
+	isPublicTrackMessage := isPublicTrackRequest(c)
 	senderRole := sessionRoleUser
 	var senderID *string
 	senderName := ""
 
 	if sessionID == "" {
+		if !isPublicTrackMessage {
+			return unauthorized(c, "session is required")
+		}
 		// Track page supports ID-based follow-up messages even without an
 		// authenticated session.
 		senderName = "Anonymous"
@@ -83,14 +93,10 @@ func CreateFeedbackMessage(c *fiber.Ctx) error {
 		session, err := loadMessageSession(c)
 		if err != nil {
 			var fiberErr *fiber.Error
-			// If the browser has a stale/expired cookie, gracefully fall back
-			// to tracking-ID based anonymous reply instead of hard failing.
 			if errors.As(err, &fiberErr) && (fiberErr.Code == fiber.StatusUnauthorized || fiberErr.Code == fiber.StatusForbidden) {
 				clearSessionCookie(c)
-				senderName = "Anonymous"
-			} else {
-				return err
 			}
+			return err
 		}
 		if senderName == "" {
 			senderRole = session.Role
@@ -200,6 +206,7 @@ func CreateFeedbackMessage(c *fiber.Ctx) error {
 		`UPDATE `+feedbackTable+` SET updated_at = ? WHERE id = ?`,
 		now, feedbackID,
 	).Error
+	emitAdminMessageCreated(feedback.Category, feedbackID)
 
 	return success(c, fiber.StatusCreated, record)
 }

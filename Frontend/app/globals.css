@@ -80,6 +80,7 @@
 }
 
 @theme inline {
+  --font-sans: var(--font-geist-sans);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -126,7 +127,7 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
   }
 
   /**
@@ -179,6 +180,50 @@
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
   }
+
+  button,
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+  }
+}
+
+.ff-user-dashboard-theme :is(
+  h1,
+  h2,
+  h3,
+  h4,
+  p,
+  label,
+  th,
+  td,
+  [data-slot="card-title"],
+  [data-slot="card-description"],
+  [data-slot="dialog-description"]
+) {
+  color: var(--foreground);
+}
+
+.ff-user-dashboard-theme :is(
+  .text-muted-foreground,
+  .text-black,
+  .text-\[\#171717\],
+  .text-\[\#374151\],
+  .text-\[\#6b7280\],
+  .text-\[\#6f6255\]
+) {
+  color: var(--foreground) !important;
+}
+
+.ff-user-dashboard-theme :is(input, textarea)::placeholder {
+  color: var(--foreground);
+  opacity: 0.72;
+}
+
+.ff-user-dashboard-theme .ff-submission-search-input::placeholder {
+  color: #9ca3af !important;
+  opacity: 1;
 }
 
 .page-fade {
@@ -382,5 +427,10 @@
 }
 
 .ff-hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.ff-password-input::-ms-reveal,
+.ff-password-input::-ms-clear {
   display: none;
 }
