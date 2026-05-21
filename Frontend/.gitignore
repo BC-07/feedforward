@@ -1,14 +1,3 @@
-node_modules
-
-feedback-timing.log
-Backend/.env
-# migration backups (keep local)
-Backend/migrations/backup/
-.vscode/
-.gocache/
-.npm/
-.npm-cache/
-npm-debug.log*
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies

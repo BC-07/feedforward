@@ -1,0 +1,481 @@
+package controller
+
+import (
+	"fmt"
+	"intern_template_v1/middleware"
+	"intern_template_v1/model"
+	"strings"
+	"time"
+
+	"github.com/gofiber/fiber/v2"
+)
+
+func Getnames(c *fiber.Ctx) error {
+	db := middleware.DBConn
+
+	var data []map[string]any
+	if err := db.Raw("SELECT * FROM public.students").Scan(&data).Error; err != nil {
+		return serverError(c, "Server Failed", err)
+	}
+
+	return success(c, fiber.StatusOK, data)
+}
+
+func InsertData(c *fiber.Ctx) error {
+	db := middleware.DBConn
+
+	var insertData []map[string]any
+	if err := parseBody(c, &insertData); err != nil {
+		return parseError(c, "failed to parse data", err)
+	}
+
+	if err := db.Exec("").Create(&insertData).Error; err != nil {
+		return serverError(c, "failed to insert data", err)
+	}
+
+	return success(c, fiber.StatusOK, insertData)
+}
+
+func UpdateExec(c *fiber.Ctx) error {
+	db := middleware.DBConn
+
+	var updateExec map[string]any
+	if err := parseBody(c, &updateExec); err != nil {
+		return parseError(c, "Invalid parse request", err)
+	}
+
+	if err := db.Exec("UPDATE public.students SET name = ? WHERE students.id = ?", updateExec["name"], updateExec["id"]).Error; err != nil {
+		return serverError(c, "Internal Server error", err)
+	}
+
+	return success(c, fiber.StatusCreated, updateExec)
+}
+
+func InsertExec(c *fiber.Ctx) error {
+	db := middleware.DBConn
+
+	var insertExec map[string]any
+	if err := parseBody(c, &insertExec); err != nil {
+		return parseError(c, "Invalid parse request", err)
+	}
+
+	if err := db.Exec("INSERT INTO public.students (name) VALUES (?)", insertExec["name"]).Error; err != nil {
+		return serverError(c, "Internal Server error", err)
+	}
+
+	return success(c, fiber.StatusCreated, insertExec)
+}
+
+func GetFeedbacks(c *fiber.Ctx) error {
+	db := middleware.DBConn
+	if err := ensureFeedbackEmailColumn(); err != nil {
+		return serverError(c, "failed to initialize feedback email storage", err)
+	}
+
+	// Build the filter dynamically so the same handler supports admin and user views.
+	query := `SELECT id, type, category, subject, message, status, priority, user_id, user_name, user_email, is_anonymous, response, created_at, updated_at
+		FROM ` + feedbackTable
+	var args []any
+	var conditions []string
+
+	if category := strings.TrimSpace(c.Query("category")); category != "" {
+		conditions = append(conditions, "LOWER(category) = LOWER(?)")
+		args = append(args, category)
+	}
+	if userID := strings.TrimSpace(c.Query("userId")); userID != "" {
+		conditions = append(conditions, "user_id = ?")
+		args = append(args, userID)
+	}
+	if search := strings.TrimSpace(c.Query("search")); search != "" {
+		pattern := "%" + strings.ToLower(search) + "%"
+		conditions = append(conditions, "(LOWER(id) LIKE ? OR LOWER(subject) LIKE ? OR LOWER(message) LIKE ? OR LOWER(COALESCE(user_name, '')) LIKE ?)")
+		args = append(args, pattern, pattern, pattern, pattern)
+	}
+	if feedbackType := strings.TrimSpace(c.Query("type")); feedbackType != "" {
+		conditions = append(conditions, "LOWER(type) = LOWER(?)")
+		args = append(args, feedbackType)
+	}
+	if status := normalizeFeedbackStatusFilter(c.Query("status")); status != "" {
+		conditions = append(conditions, "status = ?")
+		args = append(args, status)
+	}
+	if priority := normalizeFeedbackPriorityFilter(c.Query("priority")); priority != "" {
+		conditions = append(conditions, "priority = ?")
+		args = append(args, priority)
+	}
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	query += " ORDER BY created_at DESC"
+
+	var feedbacks []model.FeedbackModel
+	if err := db.Raw(query, args...).Scan(&feedbacks).Error; err != nil {
+		return serverError(c, "failed to fetch feedbacks", err)
+	}
+
+	return success(c, fiber.StatusOK, feedbacks)
+}
+
+func normalizeFeedbackStatusFilter(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.NewReplacer(" ", "", "_", "", "-", "").Replace(normalized)
+
+	switch normalized {
+	case "pending":
+		return "Pending"
+	case "inprogress":
+		return "In Progress"
+	case "resolved":
+		return "Resolved"
+	default:
+		return ""
+	}
+}
+
+func normalizeFeedbackPriorityFilter(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "low":
+		return "Low"
+	case "medium":
+		return "Medium"
+	case "high":
+		return "High"
+	default:
+		return ""
+	}
+}
+
+func GetFeedbackByID(c *fiber.Ctx) error {
+	feedback, err := fetchFeedbackByID(c.Params("id"))
+	if err != nil {
+		return notFound(c, "feedback not found", err)
+	}
+	if feedback.ID == "" {
+		return notFound(c, "feedback not found", nil)
+	}
+
+	return success(c, fiber.StatusOK, feedback)
+}
+
+func isPublicTrackRequest(c *fiber.Ctx) bool {
+	return strings.EqualFold(strings.TrimSpace(c.Get("X-Track-Public")), "true")
+}
+
+func isAccountLinkedFeedback(feedback model.FeedbackModel) bool {
+	return feedback.UserID != nil && strings.TrimSpace(*feedback.UserID) != ""
+}
+
+func CreateFeedback(c *fiber.Ctx) error {
+	db := middleware.DBConn
+	if err := ensureFeedbackEmailColumn(); err != nil {
+		return serverError(c, "failed to initialize feedback email storage", err)
+	}
+
+	//Storage preparation
+	var feedback model.FeedbackModel
+
+	//validating user input in json
+	if err := parseBody(c, &feedback); err != nil {
+		return parseError(c, "failed to parse feedback", err)
+	}
+
+	if err := normalizeFeedback(&feedback); err != nil {
+		return invalidRequest(c, err.Error())
+	}
+
+	moderation := analyzeFeedbackLanguage(feedback.Subject, feedback.Message)
+	if len(moderation.MatchedWords) > 0 {
+		feedback.Subject, feedback.Message = maskFeedbackLanguage(
+			feedback.Subject,
+			feedback.Message,
+			moderation.MatchedWords,
+		)
+	}
+
+	if feedback.UserID == nil && feedback.UserEmail != nil {
+		user, err := fetchUserByEmail(*feedback.UserEmail)
+		if err != nil {
+			return serverError(c, "failed to validate feedback user email", err)
+		}
+		if user.ID == "" {
+			return invalidRequest(c, "user account not found; please log in again")
+		}
+		feedback.UserID = &user.ID
+		if feedback.UserName == nil || strings.TrimSpace(*feedback.UserName) == "" {
+			name := user.Name
+			feedback.UserName = &name
+		}
+		if feedback.UserEmail == nil || strings.TrimSpace(*feedback.UserEmail) == "" {
+			email := user.Email
+			feedback.UserEmail = &email
+		}
+	}
+
+	if feedback.UserID != nil && (feedback.UserEmail == nil || strings.TrimSpace(*feedback.UserEmail) == "") {
+		user, err := fetchUserByID(strings.TrimSpace(*feedback.UserID))
+		if err != nil {
+			return serverError(c, "failed to load feedback user", err)
+		}
+		if user.Email != "" {
+			email := user.Email
+			feedback.UserEmail = &email
+		}
+	}
+	if feedback.UserID != nil && strings.TrimSpace(*feedback.UserID) != "" {
+		user, err := fetchUserByID(strings.TrimSpace(*feedback.UserID))
+		if err != nil {
+			return serverError(c, "failed to load feedback user", err)
+		}
+		if user.ID == "" {
+			return invalidRequest(c, "user account not found; please log in again")
+		}
+		if user.Name != "" {
+			name := user.Name
+			feedback.UserName = &name
+		}
+		if user.Email != "" {
+			email := user.Email
+			feedback.UserEmail = &email
+		}
+	}
+
+	now := utcNow()
+	if feedback.CreatedAt.IsZero() {
+		feedback.CreatedAt = now
+	}
+	feedback.UpdatedAt = now
+
+	if err := db.Exec(
+		`INSERT INTO `+feedbackTable+`
+			(id, type, category, subject, message, status, priority, user_id, user_name, user_email, is_anonymous, response, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		feedback.ID,
+		feedback.Type,
+		feedback.Category,
+		feedback.Subject,
+		feedback.Message,
+		feedback.Status,
+		feedback.Priority,
+		feedback.UserID,
+		feedback.UserName,
+		feedback.UserEmail,
+		feedback.IsAnonymous,
+		feedback.Response,
+		feedback.CreatedAt,
+		feedback.UpdatedAt,
+	).Error; err != nil {
+		return serverError(c, "failed to create feedback", err)
+	}
+
+	created, err := fetchFeedbackByID(feedback.ID)
+	if err != nil {
+		return serverError(c, "failed to fetch feedback", err)
+	}
+
+	createdCopy := created
+	go func(feedback model.FeedbackModel) {
+		if err := sendTrackingEmailForFeedback(feedback); err != nil {
+			fmt.Printf("email: failed to send tracking notification for %s: %v\n", feedback.ID, err)
+			return
+		}
+	}(createdCopy)
+	emitAdminFeedbackCreated(created.Category, created.ID)
+
+	return success(c, fiber.StatusCreated, created)
+}
+
+func UpdateFeedback(c *fiber.Ctx) error {
+	db := middleware.DBConn
+	if err := ensureFeedbackEmailColumn(); err != nil {
+		return serverError(c, "failed to initialize feedback email storage", err)
+	}
+
+	existing, err := fetchFeedbackByID(c.Params("id"))
+	if err != nil {
+		return serverError(c, "failed to fetch feedback", err)
+	}
+	if existing.ID == "" {
+		return notFound(c, "feedback not found", nil)
+	}
+
+	var payload map[string]any
+	if err := parseBody(c, &payload); err != nil {
+		return parseError(c, "failed to parse feedback update", err)
+	}
+
+	// Only update fields that were actually sent by the client.
+	var sets []string
+	var args []any
+
+	if raw, ok := payload["type"].(string); ok {
+		sets = append(sets, "type = ?")
+		args = append(args, strings.TrimSpace(raw))
+	}
+	if raw, ok := payload["category"].(string); ok {
+		value := strings.TrimSpace(raw)
+		if isDisabledCategory(value) {
+			return invalidRequest(c, "invalid feedback category")
+		}
+		ok, err := categoryExists(value)
+		if err != nil {
+			return serverError(c, "failed to validate feedback category", err)
+		}
+		if !ok {
+			return invalidRequest(c, "invalid feedback category")
+		}
+		sets = append(sets, "category = ?")
+		args = append(args, value)
+	}
+	if raw, ok := payload["subject"].(string); ok {
+		sets = append(sets, "subject = ?")
+		args = append(args, strings.TrimSpace(raw))
+	}
+	if raw, ok := payload["message"].(string); ok {
+		sets = append(sets, "message = ?")
+		args = append(args, strings.TrimSpace(raw))
+	}
+	if raw, ok := payload["status"].(string); ok {
+		value := strings.TrimSpace(raw)
+		if !validStatuses[value] {
+			return invalidRequest(c, "invalid feedback status")
+		}
+		sets = append(sets, "status = ?")
+		args = append(args, value)
+	}
+	if raw, ok := payload["priority"].(string); ok {
+		value := strings.TrimSpace(raw)
+		if !validPriorities[value] {
+			return invalidRequest(c, "invalid feedback priority")
+		}
+		sets = append(sets, "priority = ?")
+		args = append(args, value)
+	}
+	if raw, exists := payload["response"]; exists {
+		if raw == nil {
+			sets = append(sets, "response = ?")
+			args = append(args, "")
+		} else if value, ok := raw.(string); ok {
+			trimmed := strings.TrimSpace(value)
+			if trimmed != "" {
+				author := ""
+				if rawAuthor, ok := payload["responseAuthor"].(string); ok {
+					author = strings.TrimSpace(rawAuthor)
+				}
+				if author == "" {
+					if session, err := requireAdminSession(c); err == nil {
+						if session.AdminID != nil {
+							var adminRecord struct {
+								FirstName string `gorm:"column:first_name"`
+							}
+							_ = db.Raw(
+								`SELECT first_name FROM `+adminTable+` WHERE id = ?`,
+								*session.AdminID,
+							).Scan(&adminRecord).Error
+							author = strings.TrimSpace(adminRecord.FirstName)
+						}
+					}
+				}
+				if author == "" {
+					if rawEmail, ok := payload["responseAuthorEmail"].(string); ok {
+						email := strings.TrimSpace(rawEmail)
+						if email != "" {
+							var adminRecord struct {
+								FirstName string `gorm:"column:first_name"`
+							}
+							_ = db.Raw(
+								`SELECT first_name FROM `+adminTable+` WHERE email = ?`,
+								email,
+							).Scan(&adminRecord).Error
+							author = strings.TrimSpace(adminRecord.FirstName)
+						}
+					}
+				}
+				if author == "" && strings.TrimSpace(existing.Category) != "" {
+					var adminRecord struct {
+						FirstName string `gorm:"column:first_name"`
+					}
+					_ = db.Raw(
+						`SELECT first_name FROM `+adminTable+` WHERE LOWER(unit) = LOWER(?) AND COALESCE(is_disabled, FALSE) = FALSE LIMIT 1`,
+						strings.TrimSpace(existing.Category),
+					).Scan(&adminRecord).Error
+					author = strings.TrimSpace(adminRecord.FirstName)
+				}
+				stamp := time.Now().UTC().Format("Jan 2, 2006 3:04 PM UTC")
+				entry := fmt.Sprintf("[%s] %s", stamp, trimmed)
+				if author != "" {
+					entry = fmt.Sprintf("[%s] %s — %s", stamp, author, trimmed)
+				}
+				combined := entry
+				if existing.Response != nil {
+					existingText := strings.TrimSpace(*existing.Response)
+					if existingText != "" {
+						combined = existingText + "\n\n" + entry
+					}
+				}
+				sets = append(sets, "response = ?")
+				args = append(args, combined)
+			}
+		}
+	}
+	if len(sets) == 0 {
+		return invalidRequest(c, "no fields provided for update")
+	}
+
+	// Always stamp the latest write time on any feedback update.
+	sets = append(sets, "updated_at = ?")
+	args = append(args, utcNow(), c.Params("id"))
+
+	result := db.Exec(
+		fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", feedbackTable, strings.Join(sets, ", ")),
+		args...,
+	)
+	if result.Error != nil {
+		return serverError(c, "failed to update feedback", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return notFound(c, "feedback not found", nil)
+	}
+
+	updated, err := fetchFeedbackByID(c.Params("id"))
+	if err != nil {
+		return serverError(c, "failed to fetch feedback", err)
+	}
+
+	if shouldSendResolvedEmail(existing, updated) {
+		updatedCopy := updated
+		go func(feedback model.FeedbackModel) {
+			if err := sendResolvedEmailForFeedback(feedback); err != nil {
+				fmt.Printf("email: failed to send resolved notification for %s: %v\n", feedback.ID, err)
+				return
+			}
+		}(updatedCopy)
+	}
+
+	return success(c, fiber.StatusOK, updated)
+}
+
+func DeleteFeedback(c *fiber.Ctx) error {
+	session, err := requireUserSession(c)
+	if err != nil {
+		return err
+	}
+
+	feedback, err := fetchFeedbackByID(c.Params("id"))
+	if err != nil {
+		return notFound(c, "feedback not found", err)
+	}
+	if feedback.ID == "" {
+		return notFound(c, "feedback not found", nil)
+	}
+	if feedback.UserID == nil || strings.TrimSpace(*feedback.UserID) == "" {
+		return unauthorized(c, "feedback ownership is required")
+	}
+	if session.UserID == nil || strings.TrimSpace(*session.UserID) != strings.TrimSpace(*feedback.UserID) {
+		return unauthorized(c, "you can only delete your own feedback")
+	}
+	if !strings.EqualFold(strings.TrimSpace(feedback.Status), "Pending") {
+		return invalidRequest(c, "only pending feedback can be deleted")
+	}
+
+	return deleteByID(c, feedbackTable, "feedback", c.Params("id"))
+}

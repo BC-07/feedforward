@@ -1,0 +1,54 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { listFeedbacks, type Feedback } from "@/lib/api";
+import { toastApiError } from "@/lib/errorHandling";
+import { AdminDashboardShell } from "@/components/admin/AdminDashboardShell";
+import { AdminFeedbackStatusChart } from "@/components/admin/AdminFeedbackStatusChart";
+import { AdminFeedbackTypeChart } from "@/components/admin/AdminFeedbackTypeChart";
+import { AdminStatsGrid } from "@/components/admin/AdminStatsGrid";
+import { useAdminSession } from "@/components/admin/useAdminSession";
+
+export default function AdminDashboardHome() {
+  const currentAdmin = useAdminSession();
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+
+  useEffect(() => {
+    if (!currentAdmin?.unit) return;
+
+    void listFeedbacks({ category: currentAdmin.unit })
+      .then((data) => {
+        setFeedbacks(data);
+      })
+      .catch((error) => {
+        toastApiError(error, "Failed to load dashboard summary.");
+      });
+  }, [currentAdmin?.unit]);
+
+  const stats = useMemo(
+    () => ({
+      total: feedbacks.length,
+      pending: feedbacks.filter((item) => item.status === "Pending").length,
+      inProgress: feedbacks.filter((item) => item.status === "In Progress")
+        .length,
+      resolved: feedbacks.filter((item) => item.status === "Resolved").length,
+    }),
+    [feedbacks],
+  );
+
+  return (
+    <AdminDashboardShell
+      title="Admin Dashboard"
+      description="Use the burger menu on the left to switch between the dashboard home and the feedback submission workspace."
+      currentAdmin={currentAdmin}
+    >
+      <div className="mx-auto w-full max-w-[1680px] space-y-6 px-4 pb-6 pt-4 sm:px-6 sm:pt-6 lg:px-8">
+        <AdminStatsGrid stats={stats} />
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
+          <AdminFeedbackTypeChart feedbacks={feedbacks} />
+          <AdminFeedbackStatusChart feedbacks={feedbacks} />
+        </div>
+      </div>
+    </AdminDashboardShell>
+  );
+}

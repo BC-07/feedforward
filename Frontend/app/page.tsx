@@ -1,0 +1,201 @@
+"use client";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { ArrowRight, Shield, MessageSquare, BarChart3, Eye } from "lucide-react";
+
+export default function Home() {
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.sessionStorage.removeItem("adminFeedback_filters");
+      window.sessionStorage.removeItem("adminFeedback_pageSize");
+      window.sessionStorage.removeItem("mySubmissions_filters");
+      window.sessionStorage.removeItem("mySubmissions_pageSize");
+      window.sessionStorage.removeItem("userDashboardSubmissionsScrollTop");
+    } catch {}
+
+    const syncLoginState = () => {
+      setIsUserLoggedIn(localStorage.getItem("isUserLoggedIn") === "true");
+    };
+
+    syncLoginState();
+    window.addEventListener("storage", syncLoginState);
+    window.addEventListener("focus", syncLoginState);
+    document.addEventListener("visibilitychange", syncLoginState);
+    const interval = window.setInterval(syncLoginState, 1000);
+
+    return () => {
+      window.removeEventListener("storage", syncLoginState);
+      window.removeEventListener("focus", syncLoginState);
+      document.removeEventListener("visibilitychange", syncLoginState);
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Hero Section */}
+      <section className="bg-gradient-to-br from-white via-orange-50 to-white pt-8 pb-4 sm:py-20 min-h-[55vh] sm:min-h-0 flex items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center max-w-4xl mx-auto flex flex-col items-center -mt-4 sm:mt-0">
+            <div className="relative -translate-y-[15px] sm:translate-y-0">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl mb-4 sm:mb-6 text-black">
+                Your Voice Matters
+              </h1>
+              <p className="text-lg sm:text-xl text-gray-700 mb-10 sm:mb-10 max-w-3xl mx-auto leading-relaxed">
+                FeedForward enables feedback, suggestions, and complaints through an organized system.
+                Help us create a better environment for everyone.
+              </p>
+            </div>
+
+            <div className="flex w-full flex-col sm:flex-row gap-3 sm:gap-4 justify-center sm:w-auto">
+              <Link
+                href="/submit"
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-orange-500 text-white hover:bg-orange-600 rounded-lg transition-colors text-base sm:text-lg inline-flex items-center justify-center gap-2"
+              >
+                Submit Feedback
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+              <Link
+                href={isUserLoggedIn ? "/user/home" : "/login"}
+                className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-black text-white hover:bg-gray-800 rounded-lg transition-colors text-base sm:text-lg text-center"
+              >
+                {isUserLoggedIn ? "Go to Dashboard" : "Login / Sign Up"}
+              </Link>
+            </div>
+            <Link
+              href="/track"
+              className="mt-4 text-sm text-orange-600 underline underline-offset-4 hover:text-orange-700 transition-colors"
+            >
+              Already submitted? Track your feedback here.
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Why Use FeedForward */}
+      <section className="pt-6 pb-12 sm:py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl sm:text-4xl text-center mb-10 sm:mb-16 text-black">
+            Why Use FeedForward?
+          </h2>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+            <Feature
+              icon={<Shield className="w-8 h-8 text-orange-500" />}
+              title="Secure Feedback"
+              text="Submit suggestions, complaints, or compliments through a trusted channel."
+            />
+            <Feature
+              icon={<MessageSquare className="w-8 h-8 text-orange-500" />}
+              title="Organized System"
+              text="Feedback is categorized, prioritized, and tracked from submission to resolution."
+            />
+            <Feature
+              icon={<BarChart3 className="w-8 h-8 text-orange-500" />}
+              title="Data-Driven Insights"
+              text="Management can analyze trends and make informed decisions based on feedback."
+            />
+            <Feature
+              icon={<Eye className="w-8 h-8 text-orange-500" />}
+              title="Transparency"
+              text="Track the status of your feedback and see how concerns are being addressed."
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits */}
+      <section className="py-12 sm:py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-2xl sm:text-4xl text-center mb-10 sm:mb-16 text-black">
+            Benefits for Everyone
+          </h2>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            <Benefit
+              title="For Users"
+              items={[
+                "Know your voice is heard",
+                "Help create a better environment",
+                "Easy way to express concerns",
+              ]}
+            />
+            <Benefit
+              title="For Administrators"
+              items={[
+                "Manage feedback efficiently",
+                "Improved monitoring and tracking",
+                "Better organization of concerns",
+              ]}
+            />
+            <Benefit
+              title="For Management"
+              items={[
+                "Access summarized reports",
+                "Make data-driven decisions",
+                "Improved organizational planning",
+              ]}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-12 sm:py-20 bg-gradient-to-br from-orange-500 to-orange-600 text-center text-white">
+        <h2 className="text-2xl sm:text-4xl mb-4 sm:mb-6">
+          Ready to Make Your Voice Heard?
+        </h2>
+        <p className="text-base sm:text-xl text-white/90 mb-6 sm:mb-8">
+          Join our community in building a better organization together through sambayanihan.
+        </p>
+        <Link
+          href="/register"
+          className="px-6 sm:px-8 py-3 sm:py-4 bg-white text-orange-600 hover:bg-gray-200 rounded-lg transition-colors text-base sm:text-lg inline-flex items-center gap-2"
+        >
+          Join Now
+          <ArrowRight className="w-5 h-5" />
+        </Link>
+
+      </section>
+    </div>
+  );
+}
+
+type FeatureProps = {
+  icon: ReactNode;
+  title: string;
+  text: string;
+};
+
+type BenefitProps = {
+  title: string;
+  items: string[];
+};
+
+const Feature = ({ icon, title, text }: FeatureProps) => (
+  <div className="text-center p-6">
+    <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      {icon}
+    </div>
+    <h3 className="text-xl mb-3 text-black">{title}</h3>
+    <p className="text-gray-600">{text}</p>
+  </div>
+);
+
+const Benefit = ({ title, items }: BenefitProps) => (
+  <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+    <h3 className="text-2xl mb-4 text-black">{title}</h3>
+    <ul className="space-y-3 text-gray-700">
+      {items.map((item: string, i: number) => (
+        <li key={i} className="flex items-start gap-2">
+          <span className="text-orange-500 mt-1">•</span>
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+);
